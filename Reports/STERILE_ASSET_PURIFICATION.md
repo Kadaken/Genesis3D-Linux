@@ -6,8 +6,11 @@ Date: 2026-09-03
 
 A project-owned asset copy now exists at `PurificationWorkspace/Assets`.
 All 47 source links were dereferenced into regular files; the isolated tree has
-zero symbolic links. The original `Assets/` link stubs were retained as a
-safety measure, and no installed target was modified or deleted. Generated
+zero symbolic links. After the copy and hashes were validated, the 47 legacy
+link stubs were removed from `Assets/` exactly as requested. Removing those
+links did not modify or delete any installed target. The engine's default asset
+root now points to `PurificationWorkspace`, so normal launches cannot fall back
+to linked legacy data. Generated
 source-path and hash evidence is kept under
 `Reports/evidence/sterile_asset_purification/` and excluded from Git.
 

@@ -13,7 +13,9 @@ at least one readable `.act` character file. It reports the exact search path
 and exits before creating an X11 window when either required asset is missing.
 
 Set `GENESIS3D_PROJECT_ROOT` to override the default
-`/home/user/Genesis3D_Project` asset root.
+`/home/user/Genesis3D_Project/PurificationWorkspace` asset root. The legacy
+external asset links were removed after the sterile copy was validated; normal
+launches now resolve only the isolated, project-owned asset tree.
 
 ## Native Linux controls
 
