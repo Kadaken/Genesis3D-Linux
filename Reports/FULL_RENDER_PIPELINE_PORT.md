@@ -76,4 +76,4 @@ layout or pointer width differs) and fixture-level offset tests.
   `GENESIS3D_WINDOW_X=892`, and `GENESIS3D_WINDOW_Y=1080` on eDP-1. No launch
   enabled input capture, and no Genesis3D process remained running.
 
-Commit: recorded after this report is committed.
+Commit: `fcea1d4` (report hash note added in the immediately amended commit).
