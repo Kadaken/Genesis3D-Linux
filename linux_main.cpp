@@ -10,6 +10,7 @@
 #include <csignal>
 #include <cmath>
 #include <cstdint>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <dirent.h>
@@ -84,6 +85,18 @@ struct RenderDiagnostics {
 struct FaceCommand {
     int32 index;
     double distance_squared;
+};
+
+struct NativeFaceCache {
+    struct Range { GLint first = 0; GLsizei count = 0; };
+    GLuint vertex_buffer = 0;
+    std::vector<Range> ranges;
+};
+
+struct CachedFaceVertex {
+    GLfloat position[3];
+    GLfloat material_uv[2];
+    GLfloat lightmap_uv[2];
 };
 
 struct NativeActor {
@@ -251,6 +264,68 @@ void destroy_world_textures(NativeTextureSet *textures) {
         glDeleteTextures(1, &textures->white_lightmap);
     textures->materials.clear();
     textures->lightmaps.clear();
+}
+
+bool build_face_cache(const geWorld *world, NativeFaceCache *cache) {
+    if (!world || !world->CurrentBSP || !cache)
+        return false;
+    const GBSP_BSPData &bsp = world->CurrentBSP->BSPData;
+    cache->ranges.resize(static_cast<size_t>(bsp.NumGFXFaces));
+    std::vector<CachedFaceVertex> vertices;
+    for (int32 face_index = 0; face_index < bsp.NumGFXFaces; ++face_index) {
+        const GFX_Face &face = bsp.GFXFaces[face_index];
+        if (face.NumVerts < 3 || face.TexInfo < 0 ||
+            face.TexInfo >= bsp.NumGFXTexInfo)
+            continue;
+        const GFX_TexInfo &texture_info = bsp.GFXTexInfo[face.TexInfo];
+        if (texture_info.Texture < 0 || texture_info.Texture >= bsp.NumGFXTextures)
+            continue;
+        const GFX_Texture &metadata = bsp.GFXTextures[texture_info.Texture];
+        if (metadata.Width <= 0 || metadata.Height <= 0)
+            continue;
+        const Surf_SurfInfo &surface = world->CurrentBSP->SurfInfo[face_index];
+        const float scale_u = std::fabs(texture_info.DrawScale[0]) > 1.0e-6f
+            ? texture_info.DrawScale[0] : 1.0f;
+        const float scale_v = std::fabs(texture_info.DrawScale[1]) > 1.0e-6f
+            ? texture_info.DrawScale[1] : 1.0f;
+        NativeFaceCache::Range &range = cache->ranges[face_index];
+        range.first = static_cast<GLint>(vertices.size());
+        for (int32 corner = 0; corner < face.NumVerts; ++corner) {
+            const int32 list_index = face.FirstVert + corner;
+            if (list_index < 0 || list_index >= bsp.NumGFXVertIndexList)
+                continue;
+            const int32 vertex_index = bsp.GFXVertIndexList[list_index];
+            if (vertex_index < 0 || vertex_index >= bsp.NumGFXVerts)
+                continue;
+            const geVec3d &vertex = bsp.GFXVerts[vertex_index];
+            const Surf_TexVert &texvert = world->CurrentBSP->TexVerts[list_index];
+            CachedFaceVertex cached = {
+                {vertex.X, vertex.Y, vertex.Z},
+                {(texvert.u / scale_u + surface.ShiftU) / metadata.Width,
+                 (texvert.v / scale_v + surface.ShiftV) / metadata.Height},
+                {face.LWidth > 0 ? (texvert.u - surface.LInfo.MinU + 8.0f) /
+                    (static_cast<float>(face.LWidth) * 16.0f) : 0.5f,
+                 face.LHeight > 0 ? (texvert.v - surface.LInfo.MinV + 8.0f) /
+                    (static_cast<float>(face.LHeight) * 16.0f) : 0.5f}};
+            vertices.push_back(cached);
+        }
+        range.count = static_cast<GLsizei>(vertices.size()) - range.first;
+    }
+    glGenBuffers(1, &cache->vertex_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, cache->vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vertices[0]),
+                 vertices.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    return glGetError() == GL_NO_ERROR;
+}
+
+void destroy_face_cache(NativeFaceCache *cache) {
+    if (cache && cache->vertex_buffer)
+        glDeleteBuffers(1, &cache->vertex_buffer);
+    if (cache) {
+        cache->vertex_buffer = 0;
+        cache->ranges.clear();
+    }
 }
 
 bool load_native_actor(const std::string &path, NativeActor *native_actor) {
@@ -434,7 +509,11 @@ bool render_native_actor(NativeActor *native_actor,
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
     const geBodyInst_Index *cursor = geometry->FaceList;
-    const geBodyInst_Index *end = cursor + geometry->FaceListSize;
+    if (geometry->FaceListSize < 0 ||
+        geometry->FaceListSize % static_cast<int32>(sizeof(*cursor)) != 0)
+        return false;
+    const geBodyInst_Index *end = cursor +
+        geometry->FaceListSize / static_cast<int32>(sizeof(*cursor));
     while (cursor < end) {
         const int primitive = *cursor++;
         if (cursor >= end)
@@ -476,8 +555,43 @@ bool render_native_actor(NativeActor *native_actor,
     return true;
 }
 
+bool validate_actor_fixtures(const std::vector<std::string> &paths,
+                             const geXForm3d &base_transform,
+                             RenderDiagnostics *diagnostics) {
+    if (paths.size() != 4)
+        return false;
+    for (size_t fixture = 0; fixture < paths.size(); ++fixture) {
+        NativeActor actor;
+        if (!load_native_actor(paths[fixture], &actor))
+            return false;
+        geBody *body = geActor_GetBody(actor.definition);
+        int vertices = 0, faces = 0, normals = 0;
+        geXForm3d transform = base_transform;
+        transform.Translation.X += static_cast<geFloat>(fixture * 36.0);
+        geActor_ClearPose(actor.actor, &transform);
+        const geXFArray *pose = geActor_GetPoseTransforms(actor.actor);
+        const geBodyInst_Geometry *geometry = geBodyInst_GetGeometry(
+            actor.body_instance, &actor.scale, pose, GE_BODY_HIGHEST_LOD, nullptr);
+        const bool valid = geBody_GetGeometryStats(body, GE_BODY_HIGHEST_LOD,
+                &vertices, &faces, &normals) && vertices > 0 && faces > 0 &&
+            normals > 0 && geBody_GetMaterialCount(body) > 0 && geometry &&
+            geometry->FaceList && geometry->SkinVertexArray &&
+            render_native_actor(&actor, diagnostics);
+        std::fprintf(stderr,
+            "Genesis3D Linux: actor fixture %s: %d vertices, %d faces, "
+            "%d normals, %d materials, posed render %s\n",
+            paths[fixture].c_str(), vertices, faces, normals,
+            geBody_GetMaterialCount(body), valid ? "PASS" : "FAIL");
+        destroy_native_actor(&actor);
+        if (!valid)
+            return false;
+    }
+    return true;
+}
+
 bool render_world_geometry(const geWorld *world,
                            const NativeTextureSet &textures,
+                           const NativeFaceCache &face_cache,
                            const PlayerCamera &camera,
                            const CameraBasis &basis,
                            NativeActor *native_actor,
@@ -573,7 +687,8 @@ bool render_world_geometry(const geWorld *world,
     const int32 first_face = std::max<int32>(0, root_model.FirstFace);
     const int32 final_face = std::min<int32>(
         bsp.NumGFXFaces, first_face + std::max<int32>(0, root_model.NumFaces));
-    std::vector<uint8_t> visible(static_cast<size_t>(bsp.NumGFXFaces), 0);
+    static std::vector<uint8_t> visible;
+    visible.assign(static_cast<size_t>(bsp.NumGFXFaces), 0);
     bool reliable_pvs = false;
     const geVec3d camera_position = {
         static_cast<geFloat>(camera.position.x),
@@ -609,8 +724,10 @@ bool render_world_geometry(const geWorld *world,
     if (!reliable_pvs)
         std::fill(visible.begin() + first_face, visible.begin() + final_face, 1);
 
-    std::vector<FaceCommand> opaque;
-    std::vector<FaceCommand> translucent;
+    static std::vector<FaceCommand> opaque;
+    static std::vector<FaceCommand> translucent;
+    opaque.clear();
+    translucent.clear();
     opaque.reserve(static_cast<size_t>(final_face - first_face));
     for (int32 face_index = first_face; face_index < final_face; ++face_index) {
         if (!visible[face_index]) {
@@ -640,7 +757,8 @@ bool render_world_geometry(const geWorld *world,
               [](const FaceCommand &left, const FaceCommand &right) {
                   return left.distance_squared > right.distance_squared;
               });
-    std::vector<FaceCommand> commands;
+    static std::vector<FaceCommand> commands;
+    commands.clear();
     commands.reserve(opaque.size() + translucent.size());
     commands.insert(commands.end(), opaque.begin(), opaque.end());
     commands.insert(commands.end(), translucent.begin(), translucent.end());
@@ -649,6 +767,18 @@ bool render_world_geometry(const geWorld *world,
     diagnostics->translucent_submissions += translucent.size();
     diagnostics->dynamic_lights += world->LightInfo
         ? static_cast<uint64_t>(world->LightInfo->NumDynamicLights) : 0;
+    glBindBuffer(GL_ARRAY_BUFFER, face_cache.vertex_buffer);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3, GL_FLOAT, sizeof(CachedFaceVertex),
+                    reinterpret_cast<const void *>(offsetof(CachedFaceVertex, position)));
+    glClientActiveTexture(GL_TEXTURE0);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glTexCoordPointer(2, GL_FLOAT, sizeof(CachedFaceVertex),
+                    reinterpret_cast<const void *>(offsetof(CachedFaceVertex, material_uv)));
+    glClientActiveTexture(GL_TEXTURE1);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glTexCoordPointer(2, GL_FLOAT, sizeof(CachedFaceVertex),
+                    reinterpret_cast<const void *>(offsetof(CachedFaceVertex, lightmap_uv)));
     for (const FaceCommand &command : commands) {
         const int32 face_index = command.index;
         const GFX_Face &face = bsp.GFXFaces[face_index];
@@ -673,10 +803,6 @@ bool render_world_geometry(const geWorld *world,
         const Surf_SurfInfo &surface = world->CurrentBSP->SurfInfo[face_index];
         if (surface.NumLTypes > 1)
             ++diagnostics->animated_surfaces;
-        const float draw_scale_u = std::fabs(texture_info.DrawScale[0]) > 1.0e-6f
-            ? texture_info.DrawScale[0] : 1.0f;
-        const float draw_scale_v = std::fabs(texture_info.DrawScale[1]) > 1.0e-6f
-            ? texture_info.DrawScale[1] : 1.0f;
         const float alpha = (texture_info.Flags & TEXINFO_TRANS)
             ? (std::max)(0.0f, (std::min)(255.0f, texture_info.Alpha)) / 255.0f
             : 1.0f;
@@ -690,38 +816,19 @@ bool render_world_geometry(const geWorld *world,
         bind_lightmap(lightmap && !(texture_info.Flags & TEXINFO_NO_LIGHTMAP)
                           ? lightmap : textures.white_lightmap);
         glColor4f(1.0f, 1.0f, 1.0f, alpha);
-        glBegin(GL_TRIANGLE_FAN);
-        for (int32 corner = 0; corner < face.NumVerts; ++corner) {
-            const int32 list_index = face.FirstVert + corner;
-            if (list_index < 0 || list_index >= bsp.NumGFXVertIndexList)
-                continue;
-            const int32 vertex_index = bsp.GFXVertIndexList[list_index];
-            if (vertex_index < 0 || vertex_index >= bsp.NumGFXVerts)
-                continue;
-            const geVec3d &vertex = bsp.GFXVerts[vertex_index];
-            const Surf_TexVert &texture_vertex =
-                world->CurrentBSP->TexVerts[list_index];
-            const float texture_u =
-                (texture_vertex.u / draw_scale_u + surface.ShiftU) /
-                texture_metadata.Width;
-            const float texture_v =
-                (texture_vertex.v / draw_scale_v + surface.ShiftV) /
-                texture_metadata.Height;
-            glMultiTexCoord2f(GL_TEXTURE0, texture_u, texture_v);
-            const float light_u = lightmap
-                ? (texture_vertex.u - surface.LInfo.MinU + 8.0f) /
-                      (static_cast<float>(face.LWidth) * 16.0f)
-                : 0.5f;
-            const float light_v = lightmap
-                ? (texture_vertex.v - surface.LInfo.MinV + 8.0f) /
-                      (static_cast<float>(face.LHeight) * 16.0f)
-                : 0.5f;
-            glMultiTexCoord2f(GL_TEXTURE1, light_u, light_v);
-            glVertex3f(vertex.X, vertex.Y, vertex.Z);
+        if (face_index < static_cast<int32>(face_cache.ranges.size())) {
+            const NativeFaceCache::Range &range = face_cache.ranges[face_index];
+            if (range.count >= 3)
+                glDrawArrays(GL_TRIANGLE_FAN, range.first, range.count);
         }
-        glEnd();
     }
 
+    glClientActiveTexture(GL_TEXTURE1);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glClientActiveTexture(GL_TEXTURE0);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
@@ -961,10 +1068,24 @@ int main() {
         geWorld_Free(world);
         return 1;
     }
+    NativeFaceCache face_cache;
+    if (!build_face_cache(world, &face_cache)) {
+        std::fprintf(stderr, "Genesis3D Linux: could not build immutable face cache\n");
+        destroy_world_textures(&world_textures);
+        glXMakeCurrent(display, None, nullptr);
+        glXDestroyContext(display, context);
+        XDestroyWindow(display, window);
+        XFreeColormap(display, colormap);
+        XFree(visual);
+        XCloseDisplay(display);
+        geWorld_Free(world);
+        return 1;
+    }
 
     NativeActor native_actor;
     bool actor_loaded = false;
-    for (const std::string &candidate : neutral_actor_assets(actors_path)) {
+    const std::vector<std::string> actor_fixtures = neutral_actor_assets(actors_path);
+    for (const std::string &candidate : actor_fixtures) {
         if (load_native_actor(candidate, &native_actor)) {
             actor_file = candidate;
             actor_loaded = true;
@@ -1000,6 +1121,7 @@ int main() {
         std::fprintf(stderr, "Genesis3D Linux: SDL2 input initialization failed: %s\n",
                      SDL_GetError());
         destroy_native_actor(&native_actor);
+        destroy_face_cache(&face_cache);
         destroy_world_textures(&world_textures);
         glXMakeCurrent(display, None, nullptr);
         glXDestroyContext(display, context);
@@ -1018,6 +1140,7 @@ int main() {
                      SDL_GetError());
         SDL_Quit();
         destroy_native_actor(&native_actor);
+        destroy_face_cache(&face_cache);
         destroy_world_textures(&world_textures);
         glXMakeCurrent(display, None, nullptr);
         glXDestroyContext(display, context);
@@ -1067,17 +1190,36 @@ int main() {
     const CameraBasis warmup_basis = camera_basis(camera);
     RenderDiagnostics warmup_diagnostics;
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    if (!render_world_geometry(world, world_textures, camera, warmup_basis,
+    if (!render_world_geometry(world, world_textures, face_cache, camera, warmup_basis,
                                &native_actor, &warmup_diagnostics, framebuffer_width,
                                framebuffer_height)) {
         std::fprintf(stderr,
                      "Genesis3D Linux: loaded world has no renderable BSP geometry\n");
         SDL_DestroyWindow(input_window);
-        SDL_Quit();
         destroy_native_actor(&native_actor);
+        destroy_face_cache(&face_cache);
         destroy_world_textures(&world_textures);
         glXMakeCurrent(display, None, nullptr);
         glXDestroyContext(display, context);
+        SDL_Quit();
+        XDestroyWindow(display, window);
+        XFreeColormap(display, colormap);
+        XFree(visual);
+        XCloseDisplay(display);
+        geWorld_Free(world);
+        return 1;
+    }
+    if (!validate_actor_fixtures(actor_fixtures, actor_transform,
+                                 &warmup_diagnostics)) {
+        std::fprintf(stderr,
+                     "Genesis3D Linux: four-asset actor fixture validation failed\n");
+        SDL_DestroyWindow(input_window);
+        destroy_native_actor(&native_actor);
+        destroy_face_cache(&face_cache);
+        destroy_world_textures(&world_textures);
+        glXMakeCurrent(display, None, nullptr);
+        glXDestroyContext(display, context);
+        SDL_Quit();
         XDestroyWindow(display, window);
         XFreeColormap(display, colormap);
         XFree(visual);
@@ -1152,7 +1294,7 @@ int main() {
         maximum_simulation_steps =
             (std::max)(maximum_simulation_steps, simulation_steps);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if (!render_world_geometry(world, world_textures, camera, basis,
+        if (!render_world_geometry(world, world_textures, face_cache, camera, basis,
                                    &native_actor, &render_diagnostics,
                                    framebuffer_width, framebuffer_height)) {
             std::fprintf(stderr,
@@ -1208,6 +1350,7 @@ int main() {
     SDL_SetRelativeMouseMode(SDL_FALSE);
     SDL_DestroyWindow(input_window);
     destroy_native_actor(&native_actor);
+    destroy_face_cache(&face_cache);
     destroy_world_textures(&world_textures);
     glXMakeCurrent(display, None, nullptr);
     glXDestroyContext(display, context);

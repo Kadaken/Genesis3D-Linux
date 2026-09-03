@@ -99,6 +99,7 @@ see {} for notes/long-term-todos
 #include	<assert.h>
 #include	<stdlib.h>
 #include	<string.h>
+#include	<stdint.h>
 
 #include	"basetype.h"
 #include	"getypes.h"
@@ -5110,26 +5111,26 @@ typedef struct TGAHEADER
 
 typedef struct 
 {
-	uint32      biSize;
-	long		biWidth;
-	long		biHeight;
+	uint32_t    biSize;
+	int32_t		biWidth;
+	int32_t		biHeight;
 	uint16      biPlanes;
 	uint16      biBitCount;
-	uint32      biCompression;
-	uint32      biSizeImage;
-	long		biXPelsPerMeter;
-	long		biYPelsPerMeter;
-	uint32      biClrUsed;
-	uint32      biClrImportant;
+	uint32_t    biCompression;
+	uint32_t    biSizeImage;
+	int32_t		biXPelsPerMeter;
+	int32_t		biYPelsPerMeter;
+	uint32_t    biClrUsed;
+	uint32_t    biClrImportant;
 } BITMAPINFOHEADER;
 
 typedef struct 
 {
 	uint16   bfType;
-	uint32   bfSize;
+	uint32_t bfSize;
 	uint16   bfReserved1;
 	uint16   bfReserved2;
-	uint32   bfOffBits;
+	uint32_t bfOffBits;
 } BITMAPFILEHEADER;
 
 typedef struct 

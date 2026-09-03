@@ -27,6 +27,7 @@
 //   this object can be file loaded as one block. 
 #include <string.h>
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "strblock.h"
@@ -54,7 +55,7 @@ int GENESISCC geStrBlock_GetChecksum(const geStrBlock *SB)
 	int Len;
 	int i,j;
 	const char *Str;
-	int Checksum=0;
+	uint32_t Checksum=0;
 	assert( SB != NULL );
 
 	Count = geStrBlock_GetCount(SB);
@@ -65,11 +66,11 @@ int GENESISCC geStrBlock_GetChecksum(const geStrBlock *SB)
 			Len = strlen(Str);
 			for (j=0; j<Len; j++)
 				 {
-					Checksum += (int)Str[j];
+					Checksum += (uint8_t)Str[j];
 				}
 			Checksum = Checksum*3;
 		}
-	return Checksum;
+	return (int32_t)Checksum;
 }
 
 geStrBlock *GENESISCC geStrBlock_Create(void)

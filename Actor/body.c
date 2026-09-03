@@ -36,6 +36,7 @@
 #include <string.h>						//strlen(), strcpy()
 #include <math.h> 						//fabs()
 #include <stdio.h>						//sscanf
+#include <stdint.h>
 
 #include "body.h"
 #include "body._h"
@@ -1400,12 +1401,69 @@ geBoolean GENESISCC geBody_ComputeLevelsOfDetail( geBody *B ,int Levels)
 #define GE_BODY_FILE_TYPE 0x5E444F42     // 'BODY'
 #define GE_BODY_FILE_VERSION 0x00F1		// Restrict version to 16 bits
 
+/* BODY 00F1 was written by the 32-bit engine.  Keep its byte records
+ * separate from the native runtime structures: in particular, a material's
+ * Bitmap field is a four-byte presence token on disk, not a host pointer. */
+typedef struct geBody_DiskXSkinVertex
+{
+	float Point[3];
+	float U, V;
+	int8_t LevelOfDetailMask;
+	uint8_t Pad;
+	int16_t BoneIndex;
+} geBody_DiskXSkinVertex;
 
+typedef struct geBody_DiskNormal
+{
+	float Normal[3];
+	int8_t LevelOfDetailMask;
+	uint8_t Pad;
+	int16_t BoneIndex;
+} geBody_DiskNormal;
 
+typedef struct geBody_DiskBone
+{
+	float BoundingBoxMin[3];
+	float BoundingBoxMax[3];
+	float AttachmentMatrix[12];
+	int16_t ParentBoneIndex;
+	uint8_t Pad[2];
+} geBody_DiskBone;
+
+typedef struct geBody_DiskMaterial
+{
+	uint32_t BitmapPresent;
+	float Red, Green, Blue;
+} geBody_DiskMaterial;
+
+typedef struct geBody_DiskTriangle
+{
+	int16_t VtxIndex[3];
+	int16_t NormalIndex[3];
+	int16_t MaterialIndex;
+} geBody_DiskTriangle;
+
+typedef char geBody_DiskXSkinVertex_Size[(sizeof(geBody_DiskXSkinVertex) == 24) ? 1 : -1];
+typedef char geBody_DiskNormal_Size[(sizeof(geBody_DiskNormal) == 16) ? 1 : -1];
+typedef char geBody_DiskBone_Size[(sizeof(geBody_DiskBone) == 76) ? 1 : -1];
+typedef char geBody_DiskMaterial_Size[(sizeof(geBody_DiskMaterial) == 16) ? 1 : -1];
+typedef char geBody_DiskTriangle_Size[(sizeof(geBody_DiskTriangle) == 14) ? 1 : -1];
+
+static void geBody_DiskFloatsToXForm(const float Disk[12], geXForm3d *Native)
+{
+	Native->AX = Disk[0]; Native->AY = Disk[1]; Native->AZ = Disk[2];
+	Native->BX = Disk[3]; Native->BY = Disk[4]; Native->BZ = Disk[5];
+	Native->CX = Disk[6]; Native->CY = Disk[7]; Native->CZ = Disk[8];
+	Native->Translation.X = Disk[9];
+	Native->Translation.Y = Disk[10];
+	Native->Translation.Z = Disk[11];
+}
 
 static geBoolean GENESISCC geBody_ReadGeometry(geBody *B, geVFile *pFile)
 {
-	uint32 u;
+	uint32_t u;
+	int16_t count16;
+	int32_t levels32;
 	int i;
 
 	assert( B != NULL );
@@ -1428,68 +1486,89 @@ static geBoolean GENESISCC geBody_ReadGeometry(geBody *B, geVFile *pFile)
 	if(geVFile_Read(pFile, &(B->BoundingBoxMax), sizeof(B->BoundingBoxMax)) == GE_FALSE)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	 return GE_FALSE; }
 
-	if(geVFile_Read(pFile, &(B->XSkinVertexCount), sizeof(B->XSkinVertexCount)) == GE_FALSE)
+	if(geVFile_Read(pFile, &count16, sizeof(count16)) == GE_FALSE)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	 return GE_FALSE; }
+	B->XSkinVertexCount = (geBody_Index)count16;
 
 	if (B->XSkinVertexCount>0)
 		{
-			u = sizeof(geBody_XSkinVertex) * B->XSkinVertexCount;
-			B->XSkinVertexArray = geRam_Allocate(u);
+			B->XSkinVertexArray = GE_RAM_ALLOCATE_ARRAY(geBody_XSkinVertex, B->XSkinVertexCount);
 			if (B->XSkinVertexArray == NULL)
 				{	geErrorLog_Add( ERR_BODY_ENOMEM , NULL);   return GE_FALSE;  }
-			if(geVFile_Read(pFile, B->XSkinVertexArray, u) == GE_FALSE)
-				{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	 return GE_FALSE; }
+			for (i=0; i<B->XSkinVertexCount; ++i)
+			{
+				geBody_DiskXSkinVertex D;
+				geBody_XSkinVertex *N = &B->XSkinVertexArray[i];
+				if (geVFile_Read(pFile, &D, sizeof(D)) == GE_FALSE)
+					{	geErrorLog_Add(ERR_BODY_FILE_READ, NULL); return GE_FALSE; }
+				N->XPoint.X=D.Point[0]; N->XPoint.Y=D.Point[1]; N->XPoint.Z=D.Point[2];
+				N->XU=D.U; N->XV=D.V; N->LevelOfDetailMask=D.LevelOfDetailMask;
+				N->BoneIndex=(geBody_Index)D.BoneIndex;
+			}
 		}
 
-	if(geVFile_Read(pFile, &(B->SkinNormalCount), sizeof(B->SkinNormalCount)) == GE_FALSE)
+	if(geVFile_Read(pFile, &count16, sizeof(count16)) == GE_FALSE)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	 return GE_FALSE; }
+	B->SkinNormalCount = (geBody_Index)count16;
 
 	if (B->SkinNormalCount>0)
 		{
-			u = sizeof(geBody_Normal) * B->SkinNormalCount;
-			B->SkinNormalArray = geRam_Allocate(u);
+			B->SkinNormalArray = GE_RAM_ALLOCATE_ARRAY(geBody_Normal, B->SkinNormalCount);
 			if (B->SkinNormalArray == NULL)
 				{	geErrorLog_Add( ERR_BODY_ENOMEM , NULL);   return GE_FALSE;  }
-			if(geVFile_Read(pFile, B->SkinNormalArray, u) == GE_FALSE)
-				{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	return GE_FALSE; }
+			for (i=0; i<B->SkinNormalCount; ++i)
+			{
+				geBody_DiskNormal D;
+				geBody_Normal *N = &B->SkinNormalArray[i];
+				if (geVFile_Read(pFile, &D, sizeof(D)) == GE_FALSE)
+					{	geErrorLog_Add(ERR_BODY_FILE_READ, NULL); return GE_FALSE; }
+				N->Normal.X=D.Normal[0]; N->Normal.Y=D.Normal[1]; N->Normal.Z=D.Normal[2];
+				N->LevelOfDetailMask=D.LevelOfDetailMask; N->BoneIndex=(geBody_Index)D.BoneIndex;
+			}
 		}
 
-	if(geVFile_Read(pFile, &(B->BoneCount), sizeof(B->BoneCount)) == GE_FALSE)
+	if(geVFile_Read(pFile, &count16, sizeof(count16)) == GE_FALSE)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);  return GE_FALSE; }
+	B->BoneCount = (geBody_Index)count16;
 
 	if (B->BoneCount>0)
 		{
-			u = sizeof(geBody_Bone) * B->BoneCount;
-			B->BoneArray = geRam_Allocate(u);
+			B->BoneArray = GE_RAM_ALLOCATE_ARRAY(geBody_Bone, B->BoneCount);
 			if (B->BoneArray == NULL)
 				{	geErrorLog_Add( ERR_BODY_ENOMEM , NULL);   return GE_FALSE;  }
-			if(geVFile_Read(pFile, B->BoneArray, u) == GE_FALSE)
-				{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);  return GE_FALSE; }
+			for (i=0; i<B->BoneCount; ++i)
+			{
+				geBody_DiskBone D;
+				geBody_Bone *N = &B->BoneArray[i];
+				if (geVFile_Read(pFile, &D, sizeof(D)) == GE_FALSE)
+					{	geErrorLog_Add(ERR_BODY_FILE_READ, NULL); return GE_FALSE; }
+				N->BoundingBoxMin.X=D.BoundingBoxMin[0]; N->BoundingBoxMin.Y=D.BoundingBoxMin[1]; N->BoundingBoxMin.Z=D.BoundingBoxMin[2];
+				N->BoundingBoxMax.X=D.BoundingBoxMax[0]; N->BoundingBoxMax.Y=D.BoundingBoxMax[1]; N->BoundingBoxMax.Z=D.BoundingBoxMax[2];
+				geBody_DiskFloatsToXForm(D.AttachmentMatrix, &N->AttachmentMatrix);
+				N->ParentBoneIndex=(geBody_Index)D.ParentBoneIndex;
+			}
 		}
 
 	B->BoneNames = geStrBlock_CreateFromFile(pFile);
 	if (B->BoneNames==NULL)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL); 	 return GE_FALSE; }
 	
-	if(geVFile_Read(pFile, &(B->MaterialCount), sizeof(B->MaterialCount)) == GE_FALSE)
+	if(geVFile_Read(pFile, &count16, sizeof(count16)) == GE_FALSE)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	 return GE_FALSE; }
+	B->MaterialCount = (geBody_Index)count16;
 
 	if (B->MaterialCount>0)
 		{
-			u = sizeof(geBody_Material) * B->MaterialCount;
-			B->MaterialArray = geRam_Allocate(u);
+			B->MaterialArray = GE_RAM_ALLOCATE_ARRAY(geBody_Material, B->MaterialCount);
 			if (B->MaterialArray == NULL)
 				{	geErrorLog_Add( ERR_BODY_ENOMEM , NULL);   return GE_FALSE;  }
-			if(geVFile_Read(pFile, B->MaterialArray, u) == GE_FALSE)
-				{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	 return GE_FALSE; }
-
-			// CB added this nastiness because it seems the Bitmap pointer is
-			//	read in with the Material array, and is later used as a boolean
-			//	for "should this material have a texture"
-			for(u=0;u<(uint32)B->MaterialCount;u++)
+			for(i=0;i<B->MaterialCount;i++)
 			{
-				if ( B->MaterialArray[u].Bitmap )
-					B->MaterialArray[u].Bitmap = (geBitmap *)1;
+				geBody_DiskMaterial D;
+				if (geVFile_Read(pFile, &D, sizeof(D)) == GE_FALSE)
+					{	geErrorLog_Add(ERR_BODY_FILE_READ, NULL); return GE_FALSE; }
+				B->MaterialArray[i].Bitmap = D.BitmapPresent ? (geBitmap *)1 : NULL;
+				B->MaterialArray[i].Red=D.Red; B->MaterialArray[i].Green=D.Green; B->MaterialArray[i].Blue=D.Blue;
 			}
 		}
 	
@@ -1497,8 +1576,9 @@ static geBoolean GENESISCC geBody_ReadGeometry(geBody *B, geVFile *pFile)
 	if ( B->MaterialNames == NULL )
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL); 	 return GE_FALSE; }
 
-	if(geVFile_Read(pFile, &(B->LevelsOfDetail), sizeof(B->LevelsOfDetail)) == GE_FALSE)
+	if(geVFile_Read(pFile, &levels32, sizeof(levels32)) == GE_FALSE)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	 return GE_FALSE; }
+	B->LevelsOfDetail = (int)levels32;
 
 	if (B->LevelsOfDetail > GE_BODY_NUMBER_OF_LOD)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	 return GE_FALSE; }
@@ -1511,12 +1591,20 @@ static geBoolean GENESISCC geBody_ReadGeometry(geBody *B, geVFile *pFile)
 			
 			if (u>0)
 				{
-					u = sizeof(geBody_Triangle) * u;
-					B->SkinFaces[i].FaceArray = geRam_Allocate(u);
+					uint32_t face;
+					B->SkinFaces[i].FaceArray = GE_RAM_ALLOCATE_ARRAY(geBody_Triangle, u);
 					if (B->SkinFaces[i].FaceArray == NULL)
 						{	geErrorLog_Add( ERR_BODY_ENOMEM , NULL);   return GE_FALSE;  }
-					if(geVFile_Read(pFile, B->SkinFaces[i].FaceArray, u) == GE_FALSE)
-						{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	 return GE_FALSE; }
+					for (face=0; face<u; ++face)
+					{
+						geBody_DiskTriangle D;
+						geBody_Triangle *N = &B->SkinFaces[i].FaceArray[face];
+						int corner;
+						if (geVFile_Read(pFile, &D, sizeof(D)) == GE_FALSE)
+							{	geErrorLog_Add(ERR_BODY_FILE_READ, NULL); return GE_FALSE; }
+						for (corner=0; corner<3; ++corner) { N->VtxIndex[corner]=D.VtxIndex[corner]; N->NormalIndex[corner]=D.NormalIndex[corner]; }
+						N->MaterialIndex=D.MaterialIndex;
+					}
 				}
 		}
 
