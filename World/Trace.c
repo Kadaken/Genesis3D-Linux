@@ -19,17 +19,19 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Assert.h>
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
  
-#include "XForm3d.h"
-#include "BaseType.h"
-#include "GBSPFile.h"
+#include "XFORM3D.H"
+#include "basetype.h"
+#include "Gbspfile.h"
 #include "World.h"
 #include "System.h"
-#include "Plane.h"
-#include "Trace.h"
+#include "PLANE.H"
+#include "TRACE.H"
 #include "ExtBox.h"
-#include "Actor.h"
+#include "actor.h"
 
 #define ON_EPSILON	(0.1f)
 
@@ -2316,7 +2318,7 @@ static void FillContents_tr(geWorld *World, int32 Node, const geVec3d *Pos, char
 				//char *name = geWBitmap_Pool_GetWNameByBitmap(World->CurrentBSP->WBitmapPool, Bitmap);
 				char str[100];
 				sprintf(str,"Leaf : %d\n",Leaf);
-				OutputDebugString(str);
+				fputs(str, stderr);
 				//if(name)
 				//{
 				//	strcpy(str, name);

@@ -44,8 +44,8 @@
 #define GE_QKFRAME_H
 
 
-#include "TKArray.h"
-#include "Quatern.h"
+#include "tkarray.h"
+#include "quatern.h"
 #include "vfile.h"
 
 #ifdef __cplusplus
@@ -134,7 +134,7 @@ geBoolean GENESISCC geQKFrame_LinearRead(geVFile* pFile, void* geQKFrame);
 geBoolean GENESISCC geQKFrame_SlerpRead(geVFile* pFile, void* geQKFrame);
 geBoolean GENESISCC geQKFrame_SquadRead(geVFile* pFile, void* geQKFrame);
 
-geBoolean GENESISCC geQKFrame_WriteToFile(geVFile *pFile, void *geQKFrame, 
+geBoolean GENESISCC geQKFrame_WriteToFile(geVFile *pFile, geTKArray *KeyList,
 								geQKFrame_InterpolationType InterpolationType, int Looping);
 geTKArray *GENESISCC geQKFrame_CreateFromFile(geVFile *pFile, geQKFrame_InterpolationType *InterpolationType, int *Looping);
 geTKArray *GENESISCC geQKFrame_CreateFromBinaryFile(geVFile *pFile, int *InterpolationType, int *Looping);

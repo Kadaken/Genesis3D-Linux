@@ -39,7 +39,7 @@ we palettize ("inverse colormap") using an octree lookup system
 #include "palettize.h"
 #include <stdlib.h>
 #include <assert.h>
-#include "ram.h"
+#include "RAM.H"
 #include "mempool.h"
 
 #ifdef _TSC
@@ -58,7 +58,7 @@ we palettize ("inverse colormap") using an octree lookup system
 
 typedef struct palInfo palInfo;
 
-int __inline	closestPalInlineRGB(int R,int G,int B,palInfo *pi);
+static inline int closestPalInlineRGB(int R, int G, int B, palInfo *pi);
 int				closestPal(int R,int G,int B,palInfo *pi);
 palInfo *		closestPalInit(uint8 * palette);
 void			closestPalFree(palInfo *info);
@@ -449,13 +449,13 @@ int hash,d,bestD,bestP;
 
 #define doSteps()	do { node = pi->root; doStep(7); doStep(6); doStep(5); doStep(4); doStep(3); doStep(2); doStep(1); doStep(0); } while(0)
 
-int __inline closestPalInlineRGB(int R,int G,int B,palInfo *pi)
+static inline int closestPalInlineRGB(int R, int G, int B, palInfo *pi)
 {
 octNode *node,*kid;
 
 	doSteps();
 
-return ((int)node)-1;
+return (int)((uintptr_t)node - 1U);
 }
 
 int closestPal(int R,int G,int B,palInfo *pi)
@@ -464,9 +464,9 @@ octNode *node,*kid;
 
 	doSteps();
 
-	assert( ((int)node) <= 256 && ((int)node) > 0 );
+	assert((uintptr_t)node <= 256U && (uintptr_t)node > 0U);
 
-return ((int)node)-1;
+return (int)((uintptr_t)node - 1U);
 }
 
 void closestPalFree(palInfo *pi)
@@ -537,7 +537,7 @@ octNode *node = root;
 		node = node->kids[idx];
 	}
 	idx = RGBbits(R,G,B,0);
-	node->kids[idx] = (octNode *)(palVal+1);
+	node->kids[idx] = (octNode *)(uintptr_t)(palVal + 1);
 }
 
 void addHash(palInfo *pi,int R,int G,int B,int palVal,int hash)

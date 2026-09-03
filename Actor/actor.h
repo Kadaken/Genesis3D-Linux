@@ -89,19 +89,19 @@
 #ifndef GE_ACTOR_H
 #define GE_ACTOR_H
 
-#include "genesis.h"				
+#include "Genesis.h"
 #include "basetype.h"
-#include "extbox.h"
+#include "ExtBox.h"
 #include "bitmap.h"
 
-#include "Motion.h"
+#include "motion.h"
 
 #ifdef GE_WORLD_H
-#include "camera.h"
-#include "Frustum.h"
+#include "Camera.h"
+#include "FRUSTUM.H"
 #endif
 
-#include "Body.h"
+#include "body.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -505,4 +505,3 @@ GENESISAPI void GENESISCC geActor_GetPosition(const geActor *A, geVec3d *Pos);
 
 
 #endif
-

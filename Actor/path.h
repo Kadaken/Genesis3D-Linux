@@ -23,7 +23,7 @@
 #define GE_PATH_H
 
 #include "basetype.h"
-#include "xform3d.h"
+#include "XFORM3D.H"
 #include "quatern.h"
 #include "vfile.h"
 

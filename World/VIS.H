@@ -23,9 +23,9 @@
 #define GE_VIS_H
 
 #include "Genesis.h"
-#include "BaseType.h"
+#include "basetype.h"
 
-#include "Frustum.h"
+#include "FRUSTUM.H"
 
 #ifdef __cplusplus
 extern "C" {

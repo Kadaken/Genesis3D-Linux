@@ -20,28 +20,27 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#include <Windows.h>
-#include <Math.h>
-#include <Assert.h>
+#include <math.h>
+#include <assert.h>
 
-#include "Genesis.H"
+#include "Genesis.h"
 #include "System.h"
-#include "Ram.h"
+#include "RAM.H"
 
 //#include "Sound.h"
 //#include "Sound3d.h"
 
 #include "World.h"
-#include "Surface.h"
+#include "SURFACE.H"
 //#include "Camera.h"
 #include "Light.h"
-#include "Plane.h"
-#include "Entities.h"
-#include "Trace.h"
-#include "User.h"
+#include "PLANE.H"
+#include "ENTITIES.H"
+#include "TRACE.H"
+#include "USER.H"
 //#include "Host.h"
-#include "Motion.h"
-#include "Vis.h"
+#include "motion.h"
+#include "VIS.H"
 
 //=====================================================================================
 //	local static globals
@@ -388,5 +387,4 @@ GENESISAPI geBoolean geWorld_GetTextureName(geWorld *World, const geVec3d *Pos, 
 //========================================================================================
 //	NetPlay
 //========================================================================================
-
 

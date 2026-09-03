@@ -56,20 +56,22 @@
 
 #include <math.h>  //fabs()
 #include <assert.h>
+#include <stdint.h>
+#include <string.h>
 
-#include "light.h"
-#include "world.h"
-#include "trace.h"		//Trace_WorldCollisionExact2()
-#include "surface.h"	// Surf_InSurfBoundingBox()
+#include "Light.h"
+#include "World.h"
+#include "TRACE.H"		//Trace_WorldCollisionExact2()
+#include "SURFACE.H"	// Surf_InSurfBoundingBox()
 
 #include "xfarray.h"
 #include "puppet.h"
 #include "pose.h"
-#include "ErrorLog.h"
-#include "ram.h"
+#include "Errorlog.h"
+#include "RAM.H"
 #include "tclip.h"
 
-#include "Frustum.h"
+#include "FRUSTUM.H"
 #include "ExtBox.h"
 #include "bodyinst.h"
 
@@ -1496,7 +1498,7 @@ static void GENESISCC gePuppet_DrawShadow(const gePuppet *P,
 						geTClip_Triangle(v);
 					}
 			}
-		assert( ((uint32)List) - ((uint32)G->FaceList) == (uint32)(G->FaceListSize) );
+		assert((uintptr_t)List - (uintptr_t)G->FaceList == (uintptr_t)G->FaceListSize);
 	}
 #endif
 }
@@ -1691,7 +1693,7 @@ geBoolean GENESISCC gePuppet_AddToGList ( const GE_TLVertex *Points, int NumPoin
 	if ( Flush )
 	{
 	    if ( PuppetTransPolyList )
-			GList_AddOperation ( 2, (uint32) PuppetTransPolyList );
+			GList_AddOperation ( 2, (uintptr_t) PuppetTransPolyList );
 
 		PuppetTransPolyList = NULL;
 		CurrentPuppetTransPoly = NULL;
@@ -1777,7 +1779,7 @@ geBoolean GENESISCC gePuppet_RenderThroughFrustum(const gePuppet *P,
 /* 03/24/2004 Wendell Buckner
     BUG FIX: Rendering Transparent Polys properly (2) */
 	geBoolean *MaterialIsTransparent = NULL;
-	geBitmap **MaterialArray = NULL;
+	const geBitmap **MaterialArray = NULL;
 	int32    MaterialCount = 0;
     int32    i = 0;
 
@@ -1858,7 +1860,7 @@ geBoolean GENESISCC gePuppet_RenderThroughFrustum(const gePuppet *P,
 /* 03/24/2004 Wendell Buckner
     BUG FIX: Rendering Transparent Polys properly (2)*/
 	MaterialCount = P->MaterialCount;
-	MaterialArray = GE_RAM_ALLOCATE_ARRAY ( geBitmap *, MaterialCount );
+	MaterialArray = GE_RAM_ALLOCATE_ARRAY ( const geBitmap *, MaterialCount );
     MaterialIsTransparent = GE_RAM_ALLOCATE_ARRAY ( geBoolean, MaterialCount );
 
 	for ( i = 0; i < MaterialCount; i++ )
@@ -2225,7 +2227,7 @@ geBoolean GENESISCC gePuppet_Render(	const gePuppet *P,
 /* 03/24/2004 Wendell Buckner
     BUG FIX: Rendering Transparent Polys properly (2) */
 	geBoolean *MaterialIsTransparent = NULL;
-	geBitmap **MaterialArray = NULL;
+	const geBitmap **MaterialArray = NULL;
 	int32    MaterialCount = 0;
 
 // changed QD 
@@ -2446,7 +2448,7 @@ geBoolean GENESISCC gePuppet_Render(	const gePuppet *P,
 /* 03/24/2004 Wendell Buckner
     BUG FIX: Rendering Transparent Polys properly (2) */
 	MaterialCount = P->MaterialCount;
-	MaterialArray = GE_RAM_ALLOCATE_ARRAY ( geBitmap *, MaterialCount );
+	MaterialArray = GE_RAM_ALLOCATE_ARRAY ( const geBitmap *, MaterialCount );
     MaterialIsTransparent = GE_RAM_ALLOCATE_ARRAY ( geBoolean, MaterialCount );
 
 	for ( i = 0; i < MaterialCount; i++ )
@@ -2765,7 +2767,8 @@ ll Buckner
 // end change
 		}
 		//assert( ((uint32)List) - ((uint32)G->FaceList) == (uint32)(G->FaceListSize) );
-		assert( ((uint32)List) - ((uint32)P->BodyG->FaceList) == (uint32)(P->BodyG->FaceListSize) );
+		assert((uintptr_t)List - (uintptr_t)P->BodyG->FaceList ==
+			(uintptr_t)P->BodyG->FaceListSize);
 	}
 
 	if (P->DoShadow)
@@ -3149,7 +3152,8 @@ geBoolean GENESISCC gePuppet_RenderShadowVolume(gePuppet *P,
 
 		if(pEdges!=NULL)
 			geRam_Free(pEdges);
-		assert( ((uint32)List) - ((uint32)P->BodyG->FaceList) == (uint32)(P->BodyG->FaceListSize) );
+		assert((uintptr_t)List - (uintptr_t)P->BodyG->FaceList ==
+			(uintptr_t)P->BodyG->FaceListSize);
 
 	}
 
@@ -3189,4 +3193,3 @@ void GENESISCC gePuppet_SetShadow(gePuppet *P, geBoolean DoShadow,
 	if ( P->ShadowMap )
 		geBitmap_CreateRef((geBitmap *)P->ShadowMap);
 }
-

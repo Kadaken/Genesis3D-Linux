@@ -19,17 +19,16 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Assert.h>
-#include <Windows.h>
-#include <Math.h>
+#include <assert.h>
+#include <math.h>
 
-#include "BaseType.h"
+#include "basetype.h"
 #include "System.h"
 #include "World.h"
-#include "GBSPFile.h"
-#include "Vec3d.h"
-#include "XForm3d.h"
-#include "Plane.h"
+#include "Gbspfile.h"
+#include "VEC3D.H"
+#include "XFORM3D.H"
+#include "PLANE.H"
 
 //=====================================================================================
 //	static local globals
@@ -223,4 +222,3 @@ void gePlane_SetFromVerts(GFX_Plane *Plane, const geVec3d *V1, const geVec3d *V2
 	// Finally, get the plane type
 	Plane->Type = PLANE_ANY;
 }
-

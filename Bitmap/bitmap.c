@@ -102,11 +102,11 @@ see {} for notes/long-term-todos
 
 #include	"basetype.h"
 #include	"getypes.h"
-#include	"ram.h"
+#include	"RAM.H"
 
 #include	"vfile.h"
-#include	"ErrorLog.h"
-#include	"Log.h"
+#include	"Errorlog.h"
+#include	"log.h"
 #include	"mempool.h"
 
 #include	"bitmap.h"
@@ -2440,7 +2440,7 @@ geRDriver_THandle * geBitmap_CreateTHandle(DRV_Driver *Driver,int Width,int Heig
 
 	DriverFormatsPtr = DriverFormats;
 	Driver->EnumPixelFormats(EnumPFCB,&DriverFormatsPtr);
-	DriverFormatsCount = ((uint32)DriverFormatsPtr - (uint32)DriverFormats)/sizeof(*DriverFormatsPtr);
+	DriverFormatsCount = (int)(DriverFormatsPtr - DriverFormats);
 	assert(DriverFormatsCount < MAX_DRIVER_FORMATS && DriverFormatsCount >= 0);
 
 	if ( DriverFormatsCount == 0 )
@@ -5744,7 +5744,7 @@ geBoolean geBitmap_Palette_BlitData(gePixelFormat SrcFormat,const void *SrcData,
 									gePixelFormat DstFormat,	  void *DstData,const geBitmap_Palette * DstPal,
 									int Pixels)
 {
-	char *SrcPtr,*DstPtr;
+	uint8 *SrcPtr,*DstPtr;
 	geBoolean SrcHasCK,DstHasCK;
 	uint32 SrcCK=0,DstCK=0;
 	int SrcCKi=0,DstCKi=0;
@@ -5754,8 +5754,8 @@ geBoolean geBitmap_Palette_BlitData(gePixelFormat SrcFormat,const void *SrcData,
 	assert( gePixelFormat_IsRaw(SrcFormat) );
 	assert( gePixelFormat_IsRaw(DstFormat) );
 
-	SrcPtr = (char *)SrcData;
-	DstPtr = (char *)DstData;
+	SrcPtr = (uint8 *)SrcData;
+	DstPtr = (uint8 *)DstData;
 
 	if ( SrcPal && SrcPal->HasColorKey )
 	{
@@ -6346,22 +6346,24 @@ GENESISAPI geBoolean GENESISCC geBitmap_Palette_SetEntry(geBitmap_Palette *P,int
 
 	if ( P->Data )
 	{
-	char *Data;
+	uint8 *Data;
 
 		if ( Color >= P->Size )
 			return GE_FALSE;
 
-		Data = (char *)(P->Data) + Color * gePixelFormat_BytesPerPel(P->Format);
+		Data = (uint8 *)(P->Data) + Color * gePixelFormat_BytesPerPel(P->Format);
 		gePixelFormat_PutPixel(P->Format,&Data,Pixel);
 	}
 	else
 	{
-	char *Data;
+	void *LockedData;
+	uint8 *Data;
 	gePixelFormat Format;
 	int Size;
 
-		if ( ! geBitmap_Palette_Lock(P,&Data,&Format,&Size) )
+		if ( ! geBitmap_Palette_Lock(P,&LockedData,&Format,&Size) )
 			return GE_FALSE;
+		Data = (uint8 *)LockedData;
 
 		if ( Color >= Size )
 		{
@@ -6384,24 +6386,26 @@ GENESISAPI geBoolean GENESISCC geBitmap_Palette_GetEntry(const geBitmap_Palette 
 
 	if ( P->Data )
 	{
-	char *Data;
+	uint8 *Data;
 
 		if ( Color >= P->Size )
 			return GE_FALSE;
 
-		Data = (char *)(P->Data) + Color * gePixelFormat_BytesPerPel(P->Format);
+		Data = (uint8 *)(P->Data) + Color * gePixelFormat_BytesPerPel(P->Format);
 		*Pixel = gePixelFormat_GetPixel(P->Format,&Data);
 	}
 	else
 	{
-	char *Data;
+	void *LockedData;
+	uint8 *Data;
 	gePixelFormat Format;
 	int Size;
 
 		// must cast away const cuz we don't have a lockforread/write on palettes
 
-		if ( ! geBitmap_Palette_Lock((geBitmap_Palette *)P,&Data,&Format,&Size) )
+		if ( ! geBitmap_Palette_Lock((geBitmap_Palette *)P,&LockedData,&Format,&Size) )
 			return GE_FALSE;
+		Data = (uint8 *)LockedData;
 
 		if ( Color >= Size )
 		{
@@ -6721,4 +6725,3 @@ GENESISAPI geBoolean GENESISCC geBitmap_GetAverageColor(const geBitmap *Bmp,int 
 }
 
 /*}{ ******************** EOF **************************/
-

@@ -43,8 +43,8 @@
 #include <DDraw.h>
 #include <D3D.h>
 
-#include "D3D_Main.h"
-#include "DCommon.h"
+#include "D3d_main.h"
+#include "Dcommon.h"
 
 void D3DSetTexHandle(D3DTEXTUREHANDLE TexHandle);
 

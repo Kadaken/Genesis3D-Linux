@@ -33,12 +33,12 @@
 
 //#define OLD_FONT
 
-#include "ErrorLog.h"
+#include "basetype.h"
+#include "Errorlog.h"
 #include "Genesis.h"
-#include <windows.h>
-#include "dcommon.h"
+#include "Dcommon.h"
 #include "Camera.h"
-#include "PtrTypes.h"
+#include "Ptrtypes.h"
 
 #define		VectorToSUB(a, b) ( *(((geFloat*)&a) + b) )
 
@@ -50,6 +50,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* Platform-neutral handles used by the system gateway. Native backends own
+ * the concrete window-system and dynamic-loader objects behind them. */
+typedef void *Sys_WindowHandle;
+typedef void *Sys_DriverHandle;
+typedef uint64_t Sys_ClockTick;
 
 typedef enum
 {
@@ -81,12 +87,7 @@ typedef struct
 
 typedef struct
 {
-/* 01/20/2004 Wendell Buckner
-    LOGO CRASH BUG - On some machines with fast proccessors (2.0ghz or better, typically intel) the value return
-	by Sys_GetCPUFreq is to large for the following variable make it a large_integer
-	Fix provide by Latex and IronDragon from the genesis3d forum
-	int32		  Freq; */
-	LARGE_INTEGER Freq;
+	Sys_ClockTick	Freq;
 } Sys_CPUInfo;
 
 typedef struct geDriver_Mode
@@ -118,7 +119,7 @@ typedef struct
 	//	Data for current driver
 	geBoolean		Active;				// GE_TRUE if a driver and mode has been initialized
 	
-	HINSTANCE		DriverHandle;		// CurrentDriver Handle (for DLL)
+	Sys_DriverHandle DriverHandle;		// Current native driver module handle
 	
 	geDriver		*CurDriver;			// Current driver
 	geDriver_Mode	*CurMode;			// Current mode
@@ -173,13 +174,13 @@ typedef struct geEngine
 	Sys_CPUInfo			CPUInfo;			// Info about the Cpu
 	Sys_DebugInfo		DebugInfo;
 
-	LARGE_INTEGER		CurrentTic;
+	Sys_ClockTick		CurrentTic;
 
 	Sys_FontInfo		FontInfo;
 
 	User_Info			*UserInfo;			// Client loaded resources, etc...
 
-	HWND				hWnd;
+	Sys_WindowHandle	hWnd;
 	char				AppName[200];
 
 	//	Global LUT's
@@ -238,7 +239,7 @@ typedef struct geEngine
 //=====================================================================================
 
 //Engine
-geEngine *Sys_EngineCreate(HWND hWnd, const char *AppName, const char *DriverDirectory, uint32 Version);
+geEngine *Sys_EngineCreate(Sys_WindowHandle hWnd, const char *AppName, const char *DriverDirectory, uint32 Version);
 
 geBoolean	Sys_ShutdownDriver(geEngine *Engine);
 
@@ -252,6 +253,7 @@ void Sys_WorldFreeMesh(geWorld *World, Mesh_MeshDef *MeshDef);
 
 // Misc system
 geBoolean Sys_GetCPUFreq(Sys_CPUInfo *Info);
+Sys_ClockTick Sys_ClockNow(void);
 geBoolean Sys_EnginePrint(geEngine *Engine, int32 x, int32 y, char *String);
 geBoolean	Sys_EngineResetDecorators(geEngine *Engine);
 

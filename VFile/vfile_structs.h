@@ -5,20 +5,18 @@
 extern "C" {
 #endif
 
-#define	WIN32_LEAN_AND_MEAN
-#include	<windows.h>
-
 #include	<stdio.h>
+#include	<pthread.h>
 #include	<assert.h>
 #include	<stdarg.h>
 #include	<string.h>
 
 #include	"basetype.h"
-#include	"ram.h"
+#include	"RAM.H"
 #include	"vfile.h"
 #include	"vfile._h"
 #include	"fsdos.h"
-#include	"fsmemory.h"
+#include	"FSMEMORY.H"
 #include	"fsvfs.h"
 
 typedef	struct	FSSearchList
@@ -35,7 +33,7 @@ typedef	struct	geVFile
 	void *						FSData;
 	geVFile *					Context;
 	FSSearchList *				SearchList;
-	CRITICAL_SECTION			CriticalSection;
+	pthread_mutex_t			CriticalSection;
 	geVFile *					BaseFile;
 }	geVFile;
 

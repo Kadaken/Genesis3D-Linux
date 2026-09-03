@@ -19,17 +19,14 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 
 void Log_Out(const char * string)
 {
-#ifdef _DEBUG
-	OutputDebugString(string);
-#endif
-	printf(string);
+	fputs(string, stdout);
 }
 
 
@@ -45,7 +42,7 @@ void Log_Printf(const char * String, ...)
     char			TempStr[1024];
 
 	va_start(ArgPtr, String);
-    vsprintf(TempStr, String, ArgPtr);
+	vsnprintf(TempStr, sizeof(TempStr), String, ArgPtr);
 	va_end(ArgPtr);
 
 	Log_Out(TempStr);

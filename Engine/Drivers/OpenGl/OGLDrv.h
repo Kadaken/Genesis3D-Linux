@@ -20,7 +20,7 @@
 #ifndef OGLDRV_H
 #define OGLDRV_H
 
-#include "DCommon.h"
+#include "Dcommon.h"
 #include "glext.h"
 
 // Here are some useful values you can change to meet your needs.

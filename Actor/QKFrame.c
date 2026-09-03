@@ -44,10 +44,10 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "vec3d.h"
+#include "VEC3D.H"
 #include "QKFrame.h"
-#include "errorlog.h"
-#include "ram.h"
+#include "Errorlog.h"
+#include "RAM.H"
 
 #define LINEAR_BLEND(a,b,t)  ( (t)*((b)-(a)) + (a) )	
 			// linear blend of a and b  0<t<1 where  t=0 ->a and t=1 ->b
@@ -791,10 +791,11 @@ geBoolean GENESISCC geQKFrame_WriteToFile(geVFile *pFile, geTKArray *KeyList,
 }
 
 
-geTKArray *GENESISCC geQKFrame_CreateFromFile(geVFile *pFile, int *InterpolationType, int *Looping)
+geTKArray *GENESISCC geQKFrame_CreateFromFile(geVFile *pFile, geQKFrame_InterpolationType *InterpolationType, int *Looping)
 {
 	int i,u,NumElements;
 	int Compression;
+	int ParsedInterpolationType;
 	geFloat StartTime=0.0f;
 	geFloat DeltaTime=0.0f;
 
@@ -812,9 +813,10 @@ geTKArray *GENESISCC geQKFrame_CreateFromFile(geVFile *pFile, int *Interpolation
 	if(strnicmp(line, QKFRAME_KEYLIST_ID, sizeof(QKFRAME_KEYLIST_ID)-1) != 0)
 		ERROREXIT;
 
-	if(sscanf(line + sizeof(QKFRAME_KEYLIST_ID)-1, "%d %d %d %d", 
-					&NumElements,InterpolationType,&Compression,Looping) != 4)
+	if(sscanf(line + sizeof(QKFRAME_KEYLIST_ID)-1, "%d %d %d %d",
+					&NumElements,&ParsedInterpolationType,&Compression,Looping) != 4)
 		ERROREXIT;
+	*InterpolationType = (geQKFrame_InterpolationType)ParsedInterpolationType;
 
 	if (!( (*InterpolationType == QKFRAME_LINEAR) || (*InterpolationType == QKFRAME_SLERP) || (*InterpolationType == QKFRAME_SQUAD) ))
 		ERROREXIT;

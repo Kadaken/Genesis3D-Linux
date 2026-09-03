@@ -23,7 +23,7 @@
 #include <DDraw.h>
 #include <D3D.h>
 
-#include "D3D_Err.h"
+#include "D3d_err.h"
 
 //================================================================================
 //	D3DErrorToString

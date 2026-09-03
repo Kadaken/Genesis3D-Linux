@@ -23,7 +23,7 @@
 #define GE_EXTBOX_H
 
 #include "basetype.h"
-#include "vec3d.h"
+#include "VEC3D.H"
 
 #ifdef __cplusplus
 	extern "C" {
@@ -91,4 +91,3 @@ GENESISAPI geBoolean GENESISCC geExtBox_RayCollision( const geExtBox *B, const g
 
 
 #endif
-

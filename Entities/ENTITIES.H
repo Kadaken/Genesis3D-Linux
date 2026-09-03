@@ -22,15 +22,14 @@
 #ifndef GE_ENTITIES_H
 #define GE_ENTITIES_H
 
-#include <Assert.h>
-#include <Windows.h>
+#include <assert.h>
 
-#include "BaseType.h"
+#include "basetype.h"
 #include "Errorlog.h"
-#include "Vec3d.h"
+#include "VEC3D.H"
 #include "System.h"
 #include "World.h"
-#include "Ram.h"
+#include "RAM.H"
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,6 +69,7 @@ typedef	struct geEntity_Class
 	char					*Name;					// Class Name
 	geEntity_ClassType		Type;					// Type of class
 	int32					TypeSize;
+	int32					TypeAlignment;
 	geEntity_Field			*Fields;				// Fields in this Class
 	int32					FieldSize;				// Size of all fields
 
@@ -121,7 +121,7 @@ geEntity_Epair			*geEntity_EpairCreate(void);
 void					geEntity_EpairDestroy(geEntity_Epair *Epair);
 geEntity_Field			*geEntity_FieldCreate(const char *Name, int32 Offset, geEntity_Class *TypeClass);
 void					geEntity_FieldDestroy(geEntity_Field *Field);
-geEntity_Class			*geEntity_ClassCreate(geEntity_ClassType Type, const char *Name, int32 TypeSize);
+geEntity_Class			*geEntity_ClassCreate(geEntity_ClassType Type, const char *Name, int32 TypeSize, int32 TypeAlignment);
 void					geEntity_ClassDestroy(geEntity_Class *Class);
 geBoolean				geEntity_ClassAddField(geEntity_Class	*Class, geEntity_Field *Field);
 geEntity_Field			*geEntity_ClassFindFieldByName(geEntity_Class *Class, const char *Name);

@@ -40,18 +40,18 @@
 #include <D3D.h>
 
 #include "THandle.h"
-#include "BaseType.h"
+#include "basetype.h"
 
 /* 07/16/2000 Wendell Buckner
     Convert to Directx7...    
 #include "D3DDrv.h"           */
-#include "D3DDrv7x.h"
+#include "D3ddrv7x.h"
 
-#include "DCommon.h"
-#include "D3DCache.h"
-#include "D3D_Main.h"
-#include "PCache.h"
-#include "D3d_FX.h"
+#include "Dcommon.h"
+#include "D3dcache.h"
+#include "D3d_main.h"
+#include "Pcache.h"
+#include "D3d_fx.h"
 
 #include "TPage.h"
 

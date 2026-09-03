@@ -21,15 +21,16 @@
 /****************************************************************************************/
 #include <Windows.h>
 #include <stdio.h>
+#include <math.h>
 
-#include "D3DDrv.h"
-#include "DCommon.h"
+#include "D3DDRV.H"
+#include "Dcommon.h"
 
-#include "Scene.h"
-#include "Render.h"
-#include "D3DCache.h"
-#include "D3D_Main.h"
-#include "PCache.h"
+#include "SCENE.H"
+#include "RENDER.H"
+#include "D3dcache.h"
+#include "D3d_main.h"
+#include "Pcache.h"
 #include "THandle.h"
 
 
@@ -39,12 +40,52 @@ BOOL				ExitHandlerActive = FALSE;
 int32				LastError;
 char				LastErrorStr[200];
 
+/*
+ * The original driver accepted the window dimensions supplied by the host and
+ * used the host's variable frame time.  Keep the legacy API intact, but make
+ * the driver policy explicit so callers can render at either 60 or 120 Hz
+ * without coupling simulation time to the number of presents.
+ */
+#define GENESIS3D_CANVAS_WIDTH       1920
+#define GENESIS3D_CANVAS_HEIGHT      1080
+#define GENESIS3D_DEFAULT_FPS        60
+#define GENESIS3D_HIGH_REFRESH_FPS   120
+
+static int   D3DDrv_TargetFPS = GENESIS3D_DEFAULT_FPS;
+static float D3DDrv_FixedDeltaTime = 1.0f / (float)GENESIS3D_DEFAULT_FPS;
+static BOOL  D3DDrv_SmoothNormals = TRUE;
+
+void DRIVERCC D3DDrv_SetTargetFPS(int TargetFPS)
+{
+	D3DDrv_TargetFPS = (TargetFPS >= GENESIS3D_HIGH_REFRESH_FPS) ?
+		GENESIS3D_HIGH_REFRESH_FPS : GENESIS3D_DEFAULT_FPS;
+	D3DDrv_FixedDeltaTime = 1.0f / (float)D3DDrv_TargetFPS;
+}
+
+int DRIVERCC D3DDrv_GetTargetFPS(void)
+{
+	return D3DDrv_TargetFPS;
+}
+
+float DRIVERCC D3DDrv_GetFixedDeltaTime(void)
+{
+	return D3DDrv_FixedDeltaTime;
+}
+
+BOOL DRIVERCC D3DDrv_SmoothNormalsEnabled(void)
+{
+	return D3DDrv_SmoothNormals;
+}
+
 geBoolean	DRIVERCC DrvShutdown(void);
 geBoolean	DRIVERCC ScreenShot(const char *Name);
 
 BOOL DRIVERCC DrvInit(DRV_DriverHook *Hook)
 {
-	RECT	WRect;
+	/* Force a stable native canvas.  The viewport may still be letterboxed by
+	 * the host window, but all projection and render targets use this size. */
+	Hook->Width = GENESIS3D_CANVAS_WIDTH;
+	Hook->Height = GENESIS3D_CANVAS_HEIGHT;
 
 	// Start up
 	if (!D3DMain_InitD3D(Hook->hWnd, Hook->DriverName+5, Hook->Width, Hook->Height))
@@ -53,15 +94,6 @@ BOOL DRIVERCC DrvInit(DRV_DriverHook *Hook)
 		return FALSE;
 	}
 	
-	// If they are asking for a window mode, use there hWnd for the size
-	if (Hook->Width ==-1 && Hook->Height == -1)
-	{
-		GetClientRect(Hook->hWnd, &WRect);
-		
-		Hook->Width = (WRect.right - WRect.left);
-		Hook->Height = (WRect.bottom - WRect.top);
-	}
-
 	ClientWindow.Width = Hook->Width;
 	ClientWindow.Height = Hook->Height;
 	ClientWindow.hWnd = Hook->hWnd;
@@ -374,5 +406,4 @@ cleanup:
 	return success;
 	
 } 
-
 

@@ -20,21 +20,21 @@
 /*                                                                                      */
 /****************************************************************************************/
 #include <Windows.h>
-#include <Assert.h>
+#include <assert.h>
 #include <stdio.h>
 #include <DDraw.h>
 #include <D3D.h>
-#include <Math.h>
+#include <math.h>
 
-#include "D3D_Main.h"
-#include "D3D_Err.h"
-#include "D3D_fx.h"
-#include "d3dcache.h"
+#include "D3d_main.h"
+#include "D3d_err.h"
+#include "D3d_fx.h"
+#include "D3dcache.h"
 
 #include "Render.h"
-#include "D3DCache.h"
+#include "D3dcache.h"
 #include "THandle.h"
-#include "PCache.h"
+#include "Pcache.h"
 
 #undef ATTEMPT
 #define ATTEMPT(x) if (!(x)) goto exit_with_error

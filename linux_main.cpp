@@ -1,4 +1,5 @@
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <GL/gl.h>
 #include <GL/glx.h>
 #include <SDL.h>
@@ -19,6 +20,7 @@
 #include <vector>
 
 #include "Genesis.h"
+#include "Entities/ENTITIES.H"
 #include "World/World.h"
 
 namespace {
@@ -59,11 +61,17 @@ struct VFileRegistryGuard {
 struct NativeTextureSet {
     std::vector<GLuint> materials;
     std::vector<GLuint> lightmaps;
+    GLuint white_lightmap = 0;
     int uploaded_materials = 0;
     int uploaded_lightmaps = 0;
+    uint64_t material_rgb_sum = 0;
+    uint64_t material_pixel_count = 0;
+    uint64_t lightmap_rgb_sum = 0;
+    uint64_t lightmap_pixel_count = 0;
 };
 
-bool upload_bitmap_texture(geBitmap *bitmap, GLuint *texture) {
+bool upload_bitmap_texture(geBitmap *bitmap, GLuint *texture,
+                           uint64_t *rgb_sum, uint64_t *pixel_count) {
     if (!bitmap || !texture)
         return false;
 
@@ -93,8 +101,19 @@ bool upload_bitmap_texture(geBitmap *bitmap, GLuint *texture) {
         for (int x = 0; x < info.Width; ++x) {
             const uint32 pixel = gePixelFormat_GetPixel(info.Format, &source);
             int red, green, blue, alpha;
-            gePixelFormat_DecomposePixel(info.Format, pixel, &red, &green,
-                                         &blue, &alpha);
+            if (gePixelFormat_HasPalette(info.Format)) {
+                geBitmap_Palette *palette = info.Palette
+                    ? info.Palette : geBitmap_GetPalette(lock);
+                if (!palette || !geBitmap_Palette_GetEntryColor(
+                        palette, static_cast<int>(pixel), &red, &green,
+                        &blue, &alpha)) {
+                    geBitmap_UnLock(lock);
+                    return false;
+                }
+            } else {
+                gePixelFormat_DecomposePixel(info.Format, pixel, &red, &green,
+                                             &blue, &alpha);
+            }
             const size_t destination =
                 (static_cast<size_t>(y) * info.Width + x) * 4U;
             rgba[destination + 0] = static_cast<uint8>(red);
@@ -102,6 +121,8 @@ bool upload_bitmap_texture(geBitmap *bitmap, GLuint *texture) {
             rgba[destination + 2] = static_cast<uint8>(blue);
             rgba[destination + 3] = static_cast<uint8>(
                 info.HasColorKey && pixel == info.ColorKey ? 0 : alpha);
+            *rgb_sum += static_cast<uint64_t>(red + green + blue);
+            ++*pixel_count;
         }
     }
 
@@ -131,11 +152,26 @@ bool upload_world_textures(const geWorld *world, NativeTextureSet *textures) {
     const GBSP_BSPData &bsp = world_bsp->BSPData;
     textures->materials.assign(static_cast<size_t>(bsp.NumGFXTextures), 0);
     textures->lightmaps.assign(static_cast<size_t>(bsp.NumGFXFaces), 0);
+    // Genesis3D lightmaps are tightly packed RGB rows; widths are not
+    // guaranteed to satisfy OpenGL's default four-byte unpack alignment.
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    const uint8 white[3] = {255, 255, 255};
+    glGenTextures(1, &textures->white_lightmap);
+    glBindTexture(GL_TEXTURE_2D, textures->white_lightmap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB,
+                 GL_UNSIGNED_BYTE, white);
 
     for (int32 index = 0; index < bsp.NumGFXTextures; ++index) {
         geBitmap *bitmap = geWBitmap_Pool_GetBitmapByIndex(
             world_bsp->WBitmapPool, index);
-        if (upload_bitmap_texture(bitmap, &textures->materials[index]))
+        if (upload_bitmap_texture(bitmap, &textures->materials[index],
+                                  &textures->material_rgb_sum,
+                                  &textures->material_pixel_count))
             ++textures->uploaded_materials;
     }
 
@@ -161,15 +197,20 @@ bool upload_world_textures(const geWorld *world, NativeTextureSet *textures) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, face.LWidth, face.LHeight, 0,
                      GL_RGB, GL_UNSIGNED_BYTE, bsp.GFXLightData + offset);
-        if (glGetError() == GL_NO_ERROR)
+        if (glGetError() == GL_NO_ERROR) {
             ++textures->uploaded_lightmaps;
-        else {
+            const uint8 *light_pixels = bsp.GFXLightData + offset;
+            for (size_t byte = 0; byte < byte_count; ++byte)
+                textures->lightmap_rgb_sum += light_pixels[byte];
+            textures->lightmap_pixel_count += pixel_count;
+        } else {
             glDeleteTextures(1, &texture);
             texture = 0;
         }
     }
 
     glBindTexture(GL_TEXTURE_2D, 0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     return textures->uploaded_materials > 0;
 }
 
@@ -182,6 +223,8 @@ void destroy_world_textures(NativeTextureSet *textures) {
     if (!textures->lightmaps.empty())
         glDeleteTextures(static_cast<GLsizei>(textures->lightmaps.size()),
                          textures->lightmaps.data());
+    if (textures->white_lightmap)
+        glDeleteTextures(1, &textures->white_lightmap);
     textures->materials.clear();
     textures->lightmaps.clear();
 }
@@ -214,7 +257,20 @@ CameraBasis camera_basis(const PlayerCamera &camera) {
             {-yaw_sine, 0.0, yaw_cosine}};
 }
 
-PlayerCamera initial_camera(const geWorld *world) {
+PlayerCamera initial_camera(geWorld *world) {
+    geEntity_EntitySet *player_set = geWorld_GetEntitySet(world, "PlayerSetup");
+    geEntity *player = player_set
+        ? geEntity_EntitySetGetNextEntity(player_set, nullptr) : nullptr;
+    const char *player_origin = player
+        ? geEntity_GetStringForKey(player, "origin") : nullptr;
+    geVec3d parsed_origin{};
+    if (player_origin && std::sscanf(player_origin, "%f %f %f",
+                                    &parsed_origin.X, &parsed_origin.Y,
+                                    &parsed_origin.Z) == 3) {
+        return {{parsed_origin.X, parsed_origin.Y, parsed_origin.Z},
+                0.0, 0.0, 400.0};
+    }
+
     const GFX_Model &root_model = world->CurrentBSP->BSPData.GFXModels[0];
     const Vec3 minimum = {root_model.Mins.X, root_model.Mins.Y,
                           root_model.Mins.Z};
@@ -333,17 +389,24 @@ bool render_world_geometry(const geWorld *world,
         return false;
     glNewList(*geometry_list, GL_COMPILE);
 
+    glActiveTexture(GL_TEXTURE0);
     glEnable(GL_TEXTURE_2D);
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glActiveTexture(GL_TEXTURE1);
+    glEnable(GL_TEXTURE_2D);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glActiveTexture(GL_TEXTURE0);
     glDisable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
+    glDisable(GL_LIGHTING);
     glDepthMask(GL_TRUE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     bool blend_enabled = false;
     GLenum depth_function = GL_LESS;
     bool depth_write = true;
-    GLuint bound_texture = 0;
+    GLuint bound_material = 0;
+    GLuint bound_lightmap = 0;
     const auto set_blend = [&blend_enabled](bool enabled) {
         if (enabled == blend_enabled)
             return;
@@ -361,11 +424,19 @@ bool render_world_geometry(const geWorld *world,
             depth_write = write;
         }
     };
-    const auto bind_texture = [&bound_texture](GLuint texture) {
-        if (texture == bound_texture)
+    const auto bind_material = [&bound_material](GLuint texture) {
+        if (texture == bound_material)
             return;
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
-        bound_texture = texture;
+        bound_material = texture;
+    };
+    const auto bind_lightmap = [&bound_lightmap](GLuint texture) {
+        if (texture == bound_lightmap)
+            return;
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        bound_lightmap = texture;
     };
 
     const int32 first_face = std::max<int32>(0, root_model.FirstFace);
@@ -404,7 +475,10 @@ bool render_world_geometry(const geWorld *world,
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         set_depth(GL_LESS, true);
-        bind_texture(material);
+        bind_material(material);
+        const GLuint lightmap = textures.lightmaps[face_index];
+        bind_lightmap(lightmap && !(texture_info.Flags & TEXINFO_NO_LIGHTMAP)
+                          ? lightmap : textures.white_lightmap);
         glColor4f(1.0f, 1.0f, 1.0f, alpha);
         glBegin(GL_TRIANGLE_FAN);
         for (int32 corner = 0; corner < face.NumVerts; ++corner) {
@@ -423,45 +497,28 @@ bool render_world_geometry(const geWorld *world,
             const float texture_v =
                 (texture_vertex.v / draw_scale_v + surface.ShiftV) /
                 texture_metadata.Height;
-            glTexCoord2f(texture_u, texture_v);
+            glMultiTexCoord2f(GL_TEXTURE0, texture_u, texture_v);
+            const float light_u = lightmap
+                ? (texture_vertex.u - surface.LInfo.MinU + 8.0f) /
+                      (static_cast<float>(face.LWidth) * 16.0f)
+                : 0.5f;
+            const float light_v = lightmap
+                ? (texture_vertex.v - surface.LInfo.MinV + 8.0f) /
+                      (static_cast<float>(face.LHeight) * 16.0f)
+                : 0.5f;
+            glMultiTexCoord2f(GL_TEXTURE1, light_u, light_v);
             glVertex3f(vertex.X, vertex.Y, vertex.Z);
         }
         glEnd();
-
-        const GLuint lightmap = textures.lightmaps[face_index];
-        if (lightmap && !(texture_info.Flags & TEXINFO_NO_LIGHTMAP)) {
-            set_blend(true);
-            glBlendFunc(GL_DST_COLOR, GL_ZERO);
-            set_depth(GL_EQUAL, false);
-            bind_texture(lightmap);
-            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-            glBegin(GL_TRIANGLE_FAN);
-            for (int32 corner = 0; corner < face.NumVerts; ++corner) {
-                const int32 list_index = face.FirstVert + corner;
-                if (list_index < 0 || list_index >= bsp.NumGFXVertIndexList)
-                    continue;
-                const int32 vertex_index = bsp.GFXVertIndexList[list_index];
-                if (vertex_index < 0 || vertex_index >= bsp.NumGFXVerts)
-                    continue;
-                const Surf_TexVert &texture_vertex =
-                    world->CurrentBSP->TexVerts[list_index];
-                const float light_u =
-                    (texture_vertex.u - surface.LInfo.MinU) /
-                    (static_cast<float>(face.LWidth) * 16.0f);
-                const float light_v =
-                    (texture_vertex.v - surface.LInfo.MinV) /
-                    (static_cast<float>(face.LHeight) * 16.0f);
-                const geVec3d &vertex = bsp.GFXVerts[vertex_index];
-                glTexCoord2f(light_u, light_v);
-                glVertex3f(vertex.X, vertex.Y, vertex.Z);
-            }
-            glEnd();
-        }
     }
 
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDisable(GL_TEXTURE_2D);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glEndList();
     glCallList(*geometry_list);
@@ -471,6 +528,16 @@ bool render_world_geometry(const geWorld *world,
 int target_fps() {
     const char *value = std::getenv("GENESIS3D_FPS");
     return value && std::atoi(value) >= 120 ? 120 : 60;
+}
+
+int window_coordinate(const char *name, int safe_default) {
+    const char *value = std::getenv(name);
+    return value && *value ? std::atoi(value) : safe_default;
+}
+
+bool environment_enabled(const char *name) {
+    const char *value = std::getenv(name);
+    return value && *value && std::string(value) != "0";
 }
 
 std::string project_root() {
@@ -610,13 +677,42 @@ int main() {
                                         visual->visual, AllocNone);
     XSetWindowAttributes attributes{};
     attributes.colormap = colormap;
-    attributes.event_mask = ExposureMask | KeyPressMask | StructureNotifyMask;
-    Window window = XCreateWindow(display, RootWindow(display, screen), 0, 0,
+    attributes.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask |
+                            FocusChangeMask | StructureNotifyMask;
+    // Fail closed for unattended launches: focus and pointer capture require
+    // an explicit interactive opt-in. GENESIS3D_NO_INPUT_CAPTURE always wins.
+    const bool input_capture_enabled =
+        environment_enabled("GENESIS3D_ENABLE_INPUT_CAPTURE") &&
+        !environment_enabled("GENESIS3D_NO_INPUT_CAPTURE");
+    const int window_x = window_coordinate("GENESIS3D_WINDOW_X", 892);
+    const int window_y = window_coordinate("GENESIS3D_WINDOW_Y", 1080);
+    Window window = XCreateWindow(display, RootWindow(display, screen),
+                                  window_x, window_y,
                                   kWidth, kHeight, 0, visual->depth,
                                   InputOutput, visual->visual,
                                   CWColormap | CWEventMask, &attributes);
     XStoreName(display, window, "Genesis3D Linux");
+    XSizeHints size_hints{};
+    size_hints.flags = USPosition;
+    size_hints.x = window_x;
+    size_hints.y = window_y;
+    XSetWMNormalHints(display, window, &size_hints);
+    if (!input_capture_enabled) {
+        XWMHints wm_hints{};
+        wm_hints.flags = InputHint;
+        wm_hints.input = False;
+        XSetWMHints(display, window, &wm_hints);
+    }
     XMapWindow(display, window);
+    // Mapping is mediated by the window manager. Wait until it has made this
+    // client viewable; merely synchronizing the request queue can still race
+    // KWin/Xwayland and make XSetInputFocus fail with BadMatch.
+    XEvent map_event{};
+    do {
+        XWindowEvent(display, window, StructureNotifyMask, &map_event);
+    } while (map_event.type != MapNotify);
+    if (input_capture_enabled)
+        XSetInputFocus(display, window, RevertToParent, CurrentTime);
     XFlush(display);
 
     GLXContext context = glXCreateContext(display, visual, nullptr, True);
@@ -641,10 +737,17 @@ int main() {
 
     std::fprintf(stderr,
                  "Genesis3D Linux: textured BSP bridge active (%d root faces, "
-                 "%d materials, %d lightmaps)\n",
+                 "%d materials, %d lightmaps; material mean %.1f/255, "
+                 "lightmap mean %.1f/255)\n",
                  world->CurrentBSP->BSPData.GFXModels[0].NumFaces,
                  world_textures.uploaded_materials,
-                 world_textures.uploaded_lightmaps);
+                 world_textures.uploaded_lightmaps,
+                 world_textures.material_pixel_count
+                     ? static_cast<double>(world_textures.material_rgb_sum) /
+                           (3.0 * world_textures.material_pixel_count) : 0.0,
+                 world_textures.lightmap_pixel_count
+                     ? static_cast<double>(world_textures.lightmap_rgb_sum) /
+                           (3.0 * world_textures.lightmap_pixel_count) : 0.0);
 
     SDL_SetHint(SDL_HINT_VIDEODRIVER, "x11");
     SDL_SetHint(SDL_HINT_VIDEO_FOREIGN_WINDOW_OPENGL, "1");
@@ -679,10 +782,21 @@ int main() {
         return 1;
     }
 
-    SDL_SetWindowGrab(input_window, SDL_TRUE);
-    if (SDL_SetRelativeMouseMode(SDL_TRUE) != 0)
+    // X11 focus was assigned immediately after mapping, before SDL attached to
+    // this foreign window. Synchronize SDL's keyboard-focus bookkeeping now so
+    // SDL_GetKeyboardState receives held keys through SDL's X11 event queue.
+    if (input_capture_enabled && SDL_SetWindowInputFocus(input_window) != 0)
+        std::fprintf(stderr, "Genesis3D Linux: could not synchronize SDL2 input focus: %s\n",
+                     SDL_GetError());
+
+    SDL_SetWindowGrab(input_window,
+                      input_capture_enabled ? SDL_TRUE : SDL_FALSE);
+    if (input_capture_enabled && SDL_SetRelativeMouseMode(SDL_TRUE) != 0)
         std::fprintf(stderr, "Genesis3D Linux: relative mouse mode unavailable: %s\n",
                      SDL_GetError());
+    if (!input_capture_enabled)
+        std::fprintf(stderr,
+                     "Genesis3D Linux: input capture disabled for unattended testing\n");
 
     PlayerCamera camera = initial_camera(world);
     GLuint world_geometry_list = 0;
@@ -692,6 +806,31 @@ int main() {
     constexpr double pitch_limit = 89.0 * kPi / 180.0;
     std::fprintf(stderr,
                  "Genesis3D Linux: controls active (WASD/arrows move, mouse looks, Shift sprints, Esc exits)\n");
+
+    // Compile and submit the immutable display list before cadence accounting.
+    // This startup work is not a recurring render deadline and otherwise makes
+    // a clean steady-state run appear to miss its first several deadlines.
+    const CameraBasis warmup_basis = camera_basis(camera);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    if (!render_world_geometry(world, world_textures, camera, warmup_basis,
+                               &world_geometry_list, framebuffer_width,
+                               framebuffer_height)) {
+        std::fprintf(stderr,
+                     "Genesis3D Linux: loaded world has no renderable BSP geometry\n");
+        SDL_DestroyWindow(input_window);
+        SDL_Quit();
+        destroy_world_textures(&world_textures);
+        glXMakeCurrent(display, None, nullptr);
+        glXDestroyContext(display, context);
+        XDestroyWindow(display, window);
+        XFreeColormap(display, colormap);
+        XFree(visual);
+        XCloseDisplay(display);
+        geWorld_Free(world);
+        return 1;
+    }
+    glXSwapBuffers(display, window);
+    glFinish();
 
     using FrameClock = std::chrono::steady_clock;
     const FrameClock::duration frame_period =
@@ -703,12 +842,18 @@ int main() {
     double simulation_accumulator = 0.0;
     uint64_t rendered_frames = 0;
     uint64_t missed_deadlines = 0;
+    uint64_t render_deadline_misses = 0;
+    uint64_t clamped_elapsed_frames = 0;
+    uint64_t maximum_simulation_steps = 0;
+    double maximum_render_lateness_ms = 0.0;
     bool running = true;
     while (running && !stop_requested) {
         const FrameClock::time_point current_tick = FrameClock::now();
         const double elapsed = std::chrono::duration<double>(
             current_tick - previous_tick).count();
         previous_tick = current_tick;
+        if (elapsed > 0.25)
+            ++clamped_elapsed_frames;
         simulation_accumulator += (std::min)(elapsed, 0.25);
 
         SDL_Event event;
@@ -731,7 +876,8 @@ int main() {
                     framebuffer_width = (std::max)(event.window.data1, 1);
                     framebuffer_height = (std::max)(event.window.data2, 1);
                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                    if (input_capture_enabled)
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                     SDL_SetRelativeMouseMode(SDL_FALSE);
                 }
@@ -740,10 +886,14 @@ int main() {
 
         const CameraBasis basis = camera_basis(camera);
         const Uint8 *keys = SDL_GetKeyboardState(nullptr);
+        uint64_t simulation_steps = 0;
         while (simulation_accumulator >= fixed_dt) {
             update_camera_movement(&camera, basis, keys, fixed_dt);
             simulation_accumulator -= fixed_dt;
+            ++simulation_steps;
         }
+        maximum_simulation_steps =
+            (std::max)(maximum_simulation_steps, simulation_steps);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         if (!render_world_geometry(world, world_textures, camera, basis,
                                    &world_geometry_list,
@@ -754,6 +904,14 @@ int main() {
         }
         glXSwapBuffers(display, window);
         ++rendered_frames;
+        const FrameClock::time_point render_finished = FrameClock::now();
+        if (render_finished > frame_deadline) {
+            ++render_deadline_misses;
+            maximum_render_lateness_ms = (std::max)(
+                maximum_render_lateness_ms,
+                std::chrono::duration<double, std::milli>(
+                    render_finished - frame_deadline).count());
+        }
         std::this_thread::sleep_until(frame_deadline);
         frame_deadline += frame_period;
         const FrameClock::time_point after_sleep = FrameClock::now();
@@ -767,19 +925,28 @@ int main() {
         FrameClock::now() - run_started).count();
     std::fprintf(stderr,
                  "Genesis3D Linux: render summary: %llu frames in %.3f s "
-                 "(%.2f FPS, %llu missed deadlines)\n",
+                 "(%.2f FPS, %llu schedule resyncs, %llu render deadline "
+                 "misses, %.3f ms max lateness, %llu elapsed clamps, %llu "
+                 "max fixed steps/frame)\n",
                  static_cast<unsigned long long>(rendered_frames), run_seconds,
                  run_seconds > 0.0 ? rendered_frames / run_seconds : 0.0,
-                 static_cast<unsigned long long>(missed_deadlines));
+                 static_cast<unsigned long long>(missed_deadlines),
+                 static_cast<unsigned long long>(render_deadline_misses),
+                 maximum_render_lateness_ms,
+                 static_cast<unsigned long long>(clamped_elapsed_frames),
+                 static_cast<unsigned long long>(maximum_simulation_steps));
 
     if (world_geometry_list != 0)
         glDeleteLists(world_geometry_list, 1);
     SDL_SetRelativeMouseMode(SDL_FALSE);
     SDL_DestroyWindow(input_window);
-    SDL_Quit();
     destroy_world_textures(&world_textures);
     glXMakeCurrent(display, None, nullptr);
     glXDestroyContext(display, context);
+    // SDL2-compat's video shutdown releases process-wide GLX display state.
+    // Tear down our independently-created GLX context first; reversing these
+    // calls makes Mesa's glXDestroyContext access state SDL has already freed.
+    SDL_Quit();
     XDestroyWindow(display, window);
     XFreeColormap(display, colormap);
     XFree(visual);

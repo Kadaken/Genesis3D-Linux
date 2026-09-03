@@ -23,7 +23,7 @@
 #include	<assert.h>
 #include	<string.h>
 
-#include	"ram.h"
+#include	"RAM.H"
 #include	"dirtree-common.h"
 
 char *	DuplicateString(const char *String)

@@ -19,14 +19,12 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #include <stdio.h>
 #include <assert.h>		// assert()	
 #include <stdlib.h>
 #include <string.h>		// memmove(), strncpy() strncat()
 
-#include "ErrorLog.h"   
+#include "Errorlog.h"
 
 #define MAX_ERRORS 30  //  ...
 
@@ -108,7 +106,7 @@ GENESISAPI void geErrorLog_AddExplicit(geErrorLog_ErrorClassType Error,
 	
 	{
 		char Number[20];
-		itoa(LineNumber,Number,10);
+		snprintf(Number, sizeof(Number), "%d", LineNumber);
 		strncat(SDst,Number,MAX_USER_NAME_LEN);
 	}
 	
@@ -138,14 +136,7 @@ GENESISAPI void geErrorLog_AddExplicit(geErrorLog_ErrorClassType Error,
 	geErrorLog_Locals.ErrorCount++;
 
 #ifndef NDEBUG
-#pragma message ("Clean up the OutputDebugStrings in geErrorLog_AddExplicit")
-{
-	char	buff[100];
-	sprintf(buff, "ErrorLog: %d -", Error);
-	OutputDebugString(buff);
-	OutputDebugString(SDst);
-	OutputDebugString("\r\n");
-}
+	fprintf(stderr, "ErrorLog: %d - %s\n", Error, SDst);
 #endif
 }
 
@@ -182,8 +173,7 @@ GENESISAPI geBoolean geErrorLog_Report(int history, geErrorLog_ErrorClassType *e
 		}
 	
 	
-	*error = geErrorLog_Locals.ErrorList[history].ErrorID;
+	*error = (geErrorLog_ErrorClassType)geErrorLog_Locals.ErrorList[history].ErrorID;
 	*UserString = geErrorLog_Locals.ErrorList[history].String;
 	return GE_TRUE;
 }
-

@@ -22,16 +22,16 @@
 #include <Windows.h>
 #include <stdio.h>
 
-#include "D3DDrv.h"
-#include "DCommon.h"
+#include "D3ddrv.h"
+#include "Dcommon.h"
 #include "Scene.h"
 #include "Render.h"
-#include "GSpan.h"
-#include "D3DCache.h"
-#include "D3D_Fx.h"
-#include "D3D_Main.h"
-#include "PCache.h"
-#include "D3D_Err.h"
+#include "Gspan.h"
+#include "D3dcache.h"
+#include "D3d_fx.h"
+#include "D3d_main.h"
+#include "Pcache.h"
+#include "D3d_err.h"
 #include "THandle.h"
 
 //#define D3D_MANAGE_TEXTURES

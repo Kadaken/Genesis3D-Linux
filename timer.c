@@ -23,7 +23,7 @@
 #include "timer.h"
 
 // changed QD - port to VS8: stdout is not a constant anymore
-#if _MSC_VER > 1200
+#if !defined(_MSC_VER) || _MSC_VER > 1200
 	FILE *timerFP = (FILE *)0;
 #else
 	FILE *timerFP = stdout;

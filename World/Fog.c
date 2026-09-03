@@ -19,8 +19,8 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Windows.h>
-#include <Assert.h>
+#include <assert.h>
+#include <string.h>
 
 #include "Fog.h"
 
@@ -108,4 +108,3 @@ GENESISAPI void *geFog_GetUserData(geFog *Fog)
 
 	return Fog->UserData;
 }
-

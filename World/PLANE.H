@@ -22,10 +22,9 @@
 #ifndef GE_PLANE_H
 #define GE_PLANE_H
 
-#include <Assert.h>
-#include <Windows.h>
+#include <assert.h>
 
-#include "GBSPFile.h"
+#include "Gbspfile.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -30,7 +30,7 @@ typedef unsigned long ulong;
 
 #pragma message("TSC on")
 
-#include "ram.h"
+#include "RAM.H"
 #include "log.h"
 #include <stdio.h>	//sprintf
 #include <windows.h>	//outputdebug

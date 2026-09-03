@@ -20,7 +20,7 @@
 #ifndef RENDER_H
 #define RENDER_H
 
-#include "DCommon.h"
+#include "Dcommon.h"
 
 #ifdef __cplusplus
 extern "C" {

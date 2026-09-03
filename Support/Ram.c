@@ -22,13 +22,16 @@
 #include <memory.h>
 #include <malloc.h>
 #include <assert.h>
+#include <stdio.h>
 
 #ifndef NDEBUG
 #define _CRTDBG_MAP_ALLOC
+#ifdef _WIN32
 #include <crtdbg.h>
 #endif
+#endif
 
-#include "ram.h"
+#include "RAM.H"
 
 /*
   This controls the MINIMAL_CONFIG flag.  Basically, all overflow, underflow,
@@ -250,7 +253,13 @@ GENESISAPI 	void* _geRam_DebugAllocate(uint32 size, const char* pFile, int line)
 
       do
       {
-          p = (char*)_malloc_dbg (size + EXTRA_SIZE, _NORMAL_BLOCK, pFile, line);
+#ifdef _WIN32
+		  p = (char*)_malloc_dbg(size + EXTRA_SIZE, _NORMAL_BLOCK, pFile, line);
+#else
+		  (void)pFile;
+		  (void)line;
+		  p = (char*)malloc(size + EXTRA_SIZE);
+#endif
       } while ((p == NULL) && geRam_DoCriticalCallback ());
 
       if (p == NULL)
@@ -412,7 +421,13 @@ GENESISAPI     void * _geRam_DebugRealloc (void *ptr, uint32 newsize, const char
 
         do
         {
-            NewPtr = (char *)_realloc_dbg(p, newsize+EXTRA_SIZE, _NORMAL_BLOCK, pFile, line);
+#ifdef _WIN32
+			NewPtr = (char *)_realloc_dbg(p, newsize+EXTRA_SIZE, _NORMAL_BLOCK, pFile, line);
+#else
+			(void)pFile;
+			(void)line;
+			NewPtr = (char *)realloc(p, newsize+EXTRA_SIZE);
+#endif
         } while ((NewPtr == NULL) && geRam_DoCriticalCallback ());
 
         // if allocation failed, return NULL...
@@ -493,7 +508,12 @@ GENESISAPI     void * geRam_Realloc (void *ptr, uint32 newsize)
 
 GENESISAPI void geRam_ReportAllocations(void)
 {
+#ifdef _WIN32
 	_CrtDumpMemoryLeaks();
+#else
+	fprintf(stderr, "Genesis3D RAM: %d allocations, %d bytes still active\n",
+		geRam_NumberOfAllocations, geRam_CurrentlyUsed);
+#endif
 }
 
 #endif

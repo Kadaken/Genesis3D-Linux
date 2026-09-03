@@ -1,0 +1,8 @@
+# Fedora's SDL2 compatibility layer retains its SDL3 environment/hash globals
+# while unloading. Match the library object rather than SDL_Quit_REAL because
+# LeakSanitizer cannot symbolize the compatibility thunk on this build.
+leak:libSDL2-2.0.so.0
+
+# No suppression is provided for Mesa's 128-byte glXChooseVisual allocation:
+# its DRI module is unloaded before LeakSanitizer collects stacks, leaving only
+# anonymous frames. Suppressing `main` would also hide real engine leaks.

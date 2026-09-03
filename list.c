@@ -35,7 +35,7 @@ List_Ram can still be as high as 30% of the time!
 #include <string.h>
 #include "list.h"
 #include "mempool.h"
-#include "ram.h"
+#include "RAM.H"
 #include "crc32.h"
 
 /**********************************/
@@ -932,7 +932,7 @@ struct Hash
 
 struct HashNode
 {
-	uint32	Key;
+	uintptr_t Key;
 	uint32	Data;
 };
 
@@ -961,7 +961,7 @@ void Hash_Destroy(Hash *H)
 	destroy(H);
 }	
 
-HashNode *	LISTCALL Hash_Add(Hash *H,uint32 Key,uint32 Data)
+HashNode *	LISTCALL Hash_Add(Hash *H,uintptr_t Key,uint32 Data)
 {
 HashNode * hn;
 	hn = MemPool_GetHunk(HashNodePool_g);
@@ -1008,7 +1008,7 @@ int n;
 	MemPool_FreeHunk(HashNodePool_g,pNode);
 }
 
-HashNode *	LISTCALL Hash_Get(Hash *pHash,uint32 Key,uint32 *pData)
+HashNode *	LISTCALL Hash_Get(Hash *pHash,uintptr_t Key,uint32 *pData)
 {
 int n;
 	for(n=0;n<pHash->NodeCount;n++)
@@ -1061,20 +1061,19 @@ uint32		LISTCALL Hash_NumMembers(Hash *pHash)
 
 struct Hash
 {
-
-	Debug(Hash * MySelf1)
+	Hash * MySelf1;
 
 	HashNode *	HashTable[HASH_SIZE];
 	HashNode *	NodeList;
 
-	Debug(int	Members)
-	Debug(Hash * MySelf2)
+	int	Members;
+	Hash * MySelf2;
 };
 
 struct HashNode
 {
 	LinkNode LN;
-	uint32	Key;
+	uintptr_t Key;
 	uint32	Data;
 	uint32	Hash;
 };
@@ -1090,8 +1089,8 @@ HashNode *pHead,*pTail;
 	
 	//memset(pHash,0,sizeof(Hash));
 
-	Debug( pHash->MySelf1 = pHash )
-	Debug( pHash->MySelf2 = pHash )
+	pHash->MySelf1 = pHash;
+	pHash->MySelf2 = pHash;
 
 	pTail = MemPool_GetHunk(HashNodePool_g);
 	assert(pTail);
@@ -1109,7 +1108,7 @@ HashNode *pHead,*pTail;
 
 	pHash->NodeList = pHead;
 
-	Debug(pHash->Members = 0)
+	pHash->Members = 0;
 
 return pHash;
 }
@@ -1122,13 +1121,13 @@ void Hash_Destroy(Hash *pHash)
 	
 		assert( pHash->MySelf1 == pHash && pHash->MySelf2 == pHash );
 
-		Debug(pHash->Members += 2) // count Head & Tail
+		pHash->Members += 2; // count Head & Tail
 
 		pList = pHash->NodeList;
 		LN_Walk_Editting(pNode,pList,pNext) {
 			MemPool_FreeHunk(HashNodePool_g,pNode);
 			assert(pHash->Members > 1);
-			Debug(pHash->Members --)
+			pHash->Members--;
 		}
 		assert(pHash->Members == 1);
 		MemPool_FreeHunk(HashNodePool_g,pList);
@@ -1136,7 +1135,6 @@ void Hash_Destroy(Hash *pHash)
 	}
 }
 
-#ifdef _DEBUG
 int Hash_ListLen(Hash *pHash,uint32 H)
 {
 HashNode *hn;
@@ -1152,20 +1150,19 @@ int Len = 0;
 	}
 return Len;
 }
-#endif
 
-HashNode * LISTCALL Hash_Add(Hash *pHash,uint32 Key,uint32 Data)
+HashNode * LISTCALL Hash_Add(Hash *pHash,uintptr_t Key,uint32 Data)
 {
 uint32 H;
 HashNode *hn,**pTable,*Node,*Prev;
-Debug( int ListLen1; int ListLen2; int HashLen1; int HashLen2; int WalkLen)
+int ListLen1, ListLen2, HashLen1, HashLen2, WalkLen;
 
 	assert(pHash);
 	assert( pHash->MySelf1 == pHash && pHash->MySelf2 == pHash );
 
 	hn = MemPool_GetHunk(HashNodePool_g);
 	assert(hn);
-	Debug( LN_Null(hn) )
+	LN_Null(hn);
 
 	hn->Key = Key;
 	hn->Data = Data;
@@ -1178,15 +1175,15 @@ Debug( int ListLen1; int ListLen2; int HashLen1; int HashLen2; int WalkLen)
 	assert( pHash->NodeList->Hash == 0 );
 	assert( ((HashNode *)LN_Prev(pHash->NodeList))->Hash == HASH_SIZE );
 
-	Debug(HashLen1 = Hash_NumMembers(pHash))
-	Debug(ListLen1 = Hash_ListLen(pHash,H))
+	HashLen1 = Hash_NumMembers(pHash);
+	ListLen1 = Hash_ListLen(pHash,H);
 
 	if ( ! Node )
 	{
 		Prev = pHash->NodeList;
 		Node = LN_Next(Prev);
 
-		Debug(WalkLen = 0)
+		WalkLen = 0;
 
 		assert(Prev->Hash < H);
 		while( Node->Hash < H )
@@ -1195,7 +1192,7 @@ Debug( int ListLen1; int ListLen2; int HashLen1; int HashLen2; int WalkLen)
 			Node = LN_Next(Prev);
 		
 			assert(WalkLen < pHash->Members );
-			Debug( WalkLen ++)
+			WalkLen++;
 			
 			assert(Prev->Hash <= Node->Hash);
 			assert(Prev->Hash < HASH_SIZE );
@@ -1208,11 +1205,11 @@ Debug( int ListLen1; int ListLen2; int HashLen1; int HashLen2; int WalkLen)
 	LN_AddBefore(hn,Node);
 	*pTable = hn;
 
-	Debug(pHash->Members ++)
+	pHash->Members++;
 
-	Debug(ListLen2 = Hash_ListLen(pHash,H))
+	ListLen2 = Hash_ListLen(pHash,H);
 	assert( ListLen2 == (ListLen1 + 1) );
-	Debug(HashLen2 = Hash_NumMembers(pHash))
+	HashLen2 = Hash_NumMembers(pHash);
 	assert( HashLen2 == (HashLen1 + 1) );
 
 return hn;
@@ -1222,7 +1219,7 @@ void LISTCALL Hash_DeleteNode(Hash *pHash,HashNode *pNode)
 {
 HashNode ** pHead;
 uint32 H;
-Debug( int ListLen1; int ListLen2;int HashLen1; int HashLen2)
+int ListLen1, ListLen2, HashLen1, HashLen2;
 
 	assert(pNode );
 	assert( pHash );
@@ -1233,10 +1230,10 @@ Debug( int ListLen1; int ListLen2;int HashLen1; int HashLen2)
 	H = pNode->Hash;
 	pHead = & ( pHash->HashTable[H] );
 
-	Debug( HashLen1 = Hash_NumMembers(pHash) )
-	Debug( ListLen1 = Hash_ListLen(pHash,H) )
+	HashLen1 = Hash_NumMembers(pHash);
+	ListLen1 = Hash_ListLen(pHash,H);
 	assert(pHash->Members > 0);
-	Debug(pHash->Members --)
+	pHash->Members--;
 
 	if ( *pHead == pNode )
 	{
@@ -1254,13 +1251,13 @@ Debug( int ListLen1; int ListLen2;int HashLen1; int HashLen2)
 
 	MemPool_FreeHunk(HashNodePool_g,pNode);
 	
-	Debug( HashLen2 = Hash_NumMembers(pHash) )
-	Debug( ListLen2 = Hash_ListLen(pHash,H) )
+	HashLen2 = Hash_NumMembers(pHash);
+	ListLen2 = Hash_ListLen(pHash,H);
 	assert( HashLen2 == (HashLen1 - 1) );
 
 }
 
-HashNode * LISTCALL Hash_Get(Hash *pHash,uint32 Key,uint32 *pData)
+HashNode * LISTCALL Hash_Get(Hash *pHash,uintptr_t Key,uint32 *pData)
 {
 uint32 H;
 HashNode *pNode;
@@ -1361,7 +1358,7 @@ void	HashNode_SetData(HashNode *pNode,uint32 Data)
 	pNode->Data = Data;
 }
 
-void	HashNode_GetData(HashNode *pNode,uint32 *pKey,uint32 *pData)
+void	HashNode_GetData(HashNode *pNode,uintptr_t *pKey,uint32 *pData)
 {
 	assert(pNode);
 	*pKey	= pNode->Key;
@@ -1374,7 +1371,7 @@ uint32	HashNode_Data(HashNode *pNode)
 return pNode->Data;
 }
 
-uint32	HashNode_Key(HashNode *pNode)
+uintptr_t HashNode_Key(HashNode *pNode)
 {
 	assert(pNode);
 return pNode->Key;

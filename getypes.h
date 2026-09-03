@@ -21,7 +21,7 @@
 #ifndef GE_TYPES_H
 #define GE_TYPES_H
 
-#include "BaseType.h"
+#include "basetype.h"
 
 
 #ifdef __cplusplus
@@ -137,4 +137,4 @@ typedef GE_Rect geRect;
 #endif
 
 
-#endif GETYPES_H
+#endif /* GE_TYPES_H */

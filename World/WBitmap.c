@@ -23,16 +23,18 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved                            */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Assert.h>
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
 
 //=====================================================================================
 //=====================================================================================
 #include "WBitmap.h"
-#include "GBSPFile.h"
-#include "Ram.h"
-#include "Bitmap.h"
+#include "Gbspfile.h"
+#include "RAM.H"
+#include "bitmap.h"
 #include "Errorlog.h"
-#include "Bitmap._h"
+#include "bitmap._h"
 
 //#define USEPERPIXEL
 
@@ -416,6 +418,7 @@ geBoolean geWBitmap_Pool_CreateAllWBitmaps(geWBitmap_Pool *Pool, GBSP_BSPData *B
 			int32					PalSize,cnt;
 			gePixelFormat			Format;
 			uint32					*DstPalPtr,*DstPalData;
+			void					*LockedPalData;
 			DRV_RGB					*SrcPalPtr;
 
 			//Pal = geBitmap_Palette_Create(GE_PIXELFORMAT_32BIT_ARGB, 256);
@@ -427,11 +430,12 @@ geBoolean geWBitmap_Pool_CreateAllWBitmaps(geWBitmap_Pool *Pool, GBSP_BSPData *B
 				return GE_FALSE;
 			}
 			
-			if (!geBitmap_Palette_Lock(Pal, &DstPalData, &Format, &PalSize))
+			if (!geBitmap_Palette_Lock(Pal, &LockedPalData, &Format, &PalSize))
 			{
 				geErrorLog_AddString(-1, "geWBitmap_Pool_CreateAllWBitmaps:  geBitmap_Palette_Lock failed.", NULL);
 				return GE_FALSE;
 			}
+			DstPalData = (uint32 *)LockedPalData;
 
 			//cnt = sizeof(DRV_Palette); 
 			// <> this doesn't seem to respect the pragma pack in dcommon !
@@ -605,8 +609,8 @@ char *geWBitmap_Pool_GetWNameByBitmap(geWBitmap_Pool *Pool, const geBitmap *Bitm
 	for (i=0; i< Pool->NumWBitmaps; i++, pWBitmap++)
 	{
 		char str[100];
-		sprintf(str,"WBitmap : %x\n",pWBitmap->Bitmap);
-		OutputDebugString(str);
+		sprintf(str,"WBitmap : %p\n", (void *)pWBitmap->Bitmap);
+		fputs(str, stderr);
 		if (pWBitmap->Bitmap == Bitmap)
 			return pWBitmap->Name;
 	}

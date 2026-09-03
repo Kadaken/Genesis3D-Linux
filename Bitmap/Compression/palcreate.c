@@ -84,7 +84,7 @@ why this isn't exactly optimal:
 #include "palcreate.h"
 #include "tsc.h"
 #include "paloptimize.h"
-#include "ram.h"
+#include "RAM.H"
 #include "yuv.h"
 #include "mempool.h"
 #include "utility.h"		// delete macro
@@ -193,11 +193,11 @@ struct octNode
 
 int createOctTree(octNode * root,const geBitmap_Info * Info,const void * Bits,geBoolean doYUV);
 geBitmap_Palette * createPaletteGoodSub(const geBitmap_Info * Info,const void * Bits);
-void addOctNode(octNode *root,int R,int G,int B,int *nLeavesPtr);
-void gatherLeaves(octNode *node,octNode *** leavesPtrPtr,int minCount);
-void gatherLeavesCutting(octNode *node,octNode *** leavesPtrPtr);
-int leafCompareCount(const void *a,const void *b);
-int leafCompareCost(const void *a,const void *b);
+static void addOctNode(octNode *root,int R,int G,int B,int *nLeavesPtr);
+static void gatherLeaves(octNode *node,octNode *** leavesPtrPtr,int minCount);
+static void gatherLeavesCutting(octNode *node,octNode *** leavesPtrPtr);
+static int leafCompareCount(const void *a,const void *b);
+static int leafCompareCost(const void *a,const void *b);
 int findClosest(int R,int G,int B,uint8 *palette,int palEntries,int *foundPalPtr);
 void computeOctRGBs(octNode *node);
 void computeCutCosts(octNode *node);
@@ -264,7 +264,7 @@ geBitmap_Palette * Pal;
 	{
 		leavesPtr = leaves;
 		gatherLeaves(root,&leavesPtr,minCount);
-		gotLeaves = ((uint32)leavesPtr - (uint32)leaves)/sizeof(octNode *);
+		gotLeaves = (int)(leavesPtr - leaves);
 	}
 
 	// sort the leaves by count
@@ -330,7 +330,7 @@ geBitmap_Palette * Pal;
 
 	leavesPtr = leaves;
 	gatherLeavesCutting(root,&leavesPtr);
-	gotLeaves = ((uint32)leavesPtr - (uint32)leaves)/sizeof(octNode *);
+	gotLeaves = (int)(leavesPtr - leaves);
 
 	// if gotLeaves < palEntries, just exit asap
 	if ( gotLeaves < palEntries )

@@ -30,23 +30,24 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved                            */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Assert.h>
-#include <Windows.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "User.h"
+#include "USER.H"
 #include "World.h"
-#include "Ram.h"
-#include "ErrorLog.h"
+#include "RAM.H"
+#include "Errorlog.h"
 #include "System.h"
-#include "Surface.h"
+#include "SURFACE.H"
 #include "Genesis.h"
 #include "Camera.h"
-#include "Frustum.h"
-#include "Plane.h"
+#include "FRUSTUM.H"
+#include "PLANE.H"
 
-#include "DCommon.h"
+#include "Dcommon.h"
 
-#include "Bitmap._h"
+#include "bitmap._h"
 
 extern int32	MirrorRecursion;					// GLOBAL!!! in World.c
 
@@ -83,21 +84,21 @@ static geBoolean RenderUserPoly(geCamera *Camera, gePoly *Poly);
 static void geWorld_LinkPolyToLeaf(const geWorld *World, gePoly *Poly);
 static void geWorld_UnLinkPolyFromLeaf(gePoly *Poly);
 
-#ifdef _DEBUG
-geBoolean geWorld_PolyIsValid(gePoly *Poly)
+static geBoolean geWorld_PolyIsValid(const gePoly *Poly)
 {
 	if (!Poly)
 		return GE_FALSE;
 
+#ifdef _DEBUG
 	if (Poly->Self1 != Poly)
 		return GE_FALSE;
 
 	if (Poly->Self2 != Poly)
 		return GE_FALSE;
+#endif
 
 	return GE_TRUE;
 }
-#endif
 
 //=====================================================================================
 //	User_EngineInit

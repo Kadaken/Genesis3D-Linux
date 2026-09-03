@@ -19,15 +19,15 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Assert.h>
-#include <Windows.h>
-#include <Math.h>
+#include <assert.h>
+#include <math.h>
+#include <string.h>
 
 #include "Camera.h"
-#include "Frustum.h"
-#include "Surface.h"
+#include "FRUSTUM.H"
+#include "SURFACE.H"
 
-#include "Vec3d.h"
+#include "VEC3D.H"
 
 //#define RIGHT_HANDED
 
@@ -1254,11 +1254,10 @@ geBoolean Frustum_ClipToPlaneL(GFX_Plane *pPlane,
         pInVert++;
     }
 
-    *NumOutVerts = ((uint32)pOutVert - (uint32)pOut)/sizeof(*pOut);
+    *NumOutVerts = (int32)(pOutVert - pOut);
 
     if ( *NumOutVerts < 3)
         return GE_FALSE;
 
 return GE_TRUE;
 }
-

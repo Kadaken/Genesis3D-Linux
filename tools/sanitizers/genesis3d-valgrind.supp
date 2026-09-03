@@ -1,0 +1,14 @@
+{
+   SDL2_compat_shutdown_globals
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   fun:SDL_Quit_REAL
+}
+{
+   Mesa_radeonsi_glXChooseVisual_global
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   fun:glXChooseVisual
+}

@@ -20,12 +20,12 @@
 /*                                                                                      */
 /****************************************************************************************/
 #include <Windows.h>
-#include <Stdio.h>
-#include <Assert.h>
+#include <stdio.h>
+#include <assert.h>
 #include <DDraw.h>
 #include <D3D.h>
 
-#include "D3DCache.h"
+#include "D3dcache.h"
 
 // Cache types are just the different types of textures
 // Texutres may vary from width/height/num miplevels/etc...

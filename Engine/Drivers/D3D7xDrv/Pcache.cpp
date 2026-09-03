@@ -78,22 +78,22 @@
 #include <Windows.h>
 #include <stdio.h>
 
-#include "D3DCache.h"
-#include "D3D_Fx.h"
+#include "D3dcache.h"
+#include "D3d_fx.h"
 
-#include "PCache.h"
+#include "Pcache.h"
 
 /*  07/16/2000 Wendell Buckner
 /*   Convert to Directx7...    
 #include "D3DDrv.h"              */
-#include "D3DDrv7x.h"
+#include "D3ddrv7x.h"
 
 #include "THandle.h"
-#include "D3D_Err.h"
+#include "D3D_ERR.H"
 
 /*   01/28/2003 Wendell Buckner                                                         */
 /*    Cache decals so that they can be drawn after all the 3d stuff...                  */
-#include "Render.h"
+#include "RENDER.H"
 
 //#define D3D_MANAGE_TEXTURES
 #define SUPER_FLUSH
@@ -294,7 +294,7 @@ static BOOL RenderWorldPolys(int32 RenderMode);
 static BOOL ClearWorldCache(void);
 static int32 GetMipLevel(DRV_TLVertex *Verts, int32 NumVerts, float ScaleU, float ScaleV, int32 MaxMipLevel);
 
-#include <Math.h>
+#include <math.h>
 
 __inline DWORD F2DW(float f)
 {

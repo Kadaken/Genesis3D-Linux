@@ -1,0 +1,15 @@
+# Out-of-tree/runtime assets are linked from the installed game data.
+/Assets/
+
+# CMake in-source artifacts and native binaries.
+/CMakeCache.txt
+/CMakeFiles/
+/Makefile
+/cmake_install.cmake
+/genesis3d_linux
+
+# Generated diagnostics and caches.
+/bsp_strings.txt
+/Reports/evidence/asset_purification/*.strings.hex.txt
+__pycache__/
+*.py[cod]

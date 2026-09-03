@@ -23,8 +23,8 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "genesis.h"
-#include "ram.h"
+#include "Genesis.h"
+#include "RAM.H"
 #include "matrix33.h"
 #include "quatern.h"
 

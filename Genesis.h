@@ -25,13 +25,13 @@
 #ifndef GENESIS_H
 #define GENESIS_H
 
-#include "BaseType.h"
-#include "Vec3d.h"
-#include "XForm3d.h"
-#include "GETypes.h"
+#include "basetype.h"
+#include "VEC3D.H"
+#include "XFORM3D.H"
+#include "getypes.h"
 #include "ExtBox.h"
 #include "vfile.h"
-#include "Bitmap.h"
+#include "bitmap.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -389,22 +389,22 @@ GENESISAPI void *geSound_GetDSound(void);
 //================================================================================
 //  Path Support
 //================================================================================
-#include "Path.h"
+#include "path.h"
 //================================================================================
 //  Motion Support
 //================================================================================
-#include "Motion.h"
+#include "motion.h"
 //================================================================================
 //  Actor Support
 //================================================================================
-#include "Actor.h"
+#include "actor.h"
 
 //MRB BEGIN
 //geSprite
 //================================================================================
 //  Sprite Support
 //================================================================================
-#include "Sprite.h"
+#include "sprite.h"
 //MRB END
 
 
@@ -689,11 +689,10 @@ GENESISAPI geBoolean		GENESISCC geCSNetMgr_StopSession(geCSNetMgr *M);
 GENESISAPI geBoolean		GENESISCC geCSNetMgr_SendToServer(geCSNetMgr *M, geBoolean Guaranteed, uint8 *Data, int32 DataSize);
 GENESISAPI geBoolean		GENESISCC geCSNetMgr_SendToClient(geCSNetMgr *M, geCSNetMgr_NetID To, geBoolean Guaranteed, uint8 *Data, int32 DataSize);
 
-#include "xtra_g3d.h"
+/* Optional historical extension header is not shipped in this source tree. */
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-
