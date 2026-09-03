@@ -102,6 +102,7 @@
 #endif
 
 #include "body.h"
+#include "xfarray.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -187,6 +188,11 @@ GENESISAPI geBoolean GENESISCC geActor_IsValid(const geActor *A);
 
 	// Returns the Actor Definition associated with Actor A
 GENESISAPI geActor_Def *GENESISCC geActor_GetActorDef(const geActor *A);
+
+/* Native renderer bridge: immutable view of the actor's current posed joint
+ * transforms.  Ownership remains with the actor and the view is invalidated
+ * by the next pose update or actor destruction. */
+GENESISAPI const geXFArray *GENESISCC geActor_GetPoseTransforms(const geActor *A);
 
 	// Writes an existing geActor to a file image.  Returns GE_TRUE on success, GE_FALSE on failure.
 GENESISAPI geBoolean GENESISCC geActor_DefWriteToFile(const geActor_Def *A, geVFile *pFile);

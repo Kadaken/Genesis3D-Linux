@@ -277,6 +277,14 @@ GENESISAPI geActor_Def *GENESISCC geActor_GetActorDef(const geActor *A)
 	return A->ActorDefinition;
 }
 
+GENESISAPI const geXFArray *GENESISCC geActor_GetPoseTransforms(const geActor *A)
+{
+	assert(geActor_IsValid(A) != GE_FALSE);
+	if (A == NULL || A->Pose == NULL)
+		return NULL;
+	return gePose_GetAllJointTransforms(A->Pose);
+}
+
 GENESISAPI void GENESISCC geActor_DefCreateRef(geActor_Def *A)
 {
 	assert( geActor_DefIsValid(A) != GE_FALSE );

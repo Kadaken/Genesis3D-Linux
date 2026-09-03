@@ -142,6 +142,8 @@ static	geBoolean	WriteTree(const DirTree *Tree, geVFile *File)
 {
 	int		Length;
 	int		Terminator;
+	int32	DiskSize;
+	int32	DiskOffset;
 
 	assert(Tree);
 	assert(Tree->Name);
@@ -167,10 +169,12 @@ static	geBoolean	WriteTree(const DirTree *Tree, geVFile *File)
 	if	(geVFile_Write(File, &Tree->AttributeFlags, sizeof(Tree->AttributeFlags)) == GE_FALSE)
 		return GE_FALSE;
 
-	if	(geVFile_Write(File, &Tree->Size, sizeof(Tree->Size)) == GE_FALSE)
+	DiskSize = (int32)Tree->Size;
+	if	(geVFile_Write(File, &DiskSize, sizeof(DiskSize)) == GE_FALSE)
 		return GE_FALSE;
 
-	if	(geVFile_Write(File, &Tree->Offset, sizeof(Tree->Offset)) == GE_FALSE)
+	DiskOffset = (int32)Tree->Offset;
+	if	(geVFile_Write(File, &DiskOffset, sizeof(DiskOffset)) == GE_FALSE)
 		return GE_FALSE;
 	
 	if	(geVFile_Write(File, &Tree->Hints.HintDataLength, sizeof(Tree->Hints.HintDataLength)) == GE_FALSE)
@@ -303,6 +307,8 @@ static	geBoolean	ReadTree(geVFile *File, DirTree **TreePtr)
 {
 	int			Terminator;
 	int			Length;
+	int32		DiskSize;
+	int32		DiskOffset;
 	DirTree *	Tree;
 
 	if	(geVFile_Read(File, &Terminator, sizeof(Terminator)) == GE_FALSE)
@@ -343,11 +349,13 @@ static	geBoolean	ReadTree(geVFile *File, DirTree **TreePtr)
 	if	(geVFile_Read(File, &Tree->AttributeFlags, sizeof(Tree->AttributeFlags)) == GE_FALSE)
 		goto fail;
 
-	if	(geVFile_Read(File, &Tree->Size, sizeof(Tree->Size)) == GE_FALSE)
+	if	(geVFile_Read(File, &DiskSize, sizeof(DiskSize)) == GE_FALSE)
 		goto fail;
+	Tree->Size = DiskSize;
 
-	if	(geVFile_Read(File, &Tree->Offset, sizeof(Tree->Offset)) == GE_FALSE)
+	if	(geVFile_Read(File, &DiskOffset, sizeof(DiskOffset)) == GE_FALSE)
 		goto fail;
+	Tree->Offset = DiskOffset;
 
 	if	(geVFile_Read(File, &Tree->Hints.HintDataLength, sizeof(Tree->Hints.HintDataLength)) == GE_FALSE)
 		goto fail;

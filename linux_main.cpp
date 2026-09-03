@@ -20,7 +20,9 @@
 #include <vector>
 
 #include "Genesis.h"
+#include "Actor/bodyinst.h"
 #include "Entities/ENTITIES.H"
+#include "World/PLANE.H"
 #include "World/World.h"
 
 namespace {
@@ -68,6 +70,28 @@ struct NativeTextureSet {
     uint64_t material_pixel_count = 0;
     uint64_t lightmap_rgb_sum = 0;
     uint64_t lightmap_pixel_count = 0;
+};
+
+struct RenderDiagnostics {
+    uint64_t visible_faces = 0;
+    uint64_t culled_faces = 0;
+    uint64_t actor_submissions = 0;
+    uint64_t translucent_submissions = 0;
+    uint64_t animated_surfaces = 0;
+    uint64_t dynamic_lights = 0;
+};
+
+struct FaceCommand {
+    int32 index;
+    double distance_squared;
+};
+
+struct NativeActor {
+    geActor_Def *definition = nullptr;
+    geActor *actor = nullptr;
+    geBodyInst *body_instance = nullptr;
+    std::vector<GLuint> materials;
+    geVec3d scale {1.0f, 1.0f, 1.0f};
 };
 
 bool upload_bitmap_texture(geBitmap *bitmap, GLuint *texture,
@@ -229,6 +253,57 @@ void destroy_world_textures(NativeTextureSet *textures) {
     textures->lightmaps.clear();
 }
 
+bool load_native_actor(const std::string &path, NativeActor *native_actor) {
+    if (!native_actor)
+        return false;
+    geVFile *file = geVFile_OpenNewSystem(nullptr, GE_VFILE_TYPE_DOS,
+                                           path.c_str(), nullptr,
+                                           GE_VFILE_OPEN_READONLY);
+    if (!file)
+        return false;
+    native_actor->definition = geActor_DefCreateFromFile(file);
+    geVFile_Close(file);
+    if (!native_actor->definition)
+        return false;
+    native_actor->actor = geActor_Create(native_actor->definition);
+    if (!native_actor->actor)
+        return false;
+    geActor_ClearPose(native_actor->actor, nullptr);
+    geBody *body = geActor_GetBody(native_actor->definition);
+    native_actor->body_instance = geBodyInst_Create(body);
+    if (!native_actor->body_instance)
+        return false;
+
+    const int material_count = geBody_GetMaterialCount(body);
+    native_actor->materials.assign(static_cast<size_t>(material_count), 0);
+    uint64_t ignored_sum = 0;
+    uint64_t ignored_pixels = 0;
+    for (int material = 0; material < material_count; ++material) {
+        const char *name = nullptr;
+        geBitmap *bitmap = nullptr;
+        geFloat red = 255.0f, green = 255.0f, blue = 255.0f;
+        if (geBody_GetMaterial(body, material, &name, &bitmap,
+                               &red, &green, &blue) && bitmap)
+            upload_bitmap_texture(bitmap, &native_actor->materials[material],
+                                  &ignored_sum, &ignored_pixels);
+    }
+    return true;
+}
+
+void destroy_native_actor(NativeActor *native_actor) {
+    if (!native_actor)
+        return;
+    if (!native_actor->materials.empty())
+        glDeleteTextures(static_cast<GLsizei>(native_actor->materials.size()),
+                         native_actor->materials.data());
+    if (native_actor->body_instance)
+        geBodyInst_Destroy(&native_actor->body_instance);
+    if (native_actor->actor)
+        geActor_Destroy(&native_actor->actor);
+    if (native_actor->definition)
+        geActor_DefDestroy(&native_actor->definition);
+}
+
 Vec3 subtract(const Vec3 &a, const Vec3 &b) {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
 }
@@ -336,13 +411,79 @@ void look_at(const Vec3 &eye, const Vec3 &target) {
                  static_cast<GLfloat>(-eye.z));
 }
 
+bool render_native_actor(NativeActor *native_actor,
+                         RenderDiagnostics *diagnostics) {
+    if (!native_actor || !native_actor->actor ||
+        !native_actor->body_instance)
+        return false;
+    const geXFArray *transforms =
+        geActor_GetPoseTransforms(native_actor->actor);
+    const geBodyInst_Geometry *geometry = geBodyInst_GetGeometry(
+        native_actor->body_instance, &native_actor->scale, transforms,
+        GE_BODY_HIGHEST_LOD, nullptr);
+    if (!geometry || !geometry->FaceList || !geometry->SkinVertexArray)
+        return false;
+
+    glActiveTexture(GL_TEXTURE1);
+    glDisable(GL_TEXTURE_2D);
+    glActiveTexture(GL_TEXTURE0);
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+    const geBodyInst_Index *cursor = geometry->FaceList;
+    const geBodyInst_Index *end = cursor + geometry->FaceListSize;
+    while (cursor < end) {
+        const int primitive = *cursor++;
+        if (cursor >= end)
+            return false;
+        const int material = *cursor++;
+        int vertex_count = 3;
+        GLenum mode = GL_TRIANGLES;
+        if (primitive == GE_BODYINST_FACE_TRISTRIP ||
+            primitive == GE_BODYINST_FACE_TRIFAN) {
+            if (cursor >= end)
+                return false;
+            vertex_count = static_cast<int>(*cursor++) + 2;
+            mode = primitive == GE_BODYINST_FACE_TRISTRIP
+                ? GL_TRIANGLE_STRIP : GL_TRIANGLE_FAN;
+        } else if (primitive != GE_BODYINST_FACE_TRIANGLE) {
+            return false;
+        }
+        if (vertex_count < 3 || end - cursor < vertex_count * 2)
+            return false;
+        const GLuint texture = material >= 0 &&
+            material < static_cast<int>(native_actor->materials.size())
+            ? native_actor->materials[material] : 0;
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glBegin(mode);
+        for (int index = 0; index < vertex_count; ++index) {
+            const int vertex_index = *cursor++;
+            ++cursor; // normal index; fixed-function lighting is not enabled
+            if (vertex_index < 0 || vertex_index >= geometry->SkinVertexCount)
+                continue;
+            const geBodyInst_SkinVertex &vertex =
+                geometry->SkinVertexArray[vertex_index];
+            glTexCoord2f(vertex.SVU, vertex.SVV);
+            glVertex3f(vertex.SVPoint.X, vertex.SVPoint.Y, vertex.SVPoint.Z);
+        }
+        glEnd();
+        ++diagnostics->actor_submissions;
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return true;
+}
+
 bool render_world_geometry(const geWorld *world,
                            const NativeTextureSet &textures,
                            const PlayerCamera &camera,
                            const CameraBasis &basis,
-                           GLuint *geometry_list,
+                           NativeActor *native_actor,
+                           RenderDiagnostics *diagnostics,
                            int width, int height) {
-    if (!world || !world->CurrentBSP || !geometry_list)
+    if (!world || !world->CurrentBSP || !diagnostics)
         return false;
 
     const GBSP_BSPData &bsp = world->CurrentBSP->BSPData;
@@ -378,16 +519,6 @@ bool render_world_geometry(const geWorld *world,
                          camera.position.y + basis.forward.y,
                          camera.position.z + basis.forward.z};
     look_at(camera.position, target);
-
-    if (*geometry_list != 0) {
-        glCallList(*geometry_list);
-        return true;
-    }
-
-    *geometry_list = glGenLists(1);
-    if (*geometry_list == 0)
-        return false;
-    glNewList(*geometry_list, GL_COMPILE);
 
     glActiveTexture(GL_TEXTURE0);
     glEnable(GL_TEXTURE_2D);
@@ -442,7 +573,84 @@ bool render_world_geometry(const geWorld *world,
     const int32 first_face = std::max<int32>(0, root_model.FirstFace);
     const int32 final_face = std::min<int32>(
         bsp.NumGFXFaces, first_face + std::max<int32>(0, root_model.NumFaces));
+    std::vector<uint8_t> visible(static_cast<size_t>(bsp.NumGFXFaces), 0);
+    bool reliable_pvs = false;
+    const geVec3d camera_position = {
+        static_cast<geFloat>(camera.position.x),
+        static_cast<geFloat>(camera.position.y),
+        static_cast<geFloat>(camera.position.z)};
+    const int32 camera_leaf = Plane_FindLeaf(
+        world, root_model.RootNode[0], &camera_position);
+    if (camera_leaf >= 0 && camera_leaf < bsp.NumGFXLeafs) {
+        const int32 cluster = bsp.GFXLeafs[camera_leaf].Cluster;
+        if (cluster >= 0 && cluster < bsp.NumGFXClusters && bsp.GFXVisData &&
+            bsp.GFXClusters[cluster].VisOfs >= 0 &&
+            bsp.GFXClusters[cluster].VisOfs < bsp.NumGFXVisData) {
+            const uint8 *pvs = bsp.GFXVisData + bsp.GFXClusters[cluster].VisOfs;
+            reliable_pvs = true;
+            for (int32 leaf_index = root_model.FirstLeaf;
+                 leaf_index < root_model.FirstLeaf + root_model.NumLeafs &&
+                 leaf_index < bsp.NumGFXLeafs; ++leaf_index) {
+                const GFX_Leaf &leaf = bsp.GFXLeafs[leaf_index];
+                if (leaf.Cluster < 0 || leaf.Cluster >= root_model.NumClusters ||
+                    !(pvs[leaf.Cluster >> 3] & (1U << (leaf.Cluster & 7))))
+                    continue;
+                for (int32 item = 0; item < leaf.NumFaces; ++item) {
+                    const int32 list_index = leaf.FirstFace + item;
+                    if (list_index < 0 || list_index >= bsp.NumGFXLeafFaces)
+                        continue;
+                    const int32 face = bsp.GFXLeafFaces[list_index];
+                    if (face >= first_face && face < final_face)
+                        visible[face] = 1;
+                }
+            }
+        }
+    }
+    if (!reliable_pvs)
+        std::fill(visible.begin() + first_face, visible.begin() + final_face, 1);
+
+    std::vector<FaceCommand> opaque;
+    std::vector<FaceCommand> translucent;
+    opaque.reserve(static_cast<size_t>(final_face - first_face));
     for (int32 face_index = first_face; face_index < final_face; ++face_index) {
+        if (!visible[face_index]) {
+            ++diagnostics->culled_faces;
+            continue;
+        }
+        const GFX_Face &face = bsp.GFXFaces[face_index];
+        double distance_squared = 0.0;
+        if (face.NumVerts > 0 && face.FirstVert >= 0 &&
+            face.FirstVert < bsp.NumGFXVertIndexList) {
+            const int32 vertex_index = bsp.GFXVertIndexList[face.FirstVert];
+            if (vertex_index >= 0 && vertex_index < bsp.NumGFXVerts) {
+                const geVec3d &point = bsp.GFXVerts[vertex_index];
+                const double dx = point.X - camera.position.x;
+                const double dy = point.Y - camera.position.y;
+                const double dz = point.Z - camera.position.z;
+                distance_squared = dx * dx + dy * dy + dz * dz;
+            }
+        }
+        const bool is_translucent = face.TexInfo >= 0 &&
+            face.TexInfo < bsp.NumGFXTexInfo &&
+            (bsp.GFXTexInfo[face.TexInfo].Flags & TEXINFO_TRANS);
+        (is_translucent ? translucent : opaque).push_back(
+            {face_index, distance_squared});
+    }
+    std::sort(translucent.begin(), translucent.end(),
+              [](const FaceCommand &left, const FaceCommand &right) {
+                  return left.distance_squared > right.distance_squared;
+              });
+    std::vector<FaceCommand> commands;
+    commands.reserve(opaque.size() + translucent.size());
+    commands.insert(commands.end(), opaque.begin(), opaque.end());
+    commands.insert(commands.end(), translucent.begin(), translucent.end());
+
+    diagnostics->visible_faces += commands.size();
+    diagnostics->translucent_submissions += translucent.size();
+    diagnostics->dynamic_lights += world->LightInfo
+        ? static_cast<uint64_t>(world->LightInfo->NumDynamicLights) : 0;
+    for (const FaceCommand &command : commands) {
+        const int32 face_index = command.index;
         const GFX_Face &face = bsp.GFXFaces[face_index];
         if (face.NumVerts < 3 || face.PlaneNum < 0 ||
             face.PlaneNum >= bsp.NumGFXPlanes || face.TexInfo < 0 ||
@@ -463,6 +671,8 @@ bool render_world_geometry(const geWorld *world,
             continue;
 
         const Surf_SurfInfo &surface = world->CurrentBSP->SurfInfo[face_index];
+        if (surface.NumLTypes > 1)
+            ++diagnostics->animated_surfaces;
         const float draw_scale_u = std::fabs(texture_info.DrawScale[0]) > 1.0e-6f
             ? texture_info.DrawScale[0] : 1.0f;
         const float draw_scale_v = std::fabs(texture_info.DrawScale[1]) > 1.0e-6f
@@ -474,7 +684,7 @@ bool render_world_geometry(const geWorld *world,
         if (alpha < 1.0f)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        set_depth(GL_LESS, true);
+        set_depth(GL_LESS, alpha >= 1.0f);
         bind_material(material);
         const GLuint lightmap = textures.lightmaps[face_index];
         bind_lightmap(lightmap && !(texture_info.Flags & TEXINFO_NO_LIGHTMAP)
@@ -520,8 +730,7 @@ bool render_world_geometry(const geWorld *world,
     glDisable(GL_TEXTURE_2D);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
-    glEndList();
-    glCallList(*geometry_list);
+    render_native_actor(native_actor, diagnostics);
     return true;
 }
 
@@ -601,6 +810,23 @@ std::string first_asset(const char *kind, const std::string &directory,
     return candidates.front();
 }
 
+std::vector<std::string> neutral_actor_assets(const std::string &directory) {
+    std::vector<std::string> candidates;
+    DIR *dir = opendir(directory.c_str());
+    if (!dir)
+        return candidates;
+    while (dirent *entry = readdir(dir)) {
+        const std::string name(entry->d_name);
+        if (name.empty() || !std::isupper(static_cast<unsigned char>(name[0])) ||
+            !has_extension(name, {".act"}))
+            continue;
+        candidates.push_back(directory + name);
+    }
+    closedir(dir);
+    std::sort(candidates.begin(), candidates.end());
+    return candidates;
+}
+
 geWorld *load_world(const std::string &map_path) {
     geVFile *map_file = geVFile_OpenNewSystem(
         nullptr, GE_VFILE_TYPE_DOS, map_path.c_str(), nullptr,
@@ -641,7 +867,7 @@ int main() {
     std::fprintf(stderr, "Genesis3D Linux: project root: %s\n", root.c_str());
     const std::string map_file = first_asset(
         "level map", maps_path, "*.bsp or *.gbsp", {".bsp", ".gbsp"});
-    const std::string actor_file = first_asset(
+    std::string actor_file = first_asset(
         "character actor", actors_path, "*.act", {".act"});
     if (map_file.empty() || actor_file.empty())
         return 1;
@@ -736,6 +962,24 @@ int main() {
         return 1;
     }
 
+    NativeActor native_actor;
+    bool actor_loaded = false;
+    for (const std::string &candidate : neutral_actor_assets(actors_path)) {
+        if (load_native_actor(candidate, &native_actor)) {
+            actor_file = candidate;
+            actor_loaded = true;
+            break;
+        }
+        destroy_native_actor(&native_actor);
+        native_actor = NativeActor{};
+    }
+    if (!actor_loaded) {
+        std::fprintf(stderr,
+                     "Genesis3D Linux: actor bridge unavailable; legacy body "
+                     "payload could not be parsed: %s\n",
+                     actor_file.c_str());
+    }
+
     std::fprintf(stderr,
                  "Genesis3D Linux: textured BSP bridge active (%d root faces, "
                  "%d materials, %d lightmaps; material mean %.1f/255, "
@@ -755,6 +999,7 @@ int main() {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
         std::fprintf(stderr, "Genesis3D Linux: SDL2 input initialization failed: %s\n",
                      SDL_GetError());
+        destroy_native_actor(&native_actor);
         destroy_world_textures(&world_textures);
         glXMakeCurrent(display, None, nullptr);
         glXDestroyContext(display, context);
@@ -772,6 +1017,7 @@ int main() {
         std::fprintf(stderr, "Genesis3D Linux: could not attach SDL2 input to X11 window: %s\n",
                      SDL_GetError());
         SDL_Quit();
+        destroy_native_actor(&native_actor);
         destroy_world_textures(&world_textures);
         glXMakeCurrent(display, None, nullptr);
         glXDestroyContext(display, context);
@@ -800,7 +1046,16 @@ int main() {
                      "Genesis3D Linux: input capture disabled for unattended testing\n");
 
     PlayerCamera camera = initial_camera(world);
-    GLuint world_geometry_list = 0;
+    const CameraBasis actor_basis = camera_basis(camera);
+    geXForm3d actor_transform;
+    geXForm3d_SetIdentity(&actor_transform);
+    actor_transform.Translation.X = static_cast<geFloat>(
+        camera.position.x + actor_basis.forward.x * 180.0);
+    actor_transform.Translation.Y = static_cast<geFloat>(camera.position.y - 48.0);
+    actor_transform.Translation.Z = static_cast<geFloat>(
+        camera.position.z + actor_basis.forward.z * 180.0);
+    if (native_actor.actor)
+        geActor_ClearPose(native_actor.actor, &actor_transform);
     int framebuffer_width = kWidth;
     int framebuffer_height = kHeight;
     constexpr double mouse_sensitivity = 0.0025;
@@ -808,18 +1063,18 @@ int main() {
     std::fprintf(stderr,
                  "Genesis3D Linux: controls active (WASD/arrows move, mouse looks, Shift sprints, Esc exits)\n");
 
-    // Compile and submit the immutable display list before cadence accounting.
-    // This startup work is not a recurring render deadline and otherwise makes
-    // a clean steady-state run appear to miss its first several deadlines.
+    // Prime asset-backed command generation before cadence accounting.
     const CameraBasis warmup_basis = camera_basis(camera);
+    RenderDiagnostics warmup_diagnostics;
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     if (!render_world_geometry(world, world_textures, camera, warmup_basis,
-                               &world_geometry_list, framebuffer_width,
+                               &native_actor, &warmup_diagnostics, framebuffer_width,
                                framebuffer_height)) {
         std::fprintf(stderr,
                      "Genesis3D Linux: loaded world has no renderable BSP geometry\n");
         SDL_DestroyWindow(input_window);
         SDL_Quit();
+        destroy_native_actor(&native_actor);
         destroy_world_textures(&world_textures);
         glXMakeCurrent(display, None, nullptr);
         glXDestroyContext(display, context);
@@ -848,6 +1103,7 @@ int main() {
     uint64_t maximum_simulation_steps = 0;
     double maximum_render_lateness_ms = 0.0;
     bool running = true;
+    RenderDiagnostics render_diagnostics;
     while (running && !stop_requested) {
         const FrameClock::time_point current_tick = FrameClock::now();
         const double elapsed = std::chrono::duration<double>(
@@ -897,7 +1153,7 @@ int main() {
             (std::max)(maximum_simulation_steps, simulation_steps);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         if (!render_world_geometry(world, world_textures, camera, basis,
-                                   &world_geometry_list,
+                                   &native_actor, &render_diagnostics,
                                    framebuffer_width, framebuffer_height)) {
             std::fprintf(stderr,
                          "Genesis3D Linux: loaded world has no renderable BSP geometry\n");
@@ -937,10 +1193,21 @@ int main() {
                  static_cast<unsigned long long>(clamped_elapsed_frames),
                  static_cast<unsigned long long>(maximum_simulation_steps));
 
-    if (world_geometry_list != 0)
-        glDeleteLists(world_geometry_list, 1);
+    std::fprintf(stderr,
+                 "Genesis3D Linux: pipeline summary: %llu visible faces, "
+                 "%llu PVS-culled faces, %llu actor primitives, %llu "
+                 "translucent submissions, %llu animated surfaces, %llu "
+                 "dynamic lights\n",
+                 static_cast<unsigned long long>(render_diagnostics.visible_faces),
+                 static_cast<unsigned long long>(render_diagnostics.culled_faces),
+                 static_cast<unsigned long long>(render_diagnostics.actor_submissions),
+                 static_cast<unsigned long long>(render_diagnostics.translucent_submissions),
+                 static_cast<unsigned long long>(render_diagnostics.animated_surfaces),
+                 static_cast<unsigned long long>(render_diagnostics.dynamic_lights));
+
     SDL_SetRelativeMouseMode(SDL_FALSE);
     SDL_DestroyWindow(input_window);
+    destroy_native_actor(&native_actor);
     destroy_world_textures(&world_textures);
     glXMakeCurrent(display, None, nullptr);
     glXDestroyContext(display, context);

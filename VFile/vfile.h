@@ -44,8 +44,8 @@ typedef struct	geVFile_Hints
 
 typedef	struct	geVFile_Time
 {
-	unsigned long	Time1;
-	unsigned long	Time2;
+	uint32	Time1;
+	uint32	Time2;
 }	geVFile_Time;
 
 #define	GE_VFILE_ATTRIB_READONLY	0x00000001

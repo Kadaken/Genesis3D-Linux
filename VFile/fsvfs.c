@@ -47,9 +47,9 @@ typedef	struct	VFSFileHeader
 	unsigned int	Signature;
 	unsigned short	Version;			// Version number
 	geBoolean		Dispersed;			// Is this VFS dispersed?
-	long			DirectoryOffset;	// File offset to directory
-	long			DataLength;			// Length of all file data, including VFS header
-	long			EndPosition;		// End Position in the RWOps file we were written to
+	int32			DirectoryOffset;	// 32-bit on-disk file offset
+	int32			DataLength;			// 32-bit legacy on-disk length
+	int32			EndPosition;		// 32-bit legacy on-disk end position
 }	VFSFileHeader;
 
 // In the above structure, EndPosition should be the same as DataLength.  We use this for
@@ -898,4 +898,3 @@ const geVFile_SystemAPIs * GENESISCC FSVFS_GetAPIs(void)
 {
 	return &FSVFS_APIs;
 }
-
