@@ -19,19 +19,19 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Assert.h>
-#include <Windows.h>
-#include <Math.h>
+#include <assert.h>
+#include <math.h>
+#include <string.h>
 
 
-#include "BaseType.h"
+#include "basetype.h"
 #include "System.h"
 #include "World.h"
-#include "Ram.h"
-#include "Surface.h"
+#include "RAM.H"
+#include "SURFACE.H"
 #include "WBitmap.h"	
-#include "Vec3d.h"
-#include "Vis.h"
+#include "VEC3D.H"
+#include "VIS.H"
 
 #include "Light.h"
 

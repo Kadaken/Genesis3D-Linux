@@ -25,11 +25,11 @@
 #include	<stdio.h>
 #include	<assert.h>
 
-#include	"BaseType.h"
-#include	"ErrorLog.h"
-#include	"VFile.h"
+#include	"basetype.h"
+#include	"Errorlog.h"
+#include	"vfile.h"
 #include	"Sound.h"
-#include	"Ram.h"
+#include	"RAM.H"
 
 typedef struct	SoundManager	SoundManager;
 typedef struct  Channel			Channel;

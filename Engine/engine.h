@@ -25,23 +25,12 @@
 
 #include "Genesis.h"
 #include "System.h"
-#include "world.h"
+#include "World.h"
 #include "bitmap.h"
 #include "BitmapList.h"
 
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-//-------------------------------------------------
-// fake out windows include
-//-------------------------------------------------
-#ifndef WINVER // if you want windows, you must include it first!
-#ifdef STRICT
-typedef struct HINSTANCE__ * HINSTANCE;
-#else // STRICT
-typedef void * HINSTANCE;
-#endif // STRICT
 #endif
 
 //-------------------------------------------------
@@ -81,7 +70,7 @@ geBoolean geEngine_InitFonts(geEngine *Engine);
 geBoolean geEngine_ShutdownFonts(geEngine *Engine);
 
 //-------- engine drivers
-HINSTANCE geEngine_LoadLibrary( const char * lpLibFileName, const char *DriverDirectory);
+Sys_DriverHandle geEngine_LoadLibrary(const char *lpLibFileName, const char *DriverDirectory);
 geBoolean geEngine_ResetDriver(geEngine *Engine);
 GENESISAPI geDriver_System *geEngine_GetDriverSystem(geEngine *Engine);
 

@@ -19,22 +19,14 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#define	WIN32_LEAN_AND_MEAN
-#pragma warning(disable : 4201 4214 4115)
-#include <windows.h>
-#include <windowsx.h>
-#pragma warning(default : 4201 4214 4115)
-
 #include <assert.h>
 #include <string.h>
 
-#include "genesis.h"
+#include "Genesis.h"
 #include "basetype.h"
-#include "extbox.h"
+#include "ExtBox.h"
 
-#include "wgClip.h"
-
-#pragma warning (disable:4514)	// unreferenced inline function (caused by Windows)
+#include "wgClip.H"
 
 //***************************************************************
 // returns true if you need to draw at all.
@@ -115,4 +107,3 @@ GENESISAPI geBoolean GENESISCC CalculateClipping(
 
 	return GE_TRUE;
 }
-

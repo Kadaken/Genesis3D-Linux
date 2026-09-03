@@ -25,7 +25,7 @@
 #include <windows.h>
 #include <dplay.h>
 
-#include "BaseType.h"
+#include "basetype.h"
 
 #ifdef	__cplusplus
 extern "C" {

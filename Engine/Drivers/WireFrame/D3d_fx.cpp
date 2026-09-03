@@ -24,13 +24,13 @@
 #include <DDraw.h>
 #include <D3D.h>
 
-#include "D3DDrv.h"
-#include "DCommon.h"
+#include "D3ddrv.h"
+#include "Dcommon.h"
 #include "Render.h"
 #include "Scene.h"
-#include "D3D_FX.h"
-#include "D3D_Main.h"
-#include "D3D_Err.h"
+#include "D3d_fx.h"
+#include "D3d_main.h"
+#include "D3d_err.h"
 
 static D3DTEXTUREHANDLE OldTexHandle = NULL;
 

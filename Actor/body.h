@@ -39,7 +39,7 @@
 */
 
 #include "basetype.h"
-#include "xform3d.h"
+#include "XFORM3D.H"
 #include "vfile.h"
 #include "bitmap.h"
 
@@ -160,4 +160,3 @@ GENESISAPI void GENESISCC geBody_SetVertexColorDot3( geVec3d LightPosition, cons
 #endif
 
 #endif
-					

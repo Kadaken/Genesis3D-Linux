@@ -25,9 +25,9 @@
 #include <string.h>
 #include <float.h>
 
-#include "vec3d.h"
-#include "xform3d.h"
-#include "ram.h"
+#include "VEC3D.H"
+#include "XFORM3D.H"
+#include "RAM.H"
 #include "matrix33.h"
 #include "quatern.h"
 
@@ -238,11 +238,6 @@ GENESISAPI geBoolean GENESISCC gePhysicsSystem_Destroy(gePhysicsSystem** ppPhyss
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // physics stuff follows
-
-static geFloat fmin(geFloat a, geFloat b)
-{
-	return a < b ? a : b;
-}
 
 GENESISAPI geBoolean GENESISCC gePhysicsSystem_Iterate(gePhysicsSystem* psPtr, geFloat Time)
 {
@@ -838,4 +833,3 @@ GENESISAPI int GENESISCC gePhysicsSystem_GetSumOfConstraintDimensions(const gePh
 
 	return pSys->sumOfConstraintDimensions;
 }
-

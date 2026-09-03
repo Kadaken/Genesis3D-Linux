@@ -26,18 +26,17 @@
 #ifndef GE_USER_H
 #define GE_USER_H
 
-#include <Assert.h>
-#include <Windows.h>
+#include <assert.h>
 
-#include "BaseType.h"
-#include "Vec3d.h"
-#include "XForm3d.h"
+#include "basetype.h"
+#include "VEC3D.H"
+#include "XFORM3D.H"
 #include "Camera.h"
 #include "Genesis.h"
 #include "World.h"
-#include "Surface.h"
+#include "SURFACE.H"
 
-#include "DCommon.h"
+#include "Dcommon.h"
 
 #ifdef __cplusplus
 extern "C" {

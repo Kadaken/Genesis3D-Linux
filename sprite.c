@@ -19,12 +19,12 @@
 #include <assert.h>
 #include <math.h>
 
-#include "world.h"
-#include "trace.h"
+#include "World.h"
+#include "TRACE.H"
 
 #include "sprite.h"
 
-#include "ErrorLog.h"
+#include "Errorlog.h"
 
 
 #define BIG_DISTANCE 30000.0f

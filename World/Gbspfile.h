@@ -22,14 +22,22 @@
 #ifndef GE_GBSPFILE_H
 #define GE_GBSPFILE_H
 
-#include <Stdio.h>
+#include <stdio.h>
 
-#include "BaseType.h"
-#include "Vec3d.h"
+#include "basetype.h"
+#include "VEC3D.H"
+#ifdef _WIN32
 #include <windows.h>
-#include "DCommon.h"
-#include "VFile.h"
-#include "Motion.h"
+#include "Dcommon.h"
+#else
+#ifndef GENESIS3D_DRV_RGB_DEFINED
+typedef struct geDrvRgb { uint8_t r, g, b; } DRV_RGB;
+typedef DRV_RGB DRV_Palette[256];
+#define GENESIS3D_DRV_RGB_DEFINED
+#endif
+#endif
+#include "vfile.h"
+#include "motion.h"
 
 #ifdef __cplusplus
 extern "C" {

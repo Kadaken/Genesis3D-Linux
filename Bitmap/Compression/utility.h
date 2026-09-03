@@ -24,8 +24,8 @@
 /****************************************************************************************/
 
 #include "basetype.h"
-#include "ram.h"
-#include "errorlog.h"
+#include "RAM.H"
+#include "Errorlog.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>	// for memcpy,memset

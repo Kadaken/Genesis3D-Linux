@@ -43,15 +43,15 @@
 /* 07/16/2000 Wendell Buckner
     Convert to Directx7...    
 #include "D3DDrv.h"           */
-#include "D3DDrv7x.h"           
+#include "D3ddrv7x.h"
 
-#include "DCommon.h"
+#include "Dcommon.h"
 
-#include "Scene.h"
-#include "Render.h"
-#include "D3DCache.h"
-#include "D3D_Main.h"
-#include "PCache.h"
+#include "SCENE.H"
+#include "RENDER.H"
+#include "D3dcache.h"
+#include "D3d_main.h"
+#include "Pcache.h"
 #include "THandle.h"
 
 DRV_Window			ClientWindow;

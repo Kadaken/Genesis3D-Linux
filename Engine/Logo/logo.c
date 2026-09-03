@@ -35,11 +35,11 @@
 
 #include	<math.h>
 
-#include	"genesis.h"
+#include	"Genesis.h"
 #include	"engine.h"
 #include	"bitmap.h"
-#include	"PixelFormat.h"
-#include	"errorlog.h"
+#include	"pixelformat.h"
+#include	"Errorlog.h"
 #include	"electric.h"
 
 extern	unsigned char	LogoActor_act[];

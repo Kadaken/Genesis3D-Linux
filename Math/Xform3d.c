@@ -26,11 +26,11 @@
 #include <assert.h>
 #include <math.h>
 
-#include "XForm3d.h"
+#include "XFORM3D.H"
 
 
 #ifndef NDEBUG
-	static geXForm3d_MaximalAssertionMode = GE_TRUE;
+	static geBoolean geXForm3d_MaximalAssertionMode = GE_TRUE;
 	#define geXForm3d_Assert if (geXForm3d_MaximalAssertionMode) assert
 
 GENESISAPI 	void GENESISCC geXForm3d_SetMaximalAssertionMode( geBoolean Enable )
@@ -406,84 +406,35 @@ GENESISAPI void GENESISCC geXForm3d_RotateNoOrthogonal(
 
 //========================================================================================
 //	geXForm3d_TransformArray
-//	Assembly version 
+//	Portable array transform
 //========================================================================================
 GENESISAPI void GENESISCC geXForm3d_TransformArray(const geXForm3d *XForm, const geVec3d *Source, geVec3d *Dest, int32 Count)
 {
-	#define FSIZE	4
-	static int32 Lookup[]={0x696C6345,0x21657370};
+	geXForm3d M;
+	int32 i;
+
 	assert( XForm != NULL );
 	assert( Source != NULL );
 	assert( Dest != NULL );
 	geXForm3d_Assert ( geXForm3d_IsOrthogonal(XForm) == GE_TRUE );
 
-
 	if (Count <= 0)								// Early out if possible
 		return;
 
-	_asm 
+	/* Cache the transform once and each source vector before writing so the
+	 * common in-place Source == Dest case remains safe. GCC can vectorize or
+	 * fuse these independent multiply/add chains for the host architecture. */
+	M = *XForm;
+	for (i = 0; i < Count; ++i)
 	{
-	mov     ecx,Count							// get item count
-	mov     esi,Source							// get source array pointer
-	mov     ebx,Dest							// get dest array pointer
-	mov     edi,XForm							// point to matrix
-	imul    ecx,ecx,3*FSIZE						// ecx is size of array
-	add     esi,ecx								// esi points to source end
-	add     ebx,ecx								// edi pointe to dest end
-	neg     ecx									// ecx ready for count-up
-          
-Again:	
-	// Multiply
-	fld   dword ptr [esi+ecx+0*FSIZE]			// 1;i1
-	fmul  dword ptr [edi+(0+0*3)*FSIZE]			// 1;m11
-	fld   dword ptr [esi+ecx+1*FSIZE]			// 1;m11 i2
-	fmul  dword ptr [edi+(1+0*3)*FSIZE]			// 1;m11 m12
-	fld   dword ptr [esi+ecx+2*FSIZE]			// 1;m11 m12 i3
-	fmul  dword ptr [edi+(2+0*3)*FSIZE]			// 1;m11 m12 m13
-	fxch  st(1)									// 0;m11 m13 m12
-	faddp st(2),st								// 1;s1a m13
-	fld   dword ptr [esi+ecx+0*FSIZE]			// 1;s1a m13 i1
-	fmul  dword ptr [edi+(0+1*3)*FSIZE]			// 1;s1a m13 m21
-	fxch  st(1)									// 0;s1a m21 m13
-	faddp st(2),st								// 1;s1b m21
-	fld   dword ptr [esi+ecx+1*FSIZE]			// 1;s1b m21 i2
-	fmul  dword ptr [edi+(1+1*3)*FSIZE]			// 1;s1b m21 m22
-	fld   dword ptr [esi+ecx+2*FSIZE]			// 1;s1b m21 m22 i3
-	fmul  dword ptr [edi+(2+1*3)*FSIZE]			// 1;s1b m21 m22 m23
-	fxch  st(1)									// 0;s1b m21 m23 m22
-	faddp st(2),st								// 1;s1b s2a m23
-	fld   dword ptr [esi+ecx+0*FSIZE]			// 1;s1b s2a m23 i1
-	fmul  dword ptr [edi+(0+2*3)*FSIZE]			// 1;s1b s2a m23 m31
-	fxch  st(1)									// 0;s1b s2a m31 m23
-	faddp st(2),st								// 1;s1b s2b m31
-	fld   dword ptr [esi+ecx+1*FSIZE]			// 1;s1b s2b m31 i2
-	fmul  dword ptr [edi+(1+2*3)*FSIZE]			// 1;s1b s2b m31 m32
-	fld   dword ptr [esi+ecx+2*FSIZE]			// 1;s1b s2b m31 m32 i3
-	fmul  dword ptr [edi+(2+2*3)*FSIZE]			// 1;s1b s2b m31 m32 m33
-	// Add translation
-	fxch  st(1)									// 0;s1b s2b m31 m33 m32
-	faddp st(2),st								// 1;s1b s2b s3a m33
-	fxch  st(3)									// 0;m33 s2b s3a s1b
-	fadd  dword ptr [edi+(9+0)*FSIZE]			// 1;m33 s2b s3a s1c
-	fxch  st(1)									// 0;m33 s2b s1c s3a 
-	faddp st(3),st								// 1;s3b s2b s1c
-	fxch  st(1)									// 0;s3b s1c s2b
-	fadd  dword ptr [edi+(9+1)*FSIZE]			// 1;s3b s1c s2c
-	fxch  st(2)									// 0;s2c s1c s3b
-	fadd  dword ptr [edi+(9+2)*FSIZE]			// 1;s2c s1c s3c
-	fxch  st(1)									// 0;s2c s3c s1c
-	fstp  dword ptr [ebx+ecx+0*FSIZE]			// 2;s2c s3c    
-	fxch  st(1)									// 0;s3c s2c    
-	fstp  dword ptr [ebx+ecx+1*FSIZE]			// 2;s3c
-	fstp  dword ptr [ebx+ecx+2*FSIZE]			// 2;
-	add   ecx,3*FSIZE							// 1;
+		const geFloat X = Source[i].X;
+		const geFloat Y = Source[i].Y;
+		const geFloat Z = Source[i].Z;
 
-	cmp ecx, 0
-	jne Again
+		Dest[i].X = X * M.AX + Y * M.AY + Z * M.AZ + M.Translation.X;
+		Dest[i].Y = X * M.BX + Y * M.BY + Z * M.BZ + M.Translation.Y;
+		Dest[i].Z = X * M.CX + Y * M.CY + Z * M.CZ + M.Translation.Z;
 	}
-
-	// 34 cycles predicted (per loop)
-	// 39 cycles measured
 }
 
 GENESISAPI void GENESISCC geXForm3d_Rotate(
@@ -871,4 +822,3 @@ GENESISAPI void GENESISCC geXForm3d_Mirror(
 
 	geXForm3d_Assert ( geXForm3d_IsOrthogonal(Dest) == GE_TRUE );
 }
-

@@ -25,7 +25,7 @@
 #define WINVER 0x0400   // default to Windows Version 4.0
 #endif
 
-#include <winresrc.h>
+#include <Winresrc.h>
 
 // operation messages sent to DLGINIT
 #define LB_ADDSTRING    (WM_USER+1)

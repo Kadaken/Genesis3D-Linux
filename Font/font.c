@@ -20,20 +20,21 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
+#ifdef _WIN32
 #define	WIN32_LEAN_AND_MEAN
 #pragma warning(disable : 4201 4214 4115)
 #include <windows.h>
 #include <windowsx.h>
 #pragma warning(default : 4201 4214 4115)
 
-#include "extbox.h"
-#include "ram.h"
-#include "wgClip.h"
+#include "ExtBox.h"
+#include "RAM.H"
+#include "wgClip.H"
 
 #include <assert.h>
 #include <string.h>
 
-#include "font.h"
+#include "font.H"
 
 #pragma warning (disable:4514)	// unreferenced inline function (caused by Windows)
 
@@ -1363,4 +1364,4 @@ GENESISAPI geBoolean GENESISCC geFont_IsAntialiased(geFont *font)
 {
    return font->antialiased;
 }
-
+#endif /* _WIN32: legacy GDI-backed font implementation */

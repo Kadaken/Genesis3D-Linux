@@ -28,7 +28,7 @@
 #include	<assert.h>
 
 #include	"basetype.h"
-#include	"ram.h"
+#include	"RAM.H"
 
 #include	"vfile.h"
 #include	"vfile._h"

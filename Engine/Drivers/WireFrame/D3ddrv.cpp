@@ -22,14 +22,14 @@
 #include <Windows.h>
 #include <stdio.h>
 
-#include "D3DDrv.h"
-#include "DCommon.h"
+#include "D3ddrv.h"
+#include "Dcommon.h"
 
 #include "Scene.h"
 #include "Render.h"
-#include "D3DCache.h"
-#include "D3D_Main.h"
-#include "PCache.h"
+#include "D3dcache.h"
+#include "D3d_main.h"
+#include "Pcache.h"
 #include "THandle.h"
 
 

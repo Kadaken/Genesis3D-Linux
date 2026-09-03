@@ -21,9 +21,9 @@
 /****************************************************************************************/
 #include <math.h>
 
-#include "Trace.h"
-#include "Vec3d.h"
-#include "XForm3d.h"
+#include "TRACE.H"
+#include "VEC3D.H"
+#include "XFORM3D.H"
 #include "Camera.h"
 #include "Sound3d.h"
 

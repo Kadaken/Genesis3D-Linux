@@ -26,10 +26,57 @@
 #include	<string.h>
 
 #include	"basetype.h"
-#include	"ram.h"
+#include	"RAM.H"
 
 #include	"dirtree.h"
 #include	"dirtree-common.h"
+
+#define GE_VFILE_MAX_PATH 1024
+#define GE_VFILE_MAX_NAME 256
+#define GE_VFILE_MAX_EXT  256
+
+static void DirTree_SplitPath(const char *Path, char *Directory, char *Name, char *Ext)
+{
+	const char *Slash;
+	const char *Backslash;
+	const char *Base;
+	const char *Dot;
+	size_t Length;
+
+	Slash = strrchr(Path, '/');
+	Backslash = strrchr(Path, '\\');
+	if (!Slash || (Backslash && Backslash > Slash))
+		Slash = Backslash;
+	Base = Slash ? Slash + 1 : Path;
+	Dot = strrchr(Base, '.');
+
+	if (Directory)
+	{
+		Length = Slash ? (size_t)(Slash - Path + 1) : 0;
+		if (Length >= GE_VFILE_MAX_PATH)
+			Length = GE_VFILE_MAX_PATH - 1;
+		memcpy(Directory, Path, Length);
+		Directory[Length] = '\0';
+	}
+	if (Name)
+	{
+		Length = Dot ? (size_t)(Dot - Base) : strlen(Base);
+		if (Length >= GE_VFILE_MAX_NAME)
+			Length = GE_VFILE_MAX_NAME - 1;
+		memcpy(Name, Base, Length);
+		Name[Length] = '\0';
+	}
+	if (Ext)
+	{
+		if (Dot)
+		{
+			strncpy(Ext, Dot, GE_VFILE_MAX_EXT - 1);
+			Ext[GE_VFILE_MAX_EXT - 1] = '\0';
+		}
+		else
+			Ext[0] = '\0';
+	}
+}
 
 #define	DIRTREE_FILE_SIGNATURE	MAKEFOURCC('D', 'T', '0', '1')
 static int DirTree_SignatureBase=0x696C6345;
@@ -367,7 +414,7 @@ DirTree *DirTree_CreateFromFile(geVFile *File)
 
 DirTree *DirTree_FindExact(const DirTree *Tree, const char *Path)
 {
-	static char	Buff[_MAX_PATH];
+	static char	Buff[GE_VFILE_MAX_PATH];
 	DirTree *	Siblings;
 
 	assert(Tree);
@@ -401,7 +448,7 @@ DirTree *DirTree_FindPartial(
 	const char *	Path,
 	const char **	LeftOvers)
 {
-	static char	Buff[_MAX_PATH];
+	static char	Buff[GE_VFILE_MAX_PATH];
 	DirTree *	Siblings;
 
 	assert(Tree);
@@ -618,14 +665,14 @@ DirTree_Finder * DirTree_CreateFinder(DirTree *Tree, const char *Path)
 {
 	DirTree_Finder *	Finder;
 	DirTree *			SubTree;
-	char				Directory[_MAX_PATH];
-	char				Name[_MAX_FNAME];
-	char				Ext[_MAX_EXT];
+	char				Directory[GE_VFILE_MAX_PATH];
+	char				Name[GE_VFILE_MAX_NAME];
+	char				Ext[GE_VFILE_MAX_EXT];
 
 	assert(Tree);
 	assert(Path);
 
-	_splitpath(Path, NULL, Directory, Name, Ext);
+	DirTree_SplitPath(Path, Directory, Name, Ext);
 
 	SubTree = DirTree_FindExact(Tree, Directory);
 	if	(!SubTree)
@@ -674,8 +721,8 @@ void DirTree_DestroyFinder(DirTree_Finder *Finder)
 DirTree * DirTree_FinderGetNextFile(DirTree_Finder *Finder)
 {
 	DirTree *	Res;
-	char		Name[_MAX_FNAME];
-	char		Ext[_MAX_EXT];
+	char		Name[GE_VFILE_MAX_NAME];
+	char		Ext[GE_VFILE_MAX_EXT];
 
 	assert(Finder);
 
@@ -686,7 +733,7 @@ DirTree * DirTree_FinderGetNextFile(DirTree_Finder *Finder)
 
 	do
 	{
-		_splitpath(Res->Name, NULL, NULL, Name, Ext);
+		DirTree_SplitPath(Res->Name, NULL, Name, Ext);
 		if	(MatchPattern(Name, Finder->MatchName) == GE_TRUE &&
 			 MatchPattern(Ext,  Finder->MatchExt) == GE_TRUE)
 		{

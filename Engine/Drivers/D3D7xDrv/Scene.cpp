@@ -33,17 +33,17 @@
 /*  07/16/2000 Wendell Buckner
 /*   Convert to Directx7...    
 #include "D3DDrv.h"             */
-#include "D3DDrv7x.h"
+#include "D3ddrv7x.h"
 
-#include "DCommon.h"
-#include "Scene.h"
-#include "Render.h"
-#include "GSpan.h"
-#include "D3DCache.h"
-#include "D3D_Fx.h"
-#include "D3D_Main.h"
-#include "PCache.h"
-#include "D3D_Err.h"
+#include "Dcommon.h"
+#include "SCENE.H"
+#include "RENDER.H"
+#include "GSPAN.H"
+#include "D3dcache.h"
+#include "D3d_fx.h"
+#include "D3d_main.h"
+#include "Pcache.h"
+#include "D3D_ERR.H"
 #include "THandle.h"
 
 //#define D3D_MANAGE_TEXTURES

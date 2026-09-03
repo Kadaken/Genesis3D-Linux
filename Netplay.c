@@ -22,14 +22,14 @@
 #define IDIRECTPLAY2_OR_GREATER
 
 #include <Windows.H>
-#include <Assert.h>
+#include <assert.h>
 
 #include <dplay.h>
 #include <dplobby.h>
-#include <Stdio.h>
+#include <stdio.h>
 
-#include "netplay.h"
-#include "ErrorLog.h"
+#include "Netplay.h"
+#include "Errorlog.h"
 
 //#define INIT_GUID
 

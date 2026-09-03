@@ -37,10 +37,10 @@
 
 
 #include "basetype.h"
-#include "xform3d.h"
+#include "XFORM3D.H"
 #include "body.h"
-#include "XFArray.h"
-#include "camera.h"
+#include "xfarray.h"
+#include "Camera.h"
 
 
 #ifdef __cplusplus
@@ -132,4 +132,3 @@ void GENESISCC geBodyInst_SetVertexColorDot3( geVec3d LightPosition, const geXFo
 #endif
 
 #endif
-		

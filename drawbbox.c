@@ -3,7 +3,9 @@
 	aligned bounding box.  You can use this code as you see fit.
 */
 
-static	void	DrawFace(geWorld *World, const geVec3d **Verts)
+#include "Genesis.h"
+
+static	void	DrawFace(geWorld *World, geVec3d * const *Verts)
 {
 	GE_LVertex	LVerts[4];
 	int			i;
@@ -19,7 +21,8 @@ static	void	DrawFace(geWorld *World, const geVec3d **Verts)
 		LVerts[i].Z = Verts[i]->Z;
 	}
 
-	geWorld_AddPolyOnce(World, &LVerts[0], 4, NULL, GE_GOURAUD_POLY, GE_FX_TRANSPARENT, 1.0f);
+	geWorld_AddPolyOnce(World, &LVerts[0], 4, NULL, GE_GOURAUD_POLY,
+		GE_RENDER_DEPTH_SORT_BF, 1.0f);
 }
 
 void	DrawBoundBox(geWorld *World, const geVec3d *Pos, const geVec3d *Min, const geVec3d *Max)
@@ -64,4 +67,3 @@ static	geVec3d *	Faces[6][4] =
 	for	(i = 0; i < 6; i++)
 		DrawFace(World, &Faces[i][0]);
 }
-

@@ -26,14 +26,14 @@
 #ifndef GE_PUPPET_H
 #define GE_PUPPET_H
 
-#include "Motion.h"
+#include "motion.h"
 #include "Camera.h"
-#include "Body.h"
-#include "Pose.h"
+#include "body.h"
+#include "pose.h"
 #include "ExtBox.h"			// geExtBox for gePuppet_RenderThroughFrustum
 // added 08.13.2004 by gekido, linking the rf exe was complaining about unresolved externals... 
 //#include "bitmap.h" //nonsense check your setup (QD)
-#include "Frustum.h"
+#include "FRUSTUM.H"
 #include "vfile.h"
 
 #ifdef __cplusplus
@@ -146,4 +146,3 @@ void GENESISCC gePuppet_SetLightingOptions(gePuppet *P,
 
 
 #endif
-

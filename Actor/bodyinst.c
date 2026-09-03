@@ -25,11 +25,13 @@
 /*                                                                                      */
 /****************************************************************************************/
 #include <assert.h>						//assert()
+#include <math.h>
+#include <stdint.h>
 
 #include "body._h"
 #include "bodyinst.h"
-#include "ram.h"
-#include "errorlog.h"
+#include "RAM.H"
+#include "Errorlog.h"
 #include "strblock.h"
 
 
@@ -41,6 +43,42 @@ typedef struct geBodyInst
 	int						 LastLevelOfDetail;
 	geBodyInst_Index		 FaceCount;
 } geBodyInst;
+
+#define GE_BODYINST_MAX_COMPONENT 1000000.0f
+
+static geFloat geBodyInst_ClampFinite(geFloat Value)
+{
+	if (!isfinite((double)Value))
+		return 0.0f;
+	if (Value > GE_BODYINST_MAX_COMPONENT)
+		return GE_BODYINST_MAX_COMPONENT;
+	if (Value < -GE_BODYINST_MAX_COMPONENT)
+		return -GE_BODYINST_MAX_COMPONENT;
+	return Value;
+}
+
+static void geBodyInst_ClampTransform(geXForm3d *Transform)
+{
+	Transform->AX = geBodyInst_ClampFinite(Transform->AX);
+	Transform->AY = geBodyInst_ClampFinite(Transform->AY);
+	Transform->AZ = geBodyInst_ClampFinite(Transform->AZ);
+	Transform->BX = geBodyInst_ClampFinite(Transform->BX);
+	Transform->BY = geBodyInst_ClampFinite(Transform->BY);
+	Transform->BZ = geBodyInst_ClampFinite(Transform->BZ);
+	Transform->CX = geBodyInst_ClampFinite(Transform->CX);
+	Transform->CY = geBodyInst_ClampFinite(Transform->CY);
+	Transform->CZ = geBodyInst_ClampFinite(Transform->CZ);
+	Transform->Translation.X = geBodyInst_ClampFinite(Transform->Translation.X);
+	Transform->Translation.Y = geBodyInst_ClampFinite(Transform->Translation.Y);
+	Transform->Translation.Z = geBodyInst_ClampFinite(Transform->Translation.Z);
+}
+
+static void geBodyInst_ClampPoint(geVec3d *Point)
+{
+	Point->X = geBodyInst_ClampFinite(Point->X);
+	Point->Y = geBodyInst_ClampFinite(Point->Y);
+	Point->Z = geBodyInst_ClampFinite(Point->Z);
+}
 
 /*	01/08/2004 Wendell Buckner
     DOT3 BUMPMAPPING */
@@ -275,15 +313,17 @@ const geBodyInst_Geometry *GENESISCC geBodyInst_GetGeometry(
 					BoneIndex = S->BoneIndex;
 				
 					geXForm3d_Multiply(	geCamera_GetCameraSpaceXForm(Camera), 
-														&(BoneXFArray[BoneIndex]),
-														&ObjectToCamera);
+																&(BoneXFArray[BoneIndex]),
+																&ObjectToCamera);
 					geBodyInst_PostScale(&ObjectToCamera,ScaleVector,&ObjectToCamera);
+					geBodyInst_ClampTransform(&ObjectToCamera);
 				}
 				if ( S->LevelOfDetailMask && LevelOfDetailBit )
 				{
 					geVec3d *VecDestPtr = &(D->SVPoint);
 					geXForm3d_Transform(  &(ObjectToCamera),
-													&(S->XPoint),VecDestPtr);
+																&(S->XPoint),VecDestPtr);
+					geBodyInst_ClampPoint(VecDestPtr);
 					
 					// changed QD Clipping
 					// projection is now done in puppet.c
@@ -325,13 +365,15 @@ const geBodyInst_Geometry *GENESISCC geBodyInst_GetGeometry(
 				{ //Keep XSkinVertexArray sorted by BoneIndex for best performance
 					BoneIndex = S->BoneIndex;
 					geBodyInst_PostScale(&BoneXFArray[BoneIndex],ScaleVector,&ObjectToWorld);
+					geBodyInst_ClampTransform(&ObjectToWorld);
 
 				}
 				if ( S->LevelOfDetailMask && LevelOfDetailBit )
 				{
 					geVec3d *VecDestPtr = &(D->SVPoint);
 					geXForm3d_Transform(  &(ObjectToWorld),
-													&(S->XPoint),VecDestPtr);
+																&(S->XPoint),VecDestPtr);
+					geBodyInst_ClampPoint(VecDestPtr);
 					D->SVU = S->XU;
 					D->SVV = S->XV;
 					if (VecDestPtr->X > G->Maxs.X ) G->Maxs.X = VecDestPtr->X;
@@ -356,6 +398,9 @@ const geBodyInst_Geometry *GENESISCC geBodyInst_GetGeometry(
 				if ( S->LevelOfDetailMask && LevelOfDetailBit )
 				{
 					geXForm3d_Rotate(&(BoneXFArray[S->BoneIndex]), &(S->Normal),D);
+					D->X = geBodyInst_ClampFinite(D->X);
+					D->Y = geBodyInst_ClampFinite(D->Y);
+					D->Z = geBodyInst_ClampFinite(D->Z);
 				}
 			}
 		}
@@ -388,11 +433,10 @@ const geBodyInst_Geometry *GENESISCC geBodyInst_GetGeometry(
 				D++;
 			}
 		}
-		assert( ((uint32)D) - ((uint32)G->FaceList) == (uint32)(G->FaceListSize) );
+		assert((uintptr_t)D - (uintptr_t)G->FaceList == (uintptr_t)G->FaceListSize);
 		G->FaceCount = Count;
 		((geBodyInst *)BI)->LastLevelOfDetail = LevelOfDetail;
 	}
 
 	return G;
 }	
-

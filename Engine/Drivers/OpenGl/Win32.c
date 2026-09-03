@@ -21,7 +21,7 @@
 #include <stdio.h>		
 
 #include "Win32.h"
-#include "OglDrv.h"
+#include "OGLDrv.h"
 
 
 HWND originalWnd		= NULL;

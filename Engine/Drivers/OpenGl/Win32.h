@@ -20,9 +20,9 @@
 #ifndef WIN32_H
 #define WIN32_H
 
-#include <gl/gl.h>
+#include <GL/gl.h>
 
-#include "DCommon.h"
+#include "Dcommon.h"
 
 struct 
 {

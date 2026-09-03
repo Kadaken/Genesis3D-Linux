@@ -22,14 +22,14 @@
 /*                                                                                      */
 /****************************************************************************************/
 #include <Windows.h>
-#include <Assert.h>
+#include <assert.h>
 
 /*  07/16/2000 Wendell Buckner
 /*   Convert to Directx7...    
 #include "D3DDrv.h"            */
-#include "D3DDrv7x.h"
+#include "D3ddrv7x.h"
 
-#include "GSpan.h"
+#include "GSPAN.H"
 
 SPAN		SpanLines[MAX_SPAN_LINES];
 

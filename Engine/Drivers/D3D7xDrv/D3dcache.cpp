@@ -31,12 +31,12 @@
 /*                                                                                      */
 /****************************************************************************************/
 #include <Windows.h>
-#include <Stdio.h>
-#include <Assert.h>
+#include <stdio.h>
+#include <assert.h>
 #include <DDraw.h>
 #include <D3D.h>
 
-#include "D3DCache.h"
+#include "D3dcache.h"
 
 // Cache types are just the different types of textures
 // Texutres may vary from width/height/num miplevels/etc...
@@ -603,7 +603,7 @@ geBoolean D3DCache_SlotIsValid(D3DCache_Slot *Slot)
 
 /* 12/23/2003 Wendell Buckner
     COMPRESSED TEXTURES - Select the best compressed texture format... */
-#include <d3d_main.h>
+#include <D3d_main.h>
 
 int32 D3DCache_SetupSlot(D3DCache *Cache, D3DCache_Slot *Slot, int32 Width, int32 Height, const DDSURFACEDESC2 *SurfDesc, geBoolean UseStage, int32 Stage)
 {

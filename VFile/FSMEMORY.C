@@ -20,21 +20,18 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#define	WIN32_LEAN_AND_MEAN
-#include	<windows.h>
-
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
 #include	<assert.h>
 
 #include	"basetype.h"
-#include	"ram.h"
+#include	"RAM.H"
 
 #include	"vfile.h"
 #include	"vfile._h"
 
-#include	"fsmemory.h"
+#include	"FSMEMORY.H"
 
 //	"MF01"
 #define	MEMORYFILE_SIGNATURE	0x3130464D
@@ -504,4 +501,3 @@ const geVFile_SystemAPIs * GENESISCC FSMemory_GetAPIs(void)
 {
 	return &FSMemory_APIs;
 }
-

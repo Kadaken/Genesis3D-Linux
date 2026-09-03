@@ -20,10 +20,10 @@
 /*                                                                                      */
 /****************************************************************************************/
 #include <Windows.h>
-#include <Assert.h>
+#include <assert.h>
 
-#include "D3DDrv.h"
-#include "GSpan.h"
+#include "D3ddrv.h"
+#include "Gspan.h"
 
 SPAN		SpanLines[MAX_SPAN_LINES];
 

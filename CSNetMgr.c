@@ -26,11 +26,11 @@
 #include <objbase.h>
 
 #include "CSNetMgr.h"
-#include "NetPlay.h"
+#include "Netplay.h"
 
-#include "BaseType.h"
-#include "Ram.h"
-#include "ErrorLog.h"
+#include "basetype.h"
+#include "RAM.H"
+#include "Errorlog.h"
 
 #include <InitGuid.h>
 

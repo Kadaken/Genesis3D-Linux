@@ -22,15 +22,15 @@
 #ifndef GE_FRUSTUM_H
 #define GE_FRUSTUM_H
 
-#include <Assert.h>
+#include <assert.h>
 //#include <Windows.h>
 
-#include "BaseType.h"
-#include "GBSPFile.h"
-#include "Vec3d.h"
+#include "basetype.h"
+#include "Gbspfile.h"
+#include "VEC3D.H"
 #include "Camera.h"
-#include "XForm3d.h"
-#include "Surface.h"
+#include "XFORM3D.H"
+#include "SURFACE.H"
 
 #ifdef __cplusplus
 extern "C" {

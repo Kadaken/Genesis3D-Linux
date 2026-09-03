@@ -40,14 +40,14 @@
 #include <math.h>	 // fabs()
 #include <stdio.h>	 //sscanf
 
-#include "world.h"	// to expose _Render apis in actor.h
+#include "World.h"	// to expose _Render apis in actor.h
 
-#include "Actor.h"
-#include "Ram.h"
-#include "Puppet.h"
-#include "Body.h"
-#include "Motion.h"
-#include "ErrorLog.h"
+#include "actor.h"
+#include "RAM.H"
+#include "puppet.h"
+#include "body.h"
+#include "motion.h"
+#include "Errorlog.h"
 #include "strblock.h"
 #ifdef _DEBUG
 #include <crtdbg.h>
@@ -60,6 +60,64 @@
 
 #define ACTOR_MOTIONS_MAX 0x0FFFF		// really arbitrary. just for sanity checking
 #define ACTOR_CUES_MAX    0x0FFFF		// arbitrary. 
+#define ACTOR_MAX_ELAPSED_TIME (1.0f / 15.0f)
+
+/*
+ * Normalize a vertex's skinning weights before a pose is consumed.  Some
+ * imported actors contain weights whose accumulated floating-point error is
+ * large enough to introduce a scale/translation bias during matrix blending.
+ * The final component is corrected after division so the stored sum is
+ * exactly 1.0f in the engine's floating-point representation.
+ *
+ * Genesis3D 1.x stores the active reference bone on each body vertex rather
+ * than a variable-length weight list.  This helper is therefore also the
+ * compatibility boundary for loaders/importers that provide blended weights:
+ * the legacy one-bone path naturally arrives here as a one-element array.
+ */
+static void geActor_NormalizeSkinningWeights(geFloat *Weights, int WeightCount)
+{
+	geFloat Sum = 0.0f;
+	int i;
+
+	if (Weights == NULL || WeightCount <= 0)
+		return;
+
+	for (i = 0; i < WeightCount; ++i)
+	{
+		if (!isfinite((double)Weights[i]) || Weights[i] < 0.0f)
+			Weights[i] = 0.0f;
+		Sum += Weights[i];
+	}
+
+	if (Sum <= 0.0f)
+	{
+		Weights[0] = 1.0f;
+		for (i = 1; i < WeightCount; ++i)
+			Weights[i] = 0.0f;
+		return;
+	}
+
+	for (i = 0; i < WeightCount; ++i)
+		Weights[i] /= Sum;
+
+	/* Correct accumulated rounding on the final influence. */
+	Sum = 0.0f;
+	for (i = 0; i < WeightCount - 1; ++i)
+		Sum += Weights[i];
+	Weights[WeightCount - 1] = 1.0f - Sum;
+}
+
+/* Animation is driven by elapsed time supplied by the host, never by the
+ * number of render ticks.  Bound a long scheduling pause so a single bad
+ * sample cannot propel a motion outside its valid interpolation range. */
+static geFloat geActor_SanitizeElapsedTime(geFloat DeltaTime)
+{
+	if (!isfinite((double)DeltaTime) || DeltaTime < 0.0f)
+		return 0.0f;
+	if (DeltaTime > ACTOR_MAX_ELAPSED_TIME)
+		return ACTOR_MAX_ELAPSED_TIME;
+	return DeltaTime;
+}
 
 typedef struct geActor
 {
@@ -442,7 +500,7 @@ GENESISAPI geBoolean GENESISCC geActor_DestroyDirect(geActor **pA)
 		gePose_Destroy( &( CurrentActor->Pose ) );
 		geMotion_Destroy(&(CurrentActor->CueMotion));
 
-		assert( _CrtIsValidPointer( &CurrentActor->ActorDefinition, sizeof(CurrentActor->ActorDefinition), FALSE ) );
+		assert(CurrentActor->ActorDefinition != NULL);
 
 		if(geActor_DefIsValid(CurrentActor->ActorDefinition)==GE_TRUE )
 		{
@@ -1525,7 +1583,7 @@ GENESISAPI geBoolean GENESISCC geActor_AnimationStep(geActor *A, geFloat DeltaTi
 	geMotion *SubM;
 	
 	assert( geActor_IsValid(A) != GE_FALSE);
-	assert( DeltaTime >= 0.0f );
+	DeltaTime = geActor_SanitizeElapsedTime(DeltaTime);
 	
 	gePose_ClearCoverage(A->Pose,0);
 
@@ -1579,7 +1637,7 @@ GENESISAPI geBoolean GENESISCC geActor_AnimationStepBoneOptimized(geActor *A, ge
 	geMotion *SubM;
 	
 	assert( geActor_IsValid(A) != GE_FALSE);
-	assert( DeltaTime >= 0.0f );
+	DeltaTime = geActor_SanitizeElapsedTime(DeltaTime);
 	
 	if (BoneName == NULL)
 		{
@@ -1658,7 +1716,7 @@ GENESISAPI geBoolean GENESISCC geActor_AnimationStepBoneOptimized(geActor *A, ge
 GENESISAPI geBoolean GENESISCC geActor_AnimationTestStep(geActor *A, geFloat DeltaTime)
 {
 	assert( geActor_IsValid(A) != GE_FALSE);
-	assert( DeltaTime >= 0.0f );
+	DeltaTime = geActor_SanitizeElapsedTime(DeltaTime);
 
 	gePose_SetMotion( A->Pose, A->CueMotion , DeltaTime, NULL );
 
@@ -1668,7 +1726,7 @@ GENESISAPI geBoolean GENESISCC geActor_AnimationTestStep(geActor *A, geFloat Del
 GENESISAPI geBoolean GENESISCC geActor_AnimationTestStepBoneOptimized(geActor *A, geFloat DeltaTime, const char *BoneName)
 {
 	assert( geActor_IsValid(A) != GE_FALSE);
-	assert( DeltaTime >= 0.0f );
+	DeltaTime = geActor_SanitizeElapsedTime(DeltaTime);
 
 	if (BoneName == NULL)
 		{

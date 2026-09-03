@@ -40,10 +40,10 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "vec3d.h"
+#include "VEC3D.H"
 #include "vkframe.h"
-#include "errorlog.h"
-#include "ram.h"
+#include "Errorlog.h"
+#include "RAM.H"
 
 #define LINEAR_BLEND(a,b,t)  ( (t)*((b)-(a)) + (a) )	
 			// linear blend of a and b  0<t<1 where  t=0 ->a and t=1 ->b
@@ -472,12 +472,13 @@ geBoolean GENESISCC geVKFrame_HermiteRead(geVFile* pFile, void* geVKFrame)
 
 
 
-geBoolean GENESISCC geVKFrame_WriteToFile(geVFile *pFile, geTKArray *KeyList, 
+geBoolean GENESISCC geVKFrame_WriteToFile(geVFile *pFile, void *geVKFrame,
 		geVKFrame_InterpolationType InterpolationType, int Looping)
 {
 	int NumElements,i;
 	geFloat Time,DeltaTime;
 	int Compression=0;
+	geTKArray *KeyList = (geTKArray *)geVKFrame;
 
 	assert( pFile != NULL );
 	assert( KeyList != NULL );
@@ -542,11 +543,13 @@ geBoolean GENESISCC geVKFrame_WriteToFile(geVFile *pFile, geTKArray *KeyList,
 }
 
 
-geTKArray *GENESISCC geVKFrame_CreateFromFile(geVFile *pFile, int *InterpolationType, int *Looping)
+geTKArray *GENESISCC geVKFrame_CreateFromFile(geVFile *pFile,
+	geVKFrame_InterpolationType *InterpolationType, int *Looping)
 {
 	#define ERROREXIT  {geErrorLog_Add( ERR_PATH_FILE_READ , NULL);if (KeyList != NULL){geTKArray_Destroy(&KeyList);}	return NULL;}
 	int i,u,NumElements;
 	int Compression;
+	int ParsedInterpolationType;
 	#define LINE_LENGTH 256
 	char line[LINE_LENGTH];
 	geTKArray *KeyList= NULL;
@@ -563,9 +566,10 @@ geTKArray *GENESISCC geVKFrame_CreateFromFile(geVFile *pFile, int *Interpolation
 	if(strnicmp(line, VKFRAME_KEYLIST_ID, sizeof(VKFRAME_KEYLIST_ID)-1) != 0)
 		ERROREXIT;
 
-	if(sscanf(line + sizeof(VKFRAME_KEYLIST_ID)-1, "%d %d %d %d", 
-					&NumElements,InterpolationType,&Compression,Looping) != 4)
+	if(sscanf(line + sizeof(VKFRAME_KEYLIST_ID)-1, "%d %d %d %d",
+					&NumElements,&ParsedInterpolationType,&Compression,Looping) != 4)
 		ERROREXIT;
+	*InterpolationType = (geVKFrame_InterpolationType)ParsedInterpolationType;
 
 	switch (*InterpolationType)
 		{
@@ -657,7 +661,8 @@ uint32 GENESISCC geVKFrame_ComputeBlockSize(geTKArray *KeyList, int Compression)
 }
 
 
-geTKArray *GENESISCC geVKFrame_CreateFromBinaryFile(geVFile *pFile, int *InterpolationType, int *Looping)
+geTKArray *GENESISCC geVKFrame_CreateFromBinaryFile(geVFile *pFile,
+	geVKFrame_InterpolationType *InterpolationType, int *Looping)
 {
 	uint32 u;
 	int BlockSize;
@@ -692,7 +697,7 @@ geTKArray *GENESISCC geVKFrame_CreateFromBinaryFile(geVFile *pFile, int *Interpo
 			return NULL;
 		}
 	u = *(uint32 *)Block;
-	*InterpolationType = (u>>16)& 0xFF;
+	*InterpolationType = (geVKFrame_InterpolationType)((u>>16)& 0xFF);
 	Compression = (u>>8) & 0xFF;
 	*Looping           = (u & 0x1);		
 	Count = *(((uint32 *)Block)+1);
@@ -780,7 +785,7 @@ geTKArray *GENESISCC geVKFrame_CreateFromBinaryFile(geVFile *pFile, int *Interpo
 
 }
 
-geBoolean GENESISCC geVKFrame_WriteToBinaryFile(geVFile *pFile, geTKArray *KeyList, 
+geBoolean GENESISCC geVKFrame_WriteToBinaryFile(geVFile *pFile, void *geVKFrame,
 		geVKFrame_InterpolationType InterpolationType, int Looping)
 {
 	#define WBERREXIT  {geErrorLog_AddString( ERR_PATH_FILE_WRITE,"Failure to write binary key data", NULL);return GE_FALSE;}
@@ -788,6 +793,7 @@ geBoolean GENESISCC geVKFrame_WriteToBinaryFile(geVFile *pFile, geTKArray *KeyLi
 	int Compression=0;
 	int Count,i;
 	geFloat Time,DeltaTime;
+	geTKArray *KeyList = (geTKArray *)geVKFrame;
 
 	assert( pFile != NULL );
 	assert( InterpolationType < 0xFF);

@@ -24,13 +24,13 @@
 #include <D3D.h>
 
 #include "THandle.h"
-#include "BaseType.h"
-#include "D3DDrv.h"
-#include "DCommon.h"
-#include "D3DCache.h"
-#include "D3D_Main.h"
-#include "PCache.h"
-#include "D3d_FX.h"
+#include "basetype.h"
+#include "D3DDRV.H"
+#include "Dcommon.h"
+#include "D3dcache.h"
+#include "D3d_main.h"
+#include "Pcache.h"
+#include "D3d_fx.h"
 
 #include "TPage.h"
 

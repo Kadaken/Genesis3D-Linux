@@ -42,10 +42,10 @@
 // If you include Windows it MUST be before dcommon!
 
 // FIXME:  What should we do with these?
-#include "XForm3d.h"
-#include "Vec3d.h"
-#include "PixelFormat.h"
-#include "geTypes.h"		// This is a no no
+#include "XFORM3D.H"
+#include "VEC3D.H"
+#include "pixelformat.h"
+#include "getypes.h"		// This is a no no
 
 #ifdef __cplusplus
 extern "C" {
@@ -97,7 +97,7 @@ typedef struct tagRECT
 
 #endif // WINVER
 
-#define	DRIVERCC _fastcall
+#define	DRIVERCC
 
 #ifndef __cplusplus
 	#define DllImport	__declspec( dllimport )
@@ -238,15 +238,21 @@ typedef struct
 	S32			B_width;
 } DRV_Window;
 
-typedef struct 
+#ifndef GENESIS3D_DRV_RGB_DEFINED
+typedef struct
 {
-    U8 r, g, b;								// RGB components for RGB lightmaps
+    U8 r, g, b;
 } DRV_RGB;
+#define GENESIS3D_DRV_RGB_DEFINED
+#endif
 
 //===========================================================================================
 // FIXME:  Get palette stuff, and bitmap out of dcommon
 #define	DRV_PALETTE_ENTRIES	256
-typedef	DRV_RGB	DRV_Palette[DRV_PALETTE_ENTRIES];
+#ifndef GENESIS3D_DRV_PALETTE_DEFINED
+typedef DRV_RGB DRV_Palette[DRV_PALETTE_ENTRIES];
+#define GENESIS3D_DRV_PALETTE_DEFINED
+#endif
 
 // Bitmap hook into the drivers (engine uses these explicitly as is)
 typedef struct

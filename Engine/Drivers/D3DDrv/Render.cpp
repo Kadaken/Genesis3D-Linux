@@ -22,17 +22,17 @@
 #include <Windows.h>
 #include <stdio.h>
 
-#include "D3DDrv.h"
-#include "DCommon.h"
-#include "Render.h"
-#include "Scene.h"
-#include "GSpan.h"
-#include "D3D_Fx.h"
-#include "D3DCache.h"
-#include "D3D_Err.h"
+#include "D3DDRV.H"
+#include "Dcommon.h"
+#include "RENDER.H"
+#include "SCENE.H"
+#include "GSPAN.H"
+#include "D3d_fx.h"
+#include "D3dcache.h"
+#include "D3D_ERR.H"
 #include "THandle.h"
 
-#include "PCache.h"
+#include "Pcache.h"
 
 #define SNAP_VERT(v)  ( ( v )  = ( geFloat )( ( long )( ( v ) * 16 ) ) / 16.0f )
 

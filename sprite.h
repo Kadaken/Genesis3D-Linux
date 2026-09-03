@@ -20,14 +20,14 @@
 #ifndef GE_SPRITE_H
 #define GE_SPRITE_H
 
-#include "genesis.h"				
+#include "Genesis.h"
 #include "basetype.h"
-#include "extbox.h"
+#include "ExtBox.h"
 #include "bitmap.h"
 
 #ifdef GE_WORLD_H
-#include "camera.h"
-#include "Frustum.h"
+#include "Camera.h"
+#include "FRUSTUM.H"
 #endif
 
 #ifdef __cplusplus

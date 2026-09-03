@@ -19,9 +19,9 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Math.h>
+#include <math.h>
 #include <assert.h>
-#include "Vec3d.h"
+#include "VEC3D.H"
 
 #define VCOMPARE_EPSILON	(geFloat)0.0005
 
@@ -122,7 +122,7 @@ GENESISAPI geBoolean GENESISCC geVec3d_Compare(const geVec3d *V1, const geVec3d 
 	return GE_TRUE;
 }
 
-#ifdef ASM_NORMALIZE
+#if defined(ASM_NORMALIZE) && defined(_MSC_VER) && defined(_M_IX86)
 
 GENESISAPI geFloat GENESISCC geVec3d_Normalize(geVec3d *V1)
 {
@@ -295,4 +295,3 @@ GENESISAPI geFloat GENESISCC		geVec3d_DistanceBetween(const geVec3d *V1, const g
 	geVec3d_Subtract(V1,V2,&B);
 	return geVec3d_Length(&B);
 }
-

@@ -21,7 +21,7 @@
 #include <stdio.h>
 
 #include "THandle.h"
-#include "OglDrv.h"
+#include "OGLDrv.h"
 #include "Render.h"
 
 extern boundTexture;

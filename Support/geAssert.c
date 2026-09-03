@@ -72,7 +72,6 @@ void geAssert_SetCriticalShutdownCallback( geAssert_CriticalShutdownCallback CB 
 
 #ifndef NDEBUG
 
-#include <windows.h>
 #include <signal.h>
 
 #define MAX_ASSERT_STRING_LENGTH 4096
@@ -132,7 +131,6 @@ static int in_assert_cnt = 0; // a semaphore
 }
 */
 #endif	// NDEBUG
-
 
 
 

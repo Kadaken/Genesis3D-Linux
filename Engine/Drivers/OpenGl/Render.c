@@ -18,10 +18,10 @@
 /****************************************************************************************/
 
 #include <windows.h>
-#include <gl/gl.h>
+#include <GL/gl.h>
 
 #include "Render.h"
-#include "OglDrv.h"
+#include "OGLDrv.h"
 #include "OglMisc.h"
 #include "THandle.h"
 #include "Win32.h"
