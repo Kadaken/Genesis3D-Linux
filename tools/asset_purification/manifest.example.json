@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "assets": [
+    {
+      "target": "Assets/Maps/example.bsp",
+      "expected_asset_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "patches": [
+        {
+          "label": "reviewed-string-001",
+          "offset": "0x1234",
+          "original_length": 16,
+          "expected_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "replacement_ascii": "ORBITAL STATION"
+        }
+      ]
+    }
+  ]
+}
