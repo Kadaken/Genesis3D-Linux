@@ -1,0 +1,494 @@
+{
+  "format": 1,
+  "assets": [
+    {
+      "target": "PurificationWorkspace/Assets/Maps/rfedit1.bsp",
+      "expected_asset_sha256": "e20d825bffc7dda8db9ac89822a01ae646b22444da99dcc666b45c5de751ea32",
+      "patches": [
+        {
+          "label": "C01",
+          "offset": "0xde8de",
+          "original_length": 7,
+          "expected_sha256": "776c2406629afdcbeb1a04b098756b81dc320e6b3bd85b56c41d459bf21825df",
+          "replacement_ascii": "NODE_A"
+        },
+        {
+          "label": "C01",
+          "offset": "0xeed92",
+          "original_length": 7,
+          "expected_sha256": "776c2406629afdcbeb1a04b098756b81dc320e6b3bd85b56c41d459bf21825df",
+          "replacement_ascii": "NODE_A"
+        },
+        {
+          "label": "C02",
+          "offset": "0xe3998",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xe3def",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xe4246",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xe46a3",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xe4afc",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xeb75a",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xebb50",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xebf5b",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xec36a",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xec777",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xecb84",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xecf92",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xed42c",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xed823",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C02",
+          "offset": "0xedc19",
+          "original_length": 14,
+          "expected_sha256": "f9cf4eeccbce15075edc3c2112b52b9c5a780e641e1d32c7c949b8e5e54a9fae",
+          "replacement_ascii": "ENTITY_01"
+        },
+        {
+          "label": "C03",
+          "offset": "0xe39b7",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xe3e0e",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xe4265",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xe46c2",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xe4b1b",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xeaad1",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xeaefd",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xeb779",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xed44b",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xed842",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C03",
+          "offset": "0xedc38",
+          "original_length": 14,
+          "expected_sha256": "49143c160fd67a0e080c0a27bcba4f786eb424c30c24a8df9754193455ff9fea",
+          "replacement_ascii": "ENTITY_02"
+        },
+        {
+          "label": "C04",
+          "offset": "0xe39e9",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xe3e40",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xe4297",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xe46f4",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xe4b57",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xebba6",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xebfb1",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xec3c0",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xec7cd",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xecbda",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C04",
+          "offset": "0xecfe8",
+          "original_length": 15,
+          "expected_sha256": "1c41b6fb9345da6082bb811e7ef8beec51a707b68361d1ca9627c63bdc8d78de",
+          "replacement_ascii": "ENTITY_003"
+        },
+        {
+          "label": "C05",
+          "offset": "0xeaaaf",
+          "original_length": 17,
+          "expected_sha256": "d579792749a6065ad194dad6d13591bbf41054e6107f48565d029322ef089004",
+          "replacement_ascii": "ENTITY_00001"
+        },
+        {
+          "label": "C05",
+          "offset": "0xeaedb",
+          "original_length": 17,
+          "expected_sha256": "d579792749a6065ad194dad6d13591bbf41054e6107f48565d029322ef089004",
+          "replacement_ascii": "ENTITY_00001"
+        },
+        {
+          "label": "C06",
+          "offset": "0xeaaf1",
+          "original_length": 15,
+          "expected_sha256": "65bacb528e3faff9a193e939f4439d6bba71e35d6838d32625322fa4deed936f",
+          "replacement_ascii": "ENTITY_004"
+        },
+        {
+          "label": "C06",
+          "offset": "0xeaf1d",
+          "original_length": 15,
+          "expected_sha256": "65bacb528e3faff9a193e939f4439d6bba71e35d6838d32625322fa4deed936f",
+          "replacement_ascii": "ENTITY_004"
+        },
+        {
+          "label": "C07",
+          "offset": "0xeab28",
+          "original_length": 15,
+          "expected_sha256": "1c48b7dfc69c337c43bebf31e0587f9bae58c6ece0c7530113c00d4c8039df2d",
+          "replacement_ascii": "ENTITY_005"
+        },
+        {
+          "label": "C07",
+          "offset": "0xeaf54",
+          "original_length": 15,
+          "expected_sha256": "1c48b7dfc69c337c43bebf31e0587f9bae58c6ece0c7530113c00d4c8039df2d",
+          "replacement_ascii": "ENTITY_005"
+        },
+        {
+          "label": "C08",
+          "offset": "0xeab4f",
+          "original_length": 22,
+          "expected_sha256": "dee7a0c0d8cbac5babc591b3817ed15d8ca3ad68f523822f281a9bae9243c522",
+          "replacement_ascii": "ENTITY_PLACEHOLDER"
+        },
+        {
+          "label": "C08",
+          "offset": "0xeaf7b",
+          "original_length": 22,
+          "expected_sha256": "dee7a0c0d8cbac5babc591b3817ed15d8ca3ad68f523822f281a9bae9243c522",
+          "replacement_ascii": "ENTITY_PLACEHOLDER"
+        },
+        {
+          "label": "C09",
+          "offset": "0xeadb3",
+          "original_length": 12,
+          "expected_sha256": "116f5b1577819ff42862604f8c1d8ae8b7cb18aeed2ade45d518a3b54b86fd09",
+          "replacement_ascii": "ENTITY01.ACT"
+        },
+        {
+          "label": "C09",
+          "offset": "0xeb1df",
+          "original_length": 12,
+          "expected_sha256": "116f5b1577819ff42862604f8c1d8ae8b7cb18aeed2ade45d518a3b54b86fd09",
+          "replacement_ascii": "ENTITY01.ACT"
+        },
+        {
+          "label": "C10",
+          "offset": "0xeba2b",
+          "original_length": 13,
+          "expected_sha256": "ce9084377b1bd7e30a768f68c2c1eb69a1649adf52bafdd89866a033ff38d7a3",
+          "replacement_ascii": "ENTITY_02.ACT"
+        },
+        {
+          "label": "C10",
+          "offset": "0xed6fd",
+          "original_length": 13,
+          "expected_sha256": "ce9084377b1bd7e30a768f68c2c1eb69a1649adf52bafdd89866a033ff38d7a3",
+          "replacement_ascii": "ENTITY_02.ACT"
+        },
+        {
+          "label": "C10",
+          "offset": "0xedaf3",
+          "original_length": 13,
+          "expected_sha256": "ce9084377b1bd7e30a768f68c2c1eb69a1649adf52bafdd89866a033ff38d7a3",
+          "replacement_ascii": "ENTITY_02.ACT"
+        },
+        {
+          "label": "C10",
+          "offset": "0xedeea",
+          "original_length": 13,
+          "expected_sha256": "ce9084377b1bd7e30a768f68c2c1eb69a1649adf52bafdd89866a033ff38d7a3",
+          "replacement_ascii": "ENTITY_02.ACT"
+        },
+        {
+          "label": "C11",
+          "offset": "0xebb6f",
+          "original_length": 19,
+          "expected_sha256": "0be6f5eff8c8d4ac179acebb11540300949dc645c947a1f460c0b6ccbbb6bd34",
+          "replacement_ascii": "ENTITY_NEUTRAL"
+        },
+        {
+          "label": "C11",
+          "offset": "0xebf7a",
+          "original_length": 19,
+          "expected_sha256": "0be6f5eff8c8d4ac179acebb11540300949dc645c947a1f460c0b6ccbbb6bd34",
+          "replacement_ascii": "ENTITY_NEUTRAL"
+        },
+        {
+          "label": "C11",
+          "offset": "0xec389",
+          "original_length": 19,
+          "expected_sha256": "0be6f5eff8c8d4ac179acebb11540300949dc645c947a1f460c0b6ccbbb6bd34",
+          "replacement_ascii": "ENTITY_NEUTRAL"
+        },
+        {
+          "label": "C11",
+          "offset": "0xec796",
+          "original_length": 19,
+          "expected_sha256": "0be6f5eff8c8d4ac179acebb11540300949dc645c947a1f460c0b6ccbbb6bd34",
+          "replacement_ascii": "ENTITY_NEUTRAL"
+        },
+        {
+          "label": "C11",
+          "offset": "0xecba3",
+          "original_length": 19,
+          "expected_sha256": "0be6f5eff8c8d4ac179acebb11540300949dc645c947a1f460c0b6ccbbb6bd34",
+          "replacement_ascii": "ENTITY_NEUTRAL"
+        },
+        {
+          "label": "C11",
+          "offset": "0xecfb1",
+          "original_length": 19,
+          "expected_sha256": "0be6f5eff8c8d4ac179acebb11540300949dc645c947a1f460c0b6ccbbb6bd34",
+          "replacement_ascii": "ENTITY_NEUTRAL"
+        },
+        {
+          "label": "C12",
+          "offset": "0xebe34",
+          "original_length": 15,
+          "expected_sha256": "78b5c6d8073dbe71035f5c609290d9a363d3ef591e5348a31b1c75f45930ca49",
+          "replacement_ascii": "ENTITY_0003.ACT"
+        },
+        {
+          "label": "C12",
+          "offset": "0xec242",
+          "original_length": 15,
+          "expected_sha256": "78b5c6d8073dbe71035f5c609290d9a363d3ef591e5348a31b1c75f45930ca49",
+          "replacement_ascii": "ENTITY_0003.ACT"
+        },
+        {
+          "label": "C12",
+          "offset": "0xec64f",
+          "original_length": 15,
+          "expected_sha256": "78b5c6d8073dbe71035f5c609290d9a363d3ef591e5348a31b1c75f45930ca49",
+          "replacement_ascii": "ENTITY_0003.ACT"
+        },
+        {
+          "label": "C12",
+          "offset": "0xeca5c",
+          "original_length": 15,
+          "expected_sha256": "78b5c6d8073dbe71035f5c609290d9a363d3ef591e5348a31b1c75f45930ca49",
+          "replacement_ascii": "ENTITY_0003.ACT"
+        },
+        {
+          "label": "C12",
+          "offset": "0xece6a",
+          "original_length": 15,
+          "expected_sha256": "78b5c6d8073dbe71035f5c609290d9a363d3ef591e5348a31b1c75f45930ca49",
+          "replacement_ascii": "ENTITY_0003.ACT"
+        },
+        {
+          "label": "C12",
+          "offset": "0xed278",
+          "original_length": 15,
+          "expected_sha256": "78b5c6d8073dbe71035f5c609290d9a363d3ef591e5348a31b1c75f45930ca49",
+          "replacement_ascii": "ENTITY_0003.ACT"
+        },
+        {
+          "label": "C13",
+          "offset": "0xee5aa",
+          "original_length": 15,
+          "expected_sha256": "735fd7347d0b1b118ff361b941b9630eee7a8b193e301692f9c1447255dbdc32",
+          "replacement_ascii": "NODE_GENERIC"
+        },
+        {
+          "label": "C14",
+          "offset": "0xee5ca",
+          "original_length": 12,
+          "expected_sha256": "9121687e949c98df70989d1f6752f7fe8ed4417b48994d246ba83b6582004e16",
+          "replacement_ascii": "MOTION_0001"
+        },
+        {
+          "label": "C15",
+          "offset": "0xee614",
+          "original_length": 13,
+          "expected_sha256": "337e563eff3c19ad00cc8da839f3124609c566db6b44f7a0c7438acf9487bf71",
+          "replacement_ascii": "ENTITY_08"
+        },
+        {
+          "label": "C16",
+          "offset": "0xee899",
+          "original_length": 11,
+          "expected_sha256": "49fc63a3e0ed191eddba7fd356a5e2c2e4a1e1cec4d929240541c33825171013",
+          "replacement_ascii": "NODE001.ACT"
+        }
+      ]
+    }
+  ]
+}

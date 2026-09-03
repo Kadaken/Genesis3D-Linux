@@ -1,5 +1,6 @@
 # Out-of-tree/runtime assets are linked from the installed game data.
 /Assets/
+/PurificationWorkspace/
 
 # CMake in-source artifacts and native binaries.
 /CMakeCache.txt
@@ -11,5 +12,6 @@
 # Generated diagnostics and caches.
 /bsp_strings.txt
 /Reports/evidence/asset_purification/*.strings.hex.txt
+/Reports/evidence/sterile_asset_purification/
 __pycache__/
 *.py[cod]
