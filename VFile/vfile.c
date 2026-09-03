@@ -19,22 +19,20 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#define	WIN32_LEAN_AND_MEAN
-#include	<windows.h>
-
 #include	<stdio.h>
+#include	<pthread.h>
 #include	<assert.h>
 #include	<stdarg.h>
 #include	<string.h>
 
 #include	"basetype.h"
-#include	"ram.h"
+#include	"RAM.H"
 
 #include	"vfile.h"
 #include	"vfile._h"
 
 #include	"fsdos.h"
-#include	"fsmemory.h"
+#include	"FSMEMORY.H"
 #include	"fsvfs.h"
 //
 // add include files for file types here
@@ -53,7 +51,7 @@ typedef	struct	geVFile
 	void *						FSData;
 	geVFile *					Context;
 	FSSearchList *				SearchList;
-	CRITICAL_SECTION			CriticalSection;
+	pthread_mutex_t			CriticalSection;
 	geVFile *					BaseFile;
 }	geVFile;
 
@@ -63,7 +61,7 @@ typedef struct	geVFile_Finder
 	void *						Data;
 }	geVFile_Finder;
 
-static	geVFile_SystemAPIs **		RegisteredAPIs;
+static	const geVFile_SystemAPIs **	RegisteredAPIs;
 static	int							SystemCount;
 static	geBoolean					BuiltInAPIsRegistered = GE_FALSE;
 
@@ -71,19 +69,18 @@ static	geBoolean					BuiltInAPIsRegistered = GE_FALSE;
 static	geBoolean					SystemInitialized = GE_FALSE;
 #endif
 
-static	CRITICAL_SECTION			MainCriticalSection;
+static	pthread_mutex_t			MainCriticalSection = PTHREAD_MUTEX_INITIALIZER;
 
 static	geBoolean GENESISCC geVFile_RegisterFileSystemInternal(const geVFile_SystemAPIs *APIs, geVFile_TypeIdentifier *Type)
 {
-	geVFile_SystemAPIs **	NewList;
+	const geVFile_SystemAPIs **	NewList;
 
 	NewList = geRam_Realloc(RegisteredAPIs, sizeof(*RegisteredAPIs) * (SystemCount + 1));
 	if	(!NewList)
 		return GE_FALSE;
 
 	RegisteredAPIs = NewList;
-#pragma message ("Casting away const in geVFile_RegisterFileSystem")
-	RegisteredAPIs[SystemCount++] = (geVFile_SystemAPIs *)APIs;
+	RegisteredAPIs[SystemCount++] = APIs;
 	*Type = SystemCount;
 
 	return GE_TRUE;
@@ -91,7 +88,12 @@ static	geBoolean GENESISCC geVFile_RegisterFileSystemInternal(const geVFile_Syst
 
 void GENESISCC geVFile_CloseAPI (void)
 {
+	pthread_mutex_lock(&MainCriticalSection);
 	geRam_Free(RegisteredAPIs);
+	RegisteredAPIs = NULL;
+	SystemCount = 0;
+	BuiltInAPIsRegistered = GE_FALSE;
+	pthread_mutex_unlock(&MainCriticalSection);
 }
 
 static	geBoolean	RegisterBuiltInAPIs(void)
@@ -612,7 +614,9 @@ GENESISAPI geBoolean GENESISCC geVFile_FinderGetProperties(const geVFile_Finder 
 }
 
 
+#ifdef _WIN32
 GENESISAPI void GENESISCC geVFile_TimeToWin32FileTime(const geVFile_Time *Time, LPFILETIME Win32FileTime)
 {
 	*Win32FileTime = *(LPFILETIME)Time;
 }
+#endif

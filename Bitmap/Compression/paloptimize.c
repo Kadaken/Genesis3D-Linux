@@ -106,6 +106,9 @@ int d;
 palOptInfo optInfo[256];
 
 	assert(palEntries <= 256);
+	if (palEntries <= 0 || palEntries > 256 || !palette || !Bits)
+		return;
+	memcpy(savePalette, palette, sizeof(savePalette));
 
 	pushTSC();
 

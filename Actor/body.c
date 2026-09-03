@@ -39,8 +39,8 @@
 
 #include "body.h"
 #include "body._h"
-#include "ram.h"
-#include "errorlog.h"
+#include "RAM.H"
+#include "Errorlog.h"
 
 
 #define MAX(aa,bb)   ( (aa)>(bb)?(aa):(bb) )
@@ -504,7 +504,7 @@ geBitmap * GENESISCC geBody_GetBumpMapAltByName(const geBody *B, const char *Bum
 
 
 #if defined(DEBUG) || !defined(NDEBUG)
-static geBoolean GENESISCC geBody_SanityCheck(const geBody *B)
+geBoolean GENESISCC geBody_SanityCheck(const geBody *B)
 {
 	int i,j,k;
 	int Lod,FaceCount,VertexCount,NormalCount,BoneCount;
@@ -640,6 +640,10 @@ static void GENESISCC geBody_DestroyPossiblyIncompleteBody( geBody **PB )
 	geBody *B;
 	int i;
 
+	assert(PB != NULL);
+	assert(PB == NULL || *PB != NULL);
+	if (PB == NULL || *PB == NULL)
+		return;
 	B = *PB;
 	B->IsValid = NULL;
 	if (B->XSkinVertexArray != NULL)
@@ -669,7 +673,7 @@ static void GENESISCC geBody_DestroyPossiblyIncompleteBody( geBody **PB )
 					// <> CB ; see note above
 					// this doesn't seem to prevent us from crashing here
 					//	when an actor has an error during _Create
-					if ( (uint32)(B->MaterialArray[i].Bitmap) > 1 )
+						if ((uintptr_t)B->MaterialArray[i].Bitmap > (uintptr_t)1)
 						geBitmap_Destroy(&(B->MaterialArray[i].Bitmap));
 					B->MaterialArray[i].Bitmap = NULL;
 				}
@@ -1383,7 +1387,6 @@ geBoolean GENESISCC geBody_ComputeLevelsOfDetail( geBody *B ,int Levels)
 	assert( geBody_IsValid(B) != GE_FALSE );
 	#pragma message ("LOD code goes here:")
 	B->LevelsOfDetail = GE_BODY_HIGHEST_LOD_MASK; // Levels
-	Levels;
 	return GE_TRUE;
 }	
 
@@ -1523,7 +1526,7 @@ static geBoolean GENESISCC geBody_ReadGeometry(geBody *B, geVFile *pFile)
 
 geBody *GENESISCC geBody_CreateFromFile(geVFile *pFile)
 {
-	geBody  *B;
+	geBody  *B = NULL;
 	int i;
 
 	geVFile *VFile;

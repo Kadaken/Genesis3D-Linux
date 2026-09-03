@@ -19,16 +19,40 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Stdio.h>
+#include <stdio.h>
 #include <assert.h>
+#include <stddef.h>
+#include <string.h>
 
-#include "GBSPFile.h"
-#include "Vec3d.h"
-#include "Ram.h"
-#include "System.h"
+#include "Gbspfile.h"
+#include "VEC3D.H"
+#include "RAM.H"
+#include "Errorlog.h"
+#include "vfile.h"
 
-#include "ErrorLog.h"
-#include "VFile.h"
+/* GBSP files were authored by the 32-bit Windows tools.  GFX_Model is the
+ * only chunk record containing a process pointer, so its on-disk form must
+ * remain 80 bytes even when the native runtime uses 64-bit pointers. */
+typedef struct GFX_ModelDisk
+{
+	int32 RootNode[2];
+	geVec3d Mins;
+	geVec3d Maxs;
+	geVec3d Origin;
+	int32 FirstFace;
+	int32 NumFaces;
+	int32 FirstLeaf;
+	int32 NumLeafs;
+	int32 FirstCluster;
+	int32 NumClusters;
+	int32 Areas[2];
+	uint32 Motion;
+} GFX_ModelDisk;
+
+_Static_assert(sizeof(GFX_ModelDisk) == 80,
+	"The legacy GBSP model record must remain 80 bytes");
+_Static_assert(offsetof(GFX_ModelDisk, Motion) == 76,
+	"Unexpected legacy GBSP model layout");
 
 static geBoolean LoadMotions(GBSP_BSPData *BSP, geVFile *f)
 {
@@ -105,7 +129,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 	{
 		case GBSP_CHUNK_HEADER:
 		{
-//		printf("GBSP_CHUNK_HEADER\n");
 			if (sizeof(GBSP_Header) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -127,24 +150,29 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_MODELS:
 		{
-//		printf("GBSP_CHUNK_MODELS\n");
-			if (sizeof(GFX_Model) != Chunk->Size)
+			if (sizeof(GFX_ModelDisk) != (size_t)Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
 				return GE_FALSE;
 			}
 			BSP->NumGFXModels = Chunk->Elements;
 			BSP->GFXModels = GE_RAM_ALLOCATE_ARRAY(GFX_Model, BSP->NumGFXModels);
-			if (!ReadChunkData(Chunk, (void*)BSP->GFXModels, f))
+			if (!BSP->GFXModels)
 				return GE_FALSE;
-			// Walk the models and zero out the motion pointers
-			for	(i = 0; i < BSP->NumGFXModels; i++)
+			for (i = 0; i < BSP->NumGFXModels; ++i)
+			{
+				GFX_ModelDisk DiskModel;
+				if (geVFile_Read(f, &DiskModel, sizeof(DiskModel)) == GE_FALSE)
+					return GE_FALSE;
+				memset(&BSP->GFXModels[i], 0, sizeof(BSP->GFXModels[i]));
+				memcpy(&BSP->GFXModels[i], &DiskModel,
+					offsetof(GFX_ModelDisk, Motion));
 				BSP->GFXModels[i].Motion = NULL;
+			}
 			break;
 		}
 		case GBSP_CHUNK_NODES:
 		{
-//		printf("GBSP_CHUNK_NODES\n");
 			if (sizeof(GFX_Node) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -158,7 +186,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_BNODES:
 		{
-//		printf("GBSP_CHUNK_BNODES\n");
 			if (sizeof(GFX_BNode) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -175,7 +202,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_LEAFS:
 		{
-//		printf("GBSP_CHUNK_LEAFS\n");
 			if (sizeof(GFX_Leaf) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -189,7 +215,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_CLUSTERS:
 		{
-//		printf("GBSP_CHUNK_CLUSTERS\n");
 			if (sizeof(GFX_Cluster) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -204,7 +229,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_AREAS:
 		{
-//		printf("GBSP_CHUNK_AREAS\n");
 			if (sizeof(GFX_Area) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -218,7 +242,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_AREA_PORTALS:
 		{
-//		printf("GBSP_CHUNK_AREA_PORTALS\n");
 			if (sizeof(GFX_AreaPortal) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -232,7 +255,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_PORTALS:
 		{
-//		printf("GBSP_CHUNK_PORTALS\n");
 			if (sizeof(GFX_Portal) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -246,7 +268,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_PLANES:
 		{
-//		printf("GBSP_CHUNK_PLANES\n");
 			if (sizeof(GFX_Plane) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -260,7 +281,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_FACES:
 		{
-//		printf("GBSP_CHUNK_FACES\n");
 			if (sizeof(GFX_Face) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -274,7 +294,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_LEAF_FACES:
 		{
-//		printf("GBSP_CHUNK_LEAF_FACES\n");
 			if (sizeof(int32) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -288,7 +307,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_LEAF_SIDES:
 		{
-//		printf("GBSP_CHUNK_LEAF_SIDES\n");
 			if (sizeof(GFX_LeafSide) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -302,7 +320,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_VERTS:
 		{
-//		printf("GBSP_CHUNK_VERTS\n");
 			if (sizeof(geVec3d) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -316,7 +333,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_VERT_INDEX:
 		{
-//		printf("GBSP_CHUNK_VERT_INDEX\n");
 			if (sizeof(int32) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -332,7 +348,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 
 		case GBSP_CHUNK_RGB_VERTS:
 		{
-//		printf("GBSP_CHUNK_RGB_VERTS\n");
 			if (sizeof(geVec3d) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -347,7 +362,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 
 		case GBSP_CHUNK_TEXINFO:
 		{
-//		printf("GBSP_CHUNK_TEXINFO\n");
 			if (sizeof(GFX_TexInfo) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -362,7 +376,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 
 		case GBSP_CHUNK_TEXTURES:
 		{
-//		printf("GBSP_CHUNK_TEXTURES\n");
 			if (sizeof(GFX_Texture) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -377,7 +390,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 
 		case GBSP_CHUNK_TEXDATA:
 		{
-//		printf("GBSP_CHUNK_TEXDATA\n");
 			if (sizeof(uint8) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -391,7 +403,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_ENTDATA:
 		{
-//		printf("GBSP_CHUNK_ENTDATA\n");
 			if (sizeof(uint8) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -405,7 +416,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_LIGHTDATA:
 		{
-//		printf("GBSP_CHUNK_LIGHTDATA\n");
 			if (sizeof(uint8) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -419,7 +429,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 		}
 		case GBSP_CHUNK_VISDATA:
 		{
-//		printf("GBSP_CHUNK_VISDATA\n");
 			if (sizeof(uint8) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -434,7 +443,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 
 		case GBSP_CHUNK_SKYDATA:
 		{
-//		printf("GBSP_CHUNK_SKYDATA\n");
 			if (sizeof(GFX_SkyData) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -447,7 +455,6 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 
 		case GBSP_CHUNK_PALETTES:
 		{
-//		printf("GBSP_CHUNK_PALETTES\n");
 			if (sizeof(DRV_Palette) != Chunk->Size)
 			{
 				geErrorLog_Add(GE_ERR_BAD_BSP_FILE_CHUNK_SIZE, NULL);
@@ -464,21 +471,18 @@ static geBoolean ReadChunk(GBSP_BSPData *BSP, GBSP_Chunk *Chunk, geVFile *f)
 
 		case GBSP_CHUNK_MOTIONS:
 		{
-//		printf("GBSP_CHUNK_MOTIONS\n");
 			return LoadMotions(BSP, f);
 		}
 
 		case GBSP_CHUNK_END:
 		{
-//		printf("GBSP_CHUNK_END\n");
 			break;
 		}
 		default:
-//		printf("Don't know what this chunk is\n");
 			return GE_FALSE;
 	}
 
-	return TRUE;
+	return GE_TRUE;
 }
 
 //========================================================================================
@@ -503,7 +507,7 @@ BOOL GBSP_LoadGBSPFile(geVFile *File, GBSP_BSPData *BSP)
 			break;
 	}
 
-	return TRUE;
+	return GE_TRUE;
 }
 
 //========================================================================================
@@ -612,6 +616,5 @@ BOOL GBSP_FreeGBSPFile(GBSP_BSPData *BSP)
 	BSP->NumGFXVisData = 0;
 	BSP->NumGFXPortals = 0;
 
-	return TRUE;
+	return GE_TRUE;
 }
-

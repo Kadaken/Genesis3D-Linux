@@ -19,18 +19,18 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Windows.h>
-#include <Assert.h>
+#include <assert.h>
+#include <string.h>
 
-#include "Entities.h"
-#include "BaseType.h"
+#include "ENTITIES.H"
+#include "basetype.h"
 #include "Errorlog.h"
-#include "Vec3d.h"
-#include "Ram.h"
+#include "VEC3D.H"
+#include "RAM.H"
 
 // These are temporary until we find a better way to get models pointers into the entity stuff
 #include "World.h"
-#include "GBSPFile.h"
+#include "Gbspfile.h"
 
 
 //=====================================================================================
@@ -359,9 +359,14 @@ void geEntity_FieldDestroy(geEntity_Field *Field)
 //====================================================================================
 //	geEntity_ClassCreate
 //====================================================================================
-geEntity_Class *geEntity_ClassCreate(geEntity_ClassType Type, const char *Name, int32 TypeSize)
+geEntity_Class *geEntity_ClassCreate(geEntity_ClassType Type, const char *Name,
+	int32 TypeSize, int32 TypeAlignment)
 {
 	geEntity_Class	*Class;
+
+	if (TypeSize <= 0 || TypeAlignment <= 0 ||
+		(TypeAlignment & (TypeAlignment - 1)) != 0)
+		return NULL;
 
 	Class = GE_RAM_ALLOCATE_STRUCT(geEntity_Class);
 
@@ -376,6 +381,7 @@ geEntity_Class *geEntity_ClassCreate(geEntity_ClassType Type, const char *Name, 
 		Class->Name = CopyString(Name);
 
 	Class->TypeSize = TypeSize;
+	Class->TypeAlignment = TypeAlignment;
 
 	return Class;
 }
@@ -411,8 +417,8 @@ geBoolean geEntity_ClassAddField(geEntity_Class	*Class, geEntity_Field *Field)
 	Field->Next = Class->Fields;
 	Class->Fields = Field;
 
-	// Grow fieldsize by Fields TypeClass size
-	Class->FieldSize += Field->TypeClass->TypeSize;
+	// Include both this field and any native-alignment padding before it.
+	Class->FieldSize = Field->Offset + Field->TypeClass->TypeSize;
 
 	return GE_TRUE;
 }
@@ -636,6 +642,8 @@ geBoolean geEntity_EntitySetAddClass(geEntity_EntitySet *EntitySet, geEntity_Cla
 {
 	assert(EntitySet);
 	assert(Class);
+	if (!EntitySet || !Class)
+		return GE_FALSE;
 
 	assert(Class->Next == NULL);		// We want fresh ones only
 
@@ -656,28 +664,28 @@ static geBoolean BuildClassTypes(geEntity_EntitySet *EntitySet)
 	geEntity_EntitySet	*Set;
 	
 	// Fill in the pre-defined atomic types
-	Class = geEntity_ClassCreate(TYPE_INT, "int", sizeof(int32));
+	Class = geEntity_ClassCreate(TYPE_INT, "int", sizeof(int32), _Alignof(int32));
 	geEntity_EntitySetAddClass(EntitySet, Class);
 //
 // For Reality Factory floating point data type in entities
 // is set to be geFloat, not float as in Gedit
 //
-	Class = geEntity_ClassCreate(TYPE_FLOAT, "geFloat", sizeof(geFloat));
+	Class = geEntity_ClassCreate(TYPE_FLOAT, "geFloat", sizeof(geFloat), _Alignof(geFloat));
 	geEntity_EntitySetAddClass(EntitySet, Class);
 
-	Class = geEntity_ClassCreate(TYPE_COLOR, "color", sizeof(GE_RGBA));
+	Class = geEntity_ClassCreate(TYPE_COLOR, "color", sizeof(GE_RGBA), _Alignof(GE_RGBA));
 	geEntity_EntitySetAddClass(EntitySet, Class);
 
-	Class = geEntity_ClassCreate(TYPE_POINT, "point", sizeof(geVec3d));
+	Class = geEntity_ClassCreate(TYPE_POINT, "point", sizeof(geVec3d), _Alignof(geVec3d));
 	geEntity_EntitySetAddClass(EntitySet, Class);
 
-	Class = geEntity_ClassCreate(TYPE_STRING, "string", sizeof(char *));
+	Class = geEntity_ClassCreate(TYPE_STRING, "string", sizeof(char *), _Alignof(char *));
 	geEntity_EntitySetAddClass(EntitySet, Class);
 
-	Class = geEntity_ClassCreate(TYPE_PTR, "ptr", sizeof(void *));
+	Class = geEntity_ClassCreate(TYPE_PTR, "ptr", sizeof(void *), _Alignof(void *));
 	geEntity_EntitySetAddClass(EntitySet, Class);
 
-	Class = geEntity_ClassCreate(TYPE_MODEL, "model", sizeof(void*));
+	Class = geEntity_ClassCreate(TYPE_MODEL, "model", sizeof(void *), _Alignof(void *));
 	geEntity_EntitySetAddClass(EntitySet, Class);
 	
 	//	Find all the %typedef% keywords, and allocate them as TYPE_STRUCT's
@@ -700,7 +708,7 @@ static geBoolean BuildClassTypes(geEntity_EntitySet *EntitySet)
 		if (!Name)
 			return GE_FALSE;
 
-		Class = geEntity_ClassCreate(TYPE_STRUCT, Name, sizeof(void*));
+		Class = geEntity_ClassCreate(TYPE_STRUCT, Name, sizeof(void *), _Alignof(void *));
 
 		if (!Class)
 			goto ExitWithError;
@@ -758,7 +766,12 @@ static geBoolean BuildClassTypes(geEntity_EntitySet *EntitySet)
 			if (!TypeClass)
 				goto ExitWithError;		// Type not defined for this field!!!
 
-			Field = geEntity_FieldCreate(Epair->Key, Class->FieldSize, TypeClass);
+			{
+				const int32 Alignment = TypeClass->TypeAlignment;
+				const int32 Offset =
+					(Class->FieldSize + Alignment - 1) & ~(Alignment - 1);
+				Field = geEntity_FieldCreate(Epair->Key, Offset, TypeClass);
+			}
 
 			if (!Field)
 				goto ExitWithError;
@@ -1082,7 +1095,7 @@ geEntity_EntitySet *LoadEntitySet(const char *EntityData, int32 EntityDataSize)
 	MemFile = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_MEMORY, NULL, &Context, GE_VFILE_OPEN_READONLY);
 
 	if (!MemFile)
-		return FALSE;
+		return GE_FALSE;
 
 	// Create the entityset
 	EntitySet = geEntity_EntitySetCreate();

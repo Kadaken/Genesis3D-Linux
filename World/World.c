@@ -35,38 +35,41 @@
 /*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved                            */
 /*                                                                                      */
 /****************************************************************************************/
-#include <Assert.h>
-#include <Math.h>
+#include <assert.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
  
 #include "World.h"
 #include "System.h"
-#include "Ram.h"
-#include "BaseType.h"
-#include "GBSPFile.h"
+#include "RAM.H"
+#include "basetype.h"
+#include "Gbspfile.h"
 #include "Camera.h"
-#include "Plane.h"
-#include "Surface.h"
+#include "PLANE.H"
+#include "SURFACE.H"
 #include "Light.h"
 #include "WBitmap.h"
-#include "Frustum.h"
+#include "FRUSTUM.H"
 #ifdef	MESHES
 #include "Mesh.h"
 #endif
-#include "Entities.h"
-#include "Vis.h"
-#include "User.h"
-#include "VFile.h"
+#include "ENTITIES.H"
+#include "VIS.H"
+#include "USER.H"
+#include "vfile.h"
 
-#include "Trace.h"
+#include "TRACE.H"
 
 #include "list.h"
 
-#include "Bitmap.h"
-#include "Bitmap._h"
+#include "bitmap.h"
+#include "bitmap._h"
 
-#include "Puppet.h"
-#include "Body.h"
-#include "Motion.h"
+#include "puppet.h"
+#include "body.h"
+#include "motion.h"
 
 //#define BSP_BACK_TO_FRONT
 
@@ -151,7 +154,7 @@ static void RenderTransPoly(geCamera *Camera, World_TransPoly *pPoly);
 typedef struct
 {
 	uint8		Type;
-	uint32		Data;
+	uintptr_t	Data;
 } GList_Operation;
 
 typedef struct
@@ -262,7 +265,7 @@ void GList_Destroy(GList *GList)
 //=====================================================================================
 //	GList_AddOperation
 //=====================================================================================
-void GList_AddOperation(uint8 Type, uint32 Data)
+void GList_AddOperation(uint8 Type, uintptr_t Data)
 {
 	int32		Op;
 
@@ -312,7 +315,7 @@ geBoolean GList_RenderOperations(geCamera *Camera)
 typedef struct
 {
 	uint32	Type;
-	uint32	Data;
+	uintptr_t Data;
 	geFloat	ZOrder;
 } GList_OperationSorted;
 
@@ -480,7 +483,7 @@ void GList_AddOperationsSorted(geCamera *Camera)
 				GListOperationsSorted[NumGListOperationsSorted].ZOrder /= pWTPoly->NumVerts;
 				
 				GListOperationsSorted[NumGListOperationsSorted].Type  = GListOperations[Op].Type;
-				GListOperationsSorted[NumGListOperationsSorted].Data = (uint32) pWTPoly;
+				GListOperationsSorted[NumGListOperationsSorted].Data = (uintptr_t)pWTPoly;
 				NumGListOperationsSorted++;
 			}
 			break;
@@ -516,7 +519,7 @@ void GList_AddOperationsSorted(geCamera *Camera)
 
 						GListOperationsSorted[NumGListOperationsSorted].ZOrder /= pUPoly->NumVerts;
 
-						GListOperationsSorted[NumGListOperationsSorted].Data = (uint32) pUPoly;
+						GListOperationsSorted[NumGListOperationsSorted].Data = (uintptr_t)pUPoly;
 						GListOperationsSorted[NumGListOperationsSorted].Type  = GListOperations[Op].Type;
 						NumGListOperationsSorted++;
 
@@ -547,7 +550,7 @@ void GList_AddOperationsSorted(geCamera *Camera)
 
 					GListOperationsSorted[NumGListOperationsSorted].ZOrder /= pUPoly->NumVerts;
 
-					GListOperationsSorted[NumGListOperationsSorted].Data = (uint32) pUPoly;
+					GListOperationsSorted[NumGListOperationsSorted].Data = (uintptr_t)pUPoly;
 					GListOperationsSorted[NumGListOperationsSorted].Type  = GListOperations[Op].Type;
 					NumGListOperationsSorted++;
 
@@ -2024,7 +2027,7 @@ static void RenderBSPFrontBack_r2(int32 Node, geCamera *Camera)
 		if (PolyList)
 		{
 			CDebugInfo->NumLeafsWithUserPolys++;
-			GList_AddOperation(1, (uint32)PolyList);
+			GList_AddOperation(1, (uintptr_t)PolyList);
 		}
 
 		CDebugInfo->NumLeafsHit2++;
@@ -2081,7 +2084,7 @@ static void RenderBSPFrontBack_r(int32 Node, const geWorld_RenderInfo *RenderInf
 		if (PolyList)
 		{
 			CDebugInfo->NumLeafsWithUserPolys++;
-			GList_AddOperation(1, (uint32)PolyList);
+			GList_AddOperation(1, (uintptr_t)PolyList);
 		}
 
 		CDebugInfo->NumLeafsHit1++;
@@ -2519,7 +2522,7 @@ static void RenderFace(int32 Face, const geWorld_RenderInfo *RenderInfo, int32 C
 		pPoly->NumVerts = Length1;
 
 		// Add this TransPoly to the GList (Geometry List) that is rendered after the current subscene is done
-		GList_AddOperation(0, (uint32)pPoly);
+		GList_AddOperation(0, (uintptr_t)pPoly);
 
 		NumTransPolys[MirrorRecursion]++;
 
@@ -3038,7 +3041,7 @@ void FillAreas_r(geWorld *World, uint32 Area, uint8 *List, uint32 *Count)
 	int32			i;
 
 	List[*Count] = (uint8)Area;
-	*Count++;
+	(*Count)++;
 	
 	BSP = &World->CurrentBSP->BSPData;
 
@@ -3267,8 +3270,8 @@ GENESISAPI geBoolean geWorld_AddActor( geWorld *World, geActor *Actor, uint32 Fl
 	#ifdef DO_ADDREMOVE_MESSAGES	
 	{
 	char str[100];
-		sprintf(str,"World_AddActor : %08X\n",Actor);
-		OutputDebugString(str);
+		sprintf(str,"World_AddActor : %p\n", (void *)Actor);
+		fputs(str, stderr);
 	}
 	#endif
 	
@@ -3290,8 +3293,8 @@ GENESISAPI geBoolean geWorld_RemoveActor(geWorld *World, geActor *Actor)
 	#ifdef DO_ADDREMOVE_MESSAGES	
 	{
 	char str[100];
-		sprintf(str,"World_RemoveActor : %08X\n",Actor);
-		OutputDebugString(str);
+		sprintf(str,"World_RemoveActor : %p\n", (void *)Actor);
+		fputs(str, stderr);
 	}
 	#endif
 
@@ -3372,8 +3375,8 @@ GENESISAPI geBoolean geWorld_AddSprite(geWorld *World, geSprite *Sprite, uint32 
 	{
 		char str[100];
 
-		sprintf(str, "World_AddSprite : %08X\n", Sprite);
-		OutputDebugString(str);
+		sprintf(str, "World_AddSprite : %p\n", (void *)Sprite);
+		fputs(str, stderr);
 	}
 #endif
 	
@@ -3397,8 +3400,8 @@ GENESISAPI geBoolean geWorld_RemoveSprite(geWorld *World, geSprite *Sprite)
 	{
 		char str[100];
 
-		sprintf(str,"World_RemoveSprite : %08X\n",Sprite);
-		OutputDebugString(str);
+		sprintf(str,"World_RemoveSprite : %p\n", (void *)Sprite);
+		fputs(str, stderr);
 	}
 #endif
 
@@ -3865,7 +3868,7 @@ static geBoolean CreateStaticFogList(geWorld *World)
 {
 	geEntity			*Entity;
 	geEntity_EntitySet	*EntitySet;
-	geFog				*Fog;
+	geFog				*Fog = NULL;
 
 	// ONly interested in "FogLight"'s
 
@@ -4527,8 +4530,8 @@ GENESISAPI geBoolean geWorld_AddBitmap(geWorld *World, geBitmap *Bitmap)
 		#ifdef DO_ADDREMOVE_MESSAGES	
 		{
 		char str[100];
-			sprintf(str,"World_AddBitmap : %08X : new\n",Bitmap);
-			OutputDebugString(str);
+			sprintf(str,"World_AddBitmap : %p : new\n", (void *)Bitmap);
+			fputs(str, stderr);
 		}
 		#endif
 	}
@@ -4537,8 +4540,8 @@ GENESISAPI geBoolean geWorld_AddBitmap(geWorld *World, geBitmap *Bitmap)
 		#ifdef DO_ADDREMOVE_MESSAGES	
 		{
 		char str[100];
-			sprintf(str,"World_AddBitmap : %08X : old\n",Bitmap);
-			OutputDebugString(str);
+			sprintf(str,"World_AddBitmap : %p : old\n", (void *)Bitmap);
+			fputs(str, stderr);
 		}
 		#endif
 	}
@@ -4566,8 +4569,8 @@ GENESISAPI geBoolean geWorld_RemoveBitmap(geWorld *World,geBitmap *Bitmap)
 		#ifdef DO_ADDREMOVE_MESSAGES	
 		{
 		char str[100];
-			sprintf(str,"World_RemoveBitmap : %08X : removed\n",Bitmap);
-			OutputDebugString(str);
+			sprintf(str,"World_RemoveBitmap : %p : removed\n", (void *)Bitmap);
+			fputs(str, stderr);
 		}
 		#endif
 	}
@@ -4576,8 +4579,8 @@ GENESISAPI geBoolean geWorld_RemoveBitmap(geWorld *World,geBitmap *Bitmap)
 		#ifdef DO_ADDREMOVE_MESSAGES	
 		{
 		char str[100];
-			sprintf(str,"World_RemoveBitmap : %08X : left\n",Bitmap);
-			OutputDebugString(str);
+			sprintf(str,"World_RemoveBitmap : %p : left\n", (void *)Bitmap);
+			fputs(str, stderr);
 		}
 		#endif
 	}
@@ -4668,17 +4671,16 @@ GENESISAPI geBoolean geWorld_BitmapIsVisible(geWorld *World, const geBitmap *Bit
 //	the indices array yourself once you're done with it.
 //================================================================================
 GENESISAPI geBoolean geWorld_GetWorldGeometry(geWorld *World,
-							geVec3d **Verts, int *NumVerts,
-							long **Indices, long *NumIndices)
+								geVec3d **Verts, int32 *NumVerts,
+								int32 **Indices, int32 *NumIndices)
 {
-	int i, j, k;
+	int32 i, j, k;
 	GBSP_BSPData *bspData; // convenience pointer
-	int numTris;
+	size_t numTris;
 
-	if(!World)
+	if (!World || !World->CurrentBSP || !Verts || !NumVerts ||
+		!Indices || !NumIndices)
 		return GE_FALSE;
-
-	assert(Verts && NumVerts && Indices && NumIndices);
 
 	bspData = &World->CurrentBSP->BSPData;
 
@@ -4686,11 +4688,23 @@ GENESISAPI geBoolean geWorld_GetWorldGeometry(geWorld *World,
 	*NumVerts = bspData->NumGFXVerts;
 
 	// determine how many tris exist
-	for(i=0, numTris=0; i<bspData->NumGFXFaces; ++i)
-		numTris += bspData->GFXFaces[i].NumVerts-2; // assuming stored as fans or strips
+	for (i = 0, numTris = 0; i < bspData->NumGFXFaces; ++i)
+	{
+		if (bspData->GFXFaces[i].NumVerts >= 3)
+			numTris += (size_t)bspData->GFXFaces[i].NumVerts - 2U;
+	}
+	if (numTris > (size_t)INT32_MAX / 3U)
+		return GE_FALSE;
 
-	*NumIndices = numTris*3; // returning a triangle list
-	*Indices = malloc( sizeof(long)*(*NumIndices) );
+	*NumIndices = (int32)(numTris * 3U); // returning a triangle list
+	if (*NumIndices == 0)
+	{
+		*Indices = NULL;
+		return GE_TRUE;
+	}
+	*Indices = malloc(sizeof(**Indices) * (size_t)*NumIndices);
+	if (!*Indices)
+		return GE_FALSE;
 
 	// FANS
 	j = 0; // j is the index into the vert index array

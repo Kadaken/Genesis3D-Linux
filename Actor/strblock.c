@@ -30,8 +30,8 @@
 #include <stdio.h>
 
 #include "strblock.h"
-#include "ram.h"
-#include "errorlog.h"
+#include "RAM.H"
+#include "Errorlog.h"
 
 #define STRBLOCK_MAX_STRINGLEN 255
 
@@ -136,11 +136,8 @@ void GENESISCC geStrBlock_Delete(geStrBlock **ppSB,int Nth)
 	{
 		geStrBlock *B = *ppSB;
 		char *ToBeReplaced;
-		char *Replacement=NULL;
 		int i;
 		ToBeReplaced = &((*ppSB)->Data.CharArray[(*ppSB)->Data.IntArray[Nth]]);
-		if (Nth< (*ppSB)->Count-1)
-			Replacement  = &((*ppSB)->Data.CharArray[(*ppSB)->Data.IntArray[Nth+1]]);
 		for (i=Nth+1,CloseSize = 0; i<(*ppSB)->Count ; i++)
 			{
 				CloseSize += strlen(&((*ppSB)->Data.CharArray[(*ppSB)->Data.IntArray[i]])) +1;
@@ -152,7 +149,9 @@ void GENESISCC geStrBlock_Delete(geStrBlock **ppSB,int Nth)
 			}
 		// crunch out Nth string
 		if (Nth< (*ppSB)->Count-1)
-			memmove(ToBeReplaced,Replacement,CloseSize);
+			memmove(ToBeReplaced,
+				&((*ppSB)->Data.CharArray[(*ppSB)->Data.IntArray[Nth+1]]),
+				CloseSize);
 		// crunch out Nth index
 		memmove(&(B->Data.IntArray[Nth]),
 				&(B->Data.IntArray[Nth+1]),

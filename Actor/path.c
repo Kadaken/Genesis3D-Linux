@@ -25,17 +25,13 @@
 #include <stdio.h>  //sscanf
 
 #include "path.h"
-#include "Quatern.h"
-#include "errorlog.h"
-#include "ram.h"
+#include "quatern.h"
+#include "Errorlog.h"
+#include "RAM.H"
 #include "tkarray.h"
-#include "VKFrame.h"
+#include "vkframe.h"
 #include "QKFrame.h"
-#include "vec3d.h"
-
-#define min(aa,bb)  (( (aa)>(bb) ) ? (bb) : (aa) )
-#define max(aa,bb)  (( (aa)>(bb) ) ? (aa) : (bb) )
-
+#include "VEC3D.H"
 
 #define gePath_TimeType geFloat
 
@@ -1298,7 +1294,9 @@ gePath* GENESISCC gePath_CreateFromFile_F0_(geVFile* pFile)
 GENESISAPI gePath* GENESISCC gePath_CreateFromFile(geVFile* pFile)
 {
 	uint32 u, v, flag;
-	int Interp,Loop;
+	geQKFrame_InterpolationType QKInterp;
+	geVKFrame_InterpolationType VKInterp;
+	int Loop;
 	gePath* P;
 	#define LINE_LENGTH 256
 	char line[LINE_LENGTH];
@@ -1368,10 +1366,10 @@ GENESISAPI gePath* GENESISCC gePath_CreateFromFile(geVFile* pFile)
 		}
 	if (flag!=GE_FALSE)
 		{
-			P->Rotation.KeyList = geQKFrame_CreateFromFile(pFile,&Interp,&Loop);
+			P->Rotation.KeyList = geQKFrame_CreateFromFile(pFile,&QKInterp,&Loop);
 			if (P->Rotation.KeyList == NULL)
 				EXIT_ERROR
-			P->Rotation.InterpolationType = gePath_QKToPathInterpolation(Interp);
+			P->Rotation.InterpolationType = gePath_QKToPathInterpolation(QKInterp);
 			if (Loop)
 				P->Looped = FLAG_LOOPED;
 		}
@@ -1399,10 +1397,10 @@ GENESISAPI gePath* GENESISCC gePath_CreateFromFile(geVFile* pFile)
 					
 	if (flag!=GE_FALSE)
 		{
-			P->Translation.KeyList = geVKFrame_CreateFromFile(pFile,&Interp,&Loop);
+			P->Translation.KeyList = geVKFrame_CreateFromFile(pFile,&VKInterp,&Loop);
 			if (P->Translation.KeyList == NULL)
 				EXIT_ERROR
-			P->Translation.InterpolationType = gePath_VKToPathInterpolation(Interp);
+			P->Translation.InterpolationType = gePath_VKToPathInterpolation(VKInterp);
 			if (Loop)
 				P->Looped = FLAG_LOOPED;
 		}
@@ -1587,7 +1585,8 @@ GENESISAPI geBoolean GENESISCC gePath_WriteToBinaryFile(const gePath *P, geVFile
 static gePath * GENESISCC gePath_CreateFromBinaryFile(geVFile *F,uint32 Header)
 {
 	gePath *P;
-	int Interp,Looping;
+	geVKFrame_InterpolationType VKInterp;
+	int QKInterp,Looping;
 
 	assert( F != NULL );
 
@@ -1621,21 +1620,21 @@ static gePath * GENESISCC gePath_CreateFromBinaryFile(geVFile *F,uint32 Header)
 
 	if ((Header >> 1) & 0x1)
 		{
-			P->Translation.KeyList = geVKFrame_CreateFromBinaryFile(F,&Interp,&Looping);
+			P->Translation.KeyList = geVKFrame_CreateFromBinaryFile(F,&VKInterp,&Looping);
 			if (P->Translation.KeyList == NULL)
 				{
 					geErrorLog_AddString( -1, "Failure to read translation keys" , NULL);
 					geRam_Free(P);
 					return NULL;
 				}
-			P->Translation.InterpolationType = gePath_VKToPathInterpolation(Interp);
+			P->Translation.InterpolationType = gePath_VKToPathInterpolation(VKInterp);
 			if( Looping != 0 )
 				P->Looped = FLAG_LOOPED;
 		}
 
 	if (Header & 0x1)
 		{
-			P->Rotation.KeyList = geQKFrame_CreateFromBinaryFile(F,&Interp,&Looping);
+			P->Rotation.KeyList = geQKFrame_CreateFromBinaryFile(F,&QKInterp,&Looping);
 			if (P->Rotation.KeyList == NULL)
 				{
 					geErrorLog_AddString( -1, "Failure to read rotation keys" , NULL);
@@ -1646,7 +1645,7 @@ static gePath * GENESISCC gePath_CreateFromBinaryFile(geVFile *F,uint32 Header)
 					geRam_Free(P);
 					return NULL;
 				}
-			P->Rotation.InterpolationType = gePath_QKToPathInterpolation(Interp);
+			P->Rotation.InterpolationType = gePath_QKToPathInterpolation((geQKFrame_InterpolationType)QKInterp);
 			if( Looping != 0 )
 				P->Looped = FLAG_LOOPED;
 
@@ -1654,4 +1653,3 @@ static gePath * GENESISCC gePath_CreateFromBinaryFile(geVFile *F,uint32 Header)
 	P->Dirty = FLAG_DIRTY;
 	return P;
 }
-		

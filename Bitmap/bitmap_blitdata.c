@@ -32,7 +32,7 @@
 
 #include	"basetype.h"
 #include	"getypes.h"
-#include	"ram.h"
+#include	"RAM.H"
 
 #include	"bitmap.h"
 #include	"bitmap._h"
@@ -40,7 +40,7 @@
 #include	"bitmap_blitdata.h"
 
 #include	"vfile.h"
-#include	"ErrorLog.h"
+#include	"Errorlog.h"
 
 #include	"palcreate.h"
 #include	"palettize.h"
@@ -51,7 +51,9 @@
 #include	"timer.h"
 #endif
 
-//#define DONT_USE_ASM
+#ifndef _WIN32
+#define DONT_USE_ASM
+#endif
 
 /*}{*********************************************************************/
 
@@ -412,15 +414,15 @@ return Ret;
 geBoolean BlitData_Raw(void)
 {
 int x,y;
-char *SrcPtr,*DstPtr;
+uint8 *SrcPtr,*DstPtr;
 int R,G,B,A;
 uint32 ColorKey,Pixel;
 
 	if ( ! SrcOps || ! DstOps )
 		return GE_FALSE;
 
-	SrcPtr = (char *)SrcData;
-	DstPtr = (char *)DstData;
+	SrcPtr = (uint8 *)SrcData;
+	DstPtr = (uint8 *)DstData;
 
 	// this generic converter is pretty slow.
 	// fortunately genesis uses mostly the (Pal -> UnPal) conversion
@@ -1091,12 +1093,12 @@ return GE_FALSE;
 
 geBoolean BlitData_SameFormat(void)
 {
-char *SrcPtr,*DstPtr;
+uint8 *SrcPtr,*DstPtr;
 gePixelFormat Format;
 
 	Format = SrcFormat;
-	SrcPtr = (char *)SrcData;
-	DstPtr = (char *)DstData;
+	SrcPtr = (uint8 *)SrcData;
+	DstPtr = (uint8 *)DstData;
 
 	if ( (!DstInfo->HasColorKey) || 
 			( SrcInfo->HasColorKey && DstInfo->HasColorKey && SrcInfo->ColorKey == DstInfo->ColorKey ) )
@@ -1538,8 +1540,8 @@ geBoolean BlitData_DePalettize(void)
 					#if 1 // {
 					if ( (SizeX&1) == 0 )
 					{
-						assert( (((uint32)PalData)&3) == 0 );
-						assert( (((uint32)DstPtr )&3) == 0 );
+							assert((((uintptr_t)PalData) & (uintptr_t)3) == 0);
+							assert((((uintptr_t)DstPtr) & (uintptr_t)3) == 0);
 
 						// pair two pixels so we can output in dwords
 						
@@ -1785,8 +1787,8 @@ geBoolean BlitData_DePalettize(void)
 
 					#else
 
-					assert( (((uint32)PalData)&3) == 0);
-					assert( (((uint32)DstPtr)&3) == 0);
+						assert((((uintptr_t)PalData) & (uintptr_t)3) == 0);
+						assert((((uintptr_t)DstPtr) & (uintptr_t)3) == 0);
 
 					__asm
 					{
@@ -1844,4 +1846,3 @@ return palettizePlane(	SrcInfo,SrcData,
 }
 
 /*}{*********************************************************************/
-

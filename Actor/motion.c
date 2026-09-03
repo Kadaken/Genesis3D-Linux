@@ -30,11 +30,11 @@
 #include <string.h>		// strcmp, strnicmp
 
 #include "basetype.h"
-#include "ram.h"
-#include "errorlog.h"
+#include "RAM.H"
+#include "Errorlog.h"
 #include "motion.h"
 #include "tkevents.h"
-#include "StrBlock.h"
+#include "strblock.h"
 
 #pragma warning(disable : 4201)		// we're using nameless structures
 
@@ -286,7 +286,7 @@ GENESISAPI void GENESISCC geMotion_Destroy(geMotion **PM)
 					{	
 						geBoolean Test=	geMotion_RemoveNames(M);
 						assert( Test != GE_FALSE );
-						Test;
+						(void)Test;
 					}
 				for (i=0; i< M->Leaf.PathCount; i++)
 					{
@@ -527,6 +527,8 @@ GENESISAPI void GENESISCC geMotion_SampleChannels(const geMotion *M, int PathInd
 
 							MixTime = (Time - Mixer->TimeOffset) * Mixer->TimeScale;
 
+							geQuaternion_SetNoRotation(&R);
+							geVec3d_Clear(&T);
 							geMotion_SampleChannels(Mixer->Motion,PathIndex,MixTime,&R,&T);
 							{
 								geVec3d BlendVector;
