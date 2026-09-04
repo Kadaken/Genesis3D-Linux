@@ -1,17 +1,39 @@
-# Out-of-tree/runtime assets are linked from the installed game data.
+# Project-owned runtime assets and isolated binary purification copies stay
+# local; source-path manifests and tools remain tracked separately.
 /Assets/
 /PurificationWorkspace/
+*.act
+*.bsp
+*.gbsp
+*.bak
+*.pre-purification.bak
 
-# CMake in-source artifacts and native binaries.
+# CMake build trees, in-source artifacts, and compiled outputs.
+/build/
+/build-*/
+/cmake-build-*/
 /CMakeCache.txt
 /CMakeFiles/
 /Makefile
 /cmake_install.cmake
 /genesis3d_linux
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dll
+*.exe
+*.out
 
-# Generated diagnostics and caches.
+# Generated diagnostics, profiling evidence, scratch copies, and caches.
 /bsp_strings.txt
-/Reports/evidence/asset_purification/*.strings.hex.txt
-/Reports/evidence/sterile_asset_purification/
+/Reports/evidence/
+/scratch/
+/Scratch/
+/tmp/
+*.tmp
+*.profraw
+*.profdata
 __pycache__/
 *.py[cod]
