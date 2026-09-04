@@ -5,8 +5,10 @@ lineage.
 
 This repository descends from the
 [RealityFactory/Genesis3D](https://github.com/RealityFactory/Genesis3D) tree. It
-contains Genesis3D 1.1 code released in 1999, subsequent community-maintained
-snapshots, and Kadaken's 2026 Linux port. Kadaken did not create the original
+contains Genesis3D 1.1 code released in 1999, subsequent inherited source
+snapshots, and Kadaken's 2026 Linux port. The Linux port was developed by Kadaken
+with assistance from Gemini and Codex; no outside community contributors to
+the port are claimed. Kadaken did not create the original
 engine and is not affiliated with or endorsed by Eclipse Entertainment,
 WildTangent, Reality Factory, or the owners of games made with Genesis3D.
 
