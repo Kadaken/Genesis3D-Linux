@@ -21,8 +21,10 @@ launches now resolve only the isolated, project-owned asset tree.
 
 The SDL2-owned X11/OpenGL renderer uses SDL2 for native input. Interactive play must opt in
 with `GENESIS3D_ENABLE_INPUT_CAPTURE=1`. Hold W/A/S/D or the arrow keys to
-move, hold Shift to sprint, and move the mouse to look. Press Escape or close
-the window to exit. With interactive input enabled, the mouse is captured
+move, hold Shift to sprint, press Space to jump, and move the mouse to look.
+Player movement uses swept BSP collision, stair/slope handling, gravity, floor
+snapping, wall sliding, and ceiling rejection. Press Escape or close the
+window to exit. With interactive input enabled, the mouse is captured
 while the window has focus and released when focus is lost.
 
 Input capture is disabled by default. `GENESIS3D_NO_INPUT_CAPTURE=1` is a hard

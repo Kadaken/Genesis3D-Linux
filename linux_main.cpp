@@ -66,6 +66,19 @@ struct HeldMovementInput {
     bool right_arrow = false;
     bool sprint_left = false;
     bool sprint_right = false;
+    bool jump_space = false;
+};
+
+struct PlayerPhysics {
+    double vertical_velocity = 0.0;
+    bool grounded = false;
+    bool jump_was_held = false;
+    Vec3 ground_normal{0.0, 1.0, 0.0};
+    uint64_t collision_count = 0;
+    uint64_t step_count = 0;
+    uint64_t jump_count = 0;
+    uint64_t landing_count = 0;
+    uint64_t ceiling_count = 0;
 };
 
 struct VFileRegistryGuard {
@@ -777,6 +790,22 @@ Vec3 subtract(const Vec3 &a, const Vec3 &b) {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
+Vec3 add(const Vec3 &a, const Vec3 &b) {
+    return {a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+Vec3 scaled(const Vec3 &value, double scale) {
+    return {value.x * scale, value.y * scale, value.z * scale};
+}
+
+double dot(const Vec3 &a, const Vec3 &b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+double length_squared(const Vec3 &value) {
+    return dot(value, value);
+}
+
 Vec3 cross(const Vec3 &a, const Vec3 &b) {
     return {a.y * b.z - a.z * b.y,
             a.z * b.x - a.x * b.z,
@@ -852,10 +881,191 @@ bool set_movement_key(HeldMovementInput *input, SDL_Scancode scancode,
     case SDL_SCANCODE_RIGHT: state = &input->right_arrow; break;
     case SDL_SCANCODE_LSHIFT: state = &input->sprint_left; break;
     case SDL_SCANCODE_RSHIFT: state = &input->sprint_right; break;
+    case SDL_SCANCODE_SPACE: state = &input->jump_space; break;
     default: return false;
     }
     *state = held;
     return true;
+}
+
+// Genesis3D exposes swept axis-aligned ExtBox collision rather than a native
+// capsule cast. This 36 x 64 unit standing hull is the conservative capsule
+// approximation used for every player sweep; position is the camera eye.
+constexpr Vec3 kPlayerMins{-18.0, -56.0, -18.0};
+constexpr Vec3 kPlayerMaxs{18.0, 8.0, 18.0};
+constexpr double kGravity = 1200.0;
+constexpr double kJumpSpeed = 480.0;
+constexpr double kStepHeight = 18.0;
+constexpr double kGroundSnap = 4.0;
+constexpr double kCollisionSkin = 0.125;
+constexpr double kWalkableNormalY = 0.7071067811865476;
+constexpr int kSlidePlanes = 4;
+
+geVec3d ge_vector(const Vec3 &value) {
+    return {static_cast<geFloat>(value.x), static_cast<geFloat>(value.y),
+            static_cast<geFloat>(value.z)};
+}
+
+Vec3 native_vector(const geVec3d &value) {
+    return {value.X, value.Y, value.Z};
+}
+
+bool sweep_player(geWorld *world, const Vec3 &start, const Vec3 &end,
+                  GE_Collision *collision) {
+    const geVec3d mins = ge_vector(kPlayerMins);
+    const geVec3d maxs = ge_vector(kPlayerMaxs);
+    const geVec3d front = ge_vector(start);
+    const geVec3d back = ge_vector(end);
+    return geWorld_Collision(world, &mins, &maxs, &front, &back,
+                             GE_CONTENTS_SOLID_CLIP, GE_COLLIDE_MODELS,
+                             0xffffffffU, nullptr, nullptr, collision) != GE_FALSE;
+}
+
+struct SlideResult {
+    Vec3 position;
+    bool collided = false;
+    bool blocked_horizontally = false;
+    bool hit_floor = false;
+    bool hit_ceiling = false;
+    Vec3 floor_normal{0.0, 1.0, 0.0};
+};
+
+SlideResult slide_player(geWorld *world, const Vec3 &start,
+                         const Vec3 &displacement) {
+    SlideResult result;
+    result.position = start;
+    Vec3 remaining = displacement;
+    for (int plane = 0; plane < kSlidePlanes &&
+                        length_squared(remaining) > 1.0e-8; ++plane) {
+        const Vec3 target = add(result.position, remaining);
+        GE_Collision collision{};
+        if (!sweep_player(world, result.position, target, &collision)) {
+            result.position = target;
+            break;
+        }
+        result.collided = true;
+        const Vec3 normal = normalized(native_vector(collision.Plane.Normal));
+        result.position = add(native_vector(collision.Impact),
+                              scaled(normal, kCollisionSkin));
+        result.hit_floor = result.hit_floor || normal.y >= kWalkableNormalY;
+        if (normal.y >= kWalkableNormalY)
+            result.floor_normal = normal;
+        result.hit_ceiling = result.hit_ceiling || normal.y <= -kWalkableNormalY;
+        result.blocked_horizontally = result.blocked_horizontally ||
+            (std::abs(normal.y) < kWalkableNormalY &&
+             (std::abs(remaining.x) + std::abs(remaining.z) > 1.0e-6));
+        remaining = subtract(target, result.position);
+        const double into_plane = dot(remaining, normal);
+        if (into_plane < 0.0)
+            remaining = subtract(remaining, scaled(normal, into_plane));
+    }
+    return result;
+}
+
+bool trace_support(geWorld *world, const Vec3 &position, double distance,
+                   Vec3 *supported_position, Vec3 *normal) {
+    GE_Collision collision{};
+    const Vec3 target{position.x, position.y - distance, position.z};
+    if (!sweep_player(world, position, target, &collision))
+        return false;
+    const Vec3 hit_normal = normalized(native_vector(collision.Plane.Normal));
+    if (hit_normal.y < kWalkableNormalY)
+        return false;
+    if (supported_position)
+        *supported_position = add(native_vector(collision.Impact),
+                                  scaled(hit_normal, kCollisionSkin));
+    if (normal)
+        *normal = hit_normal;
+    return true;
+}
+
+void update_player_movement(geWorld *world, PlayerCamera *camera,
+                            PlayerPhysics *physics, const CameraBasis &basis,
+                            const HeldMovementInput &input,
+                            double delta_seconds) {
+    if (!world || !camera || !physics)
+        return;
+    const bool jump_pressed = input.jump_space && !physics->jump_was_held;
+    physics->jump_was_held = input.jump_space;
+    if (jump_pressed && physics->grounded) {
+        physics->vertical_velocity = kJumpSpeed;
+        physics->grounded = false;
+        ++physics->jump_count;
+    }
+    const double forward_axis =
+        (input.forward_w || input.forward_up ? 1.0 : 0.0) -
+        (input.backward_s || input.backward_down ? 1.0 : 0.0);
+    const double strafe_axis =
+        (input.right_d || input.right_arrow ? 1.0 : 0.0) -
+        (input.left_a || input.left_arrow ? 1.0 : 0.0);
+    Vec3 direction = normalized({
+        basis.planar_forward.x * forward_axis + basis.right.x * strafe_axis,
+        0.0,
+        basis.planar_forward.z * forward_axis + basis.right.z * strafe_axis});
+    const double sprint = input.sprint_left || input.sprint_right ? 2.0 : 1.0;
+    const Vec3 horizontal = scaled(direction,
+        camera->move_speed * sprint * delta_seconds);
+    const Vec3 horizontal_start = camera->position;
+    SlideResult direct = slide_player(world, horizontal_start, horizontal);
+    SlideResult chosen = direct;
+    if (physics->grounded && direct.blocked_horizontally &&
+        length_squared(horizontal) > 1.0e-8) {
+        const SlideResult raised = slide_player(
+            world, horizontal_start, {0.0, kStepHeight, 0.0});
+        if (!raised.hit_ceiling) {
+            SlideResult stepped = slide_player(world, raised.position, horizontal);
+            Vec3 step_floor{};
+            Vec3 step_normal{};
+            if (trace_support(world, stepped.position,
+                              kStepHeight + kGroundSnap,
+                              &step_floor, &step_normal)) {
+                const Vec3 direct_delta = subtract(direct.position, horizontal_start);
+                const Vec3 step_delta = subtract(step_floor, horizontal_start);
+                const double direct_progress = direct_delta.x * direction.x +
+                                               direct_delta.z * direction.z;
+                const double step_progress = step_delta.x * direction.x +
+                                             step_delta.z * direction.z;
+                if (step_progress > direct_progress + kCollisionSkin) {
+                    chosen = stepped;
+                    chosen.position = step_floor;
+                    chosen.hit_floor = true;
+                    chosen.floor_normal = step_normal;
+                    ++physics->step_count;
+                }
+            }
+        }
+    }
+    camera->position = chosen.position;
+    if (chosen.collided)
+        ++physics->collision_count;
+    physics->vertical_velocity -= kGravity * delta_seconds;
+    SlideResult vertical = slide_player(
+        world, camera->position,
+        {0.0, physics->vertical_velocity * delta_seconds, 0.0});
+    camera->position = vertical.position;
+    if (vertical.collided)
+        ++physics->collision_count;
+    if (vertical.hit_ceiling && physics->vertical_velocity > 0.0) {
+        physics->vertical_velocity = 0.0;
+        ++physics->ceiling_count;
+    }
+    bool grounded = vertical.hit_floor && physics->vertical_velocity <= 0.0;
+    Vec3 floor_position{};
+    Vec3 floor_normal{};
+    if (!grounded && physics->vertical_velocity <= 0.0 &&
+        trace_support(world, camera->position, kGroundSnap,
+                      &floor_position, &floor_normal)) {
+        camera->position = floor_position;
+        grounded = true;
+        vertical.floor_normal = floor_normal;
+    }
+    if (grounded) {
+        if (!physics->grounded)
+            ++physics->landing_count;
+        physics->vertical_velocity = 0.0;
+        physics->ground_normal = vertical.floor_normal;
+    }
+    physics->grounded = grounded;
 }
 
 void update_camera_movement(PlayerCamera *camera, const CameraBasis &basis,
@@ -933,6 +1143,122 @@ bool validate_camera_movement() {
                  aliases_and_sprint ? "PASS" : "FAIL");
     return sixty_hz && one_twenty_hz && diagonal_normalized &&
            aliases_and_sprint;
+}
+
+bool validate_player_physics(geWorld *world) {
+    constexpr double dt = 1.0 / 60.0;
+    constexpr double position_epsilon = 0.02;
+    PlayerCamera resting = initial_camera(world);
+    PlayerPhysics rest_physics;
+    HeldMovementInput no_input;
+    for (int step = 0; step < 240 && !rest_physics.grounded; ++step)
+        update_player_movement(world, &resting, &rest_physics,
+                               camera_basis(resting), no_input, dt);
+    const bool found_floor = rest_physics.grounded;
+    const Vec3 floor_position = resting.position;
+    for (int step = 0; step < 120; ++step)
+        update_player_movement(world, &resting, &rest_physics,
+                               camera_basis(resting), no_input, dt);
+    const bool stable_rest = rest_physics.grounded &&
+        length_squared(subtract(resting.position, floor_position)) <
+            position_epsilon * position_epsilon;
+
+    PlayerCamera falling = resting;
+    falling.position.y += 128.0;
+    PlayerPhysics fall_physics;
+    for (int step = 0; step < 240 && !fall_physics.grounded; ++step)
+        update_player_movement(world, &falling, &fall_physics,
+                               camera_basis(falling), no_input, dt);
+    const bool fall_landed = fall_physics.grounded &&
+        std::abs(falling.position.y - floor_position.y) < position_epsilon;
+
+    PlayerCamera jumping = resting;
+    PlayerPhysics jump_physics = rest_physics;
+    jump_physics.jump_was_held = false;
+    HeldMovementInput jump_input;
+    jump_input.jump_space = true;
+    const double jump_start = jumping.position.y;
+    double apex = jump_start;
+    for (int step = 0; step < 240; ++step) {
+        update_player_movement(world, &jumping, &jump_physics,
+                               camera_basis(jumping), jump_input, dt);
+        apex = (std::max)(apex, jumping.position.y);
+        // Keeping Space held validates rising-edge behavior. Release after the
+        // expected ballistic flight so a landing cannot retrigger the jump.
+        if (step == 90)
+            jump_input.jump_space = false;
+    }
+    const bool jump_cycle = jump_physics.jump_count == 1 &&
+        jump_physics.grounded && apex > jump_start + 40.0 &&
+        std::abs(jumping.position.y - jump_start) < position_epsilon;
+
+    GE_Collision ceiling{};
+    const bool ceiling_found = sweep_player(
+        world, resting.position,
+        {resting.position.x, resting.position.y + 1024.0, resting.position.z},
+        &ceiling);
+    const bool ceiling_normal = ceiling_found &&
+        normalized(native_vector(ceiling.Plane.Normal)).y <= -kWalkableNormalY;
+
+    // Presentation rate cannot alter simulation state: both paths feed the
+    // same 60 Hz accumulator and therefore execute exactly 120 fixed steps.
+    auto simulate_presented = [&](int presentation_hz) {
+        PlayerCamera candidate = resting;
+        PlayerPhysics physics = rest_physics;
+        HeldMovementInput input;
+        input.forward_w = true;
+        input.right_d = true;
+        double accumulator = 0.0;
+        for (int frame = 0; frame < presentation_hz * 2; ++frame) {
+            accumulator += 1.0 / static_cast<double>(presentation_hz);
+            while (accumulator + 1.0e-12 >= dt) {
+                update_player_movement(world, &candidate, &physics,
+                                       camera_basis(candidate), input, dt);
+                accumulator -= dt;
+            }
+        }
+        return candidate.position;
+    };
+    const Vec3 at_60 = simulate_presented(60);
+    const Vec3 at_120 = simulate_presented(120);
+    const bool presentation_invariant =
+        length_squared(subtract(at_60, at_120)) < 1.0e-10;
+
+    // Exercise horizontal clipping on the real BSP. A blocked route must make
+    // partial tangential progress rather than tunnel through its hit plane.
+    bool wall_slide = false;
+    bool step_or_slope = false;
+    for (int route = 0; route < 16 && !(wall_slide && step_or_slope); ++route) {
+        PlayerCamera traveler = resting;
+        traveler.yaw = route * (2.0 * kPi / 16.0);
+        PlayerPhysics physics = rest_physics;
+        HeldMovementInput input;
+        input.forward_w = true;
+        input.right_d = true;
+        for (int step = 0; step < 240; ++step) {
+            const uint64_t old_collisions = physics.collision_count;
+            const uint64_t old_steps = physics.step_count;
+            update_player_movement(world, &traveler, &physics,
+                                   camera_basis(traveler), input, dt);
+            wall_slide = wall_slide || physics.collision_count > old_collisions;
+            step_or_slope = step_or_slope || physics.step_count > old_steps ||
+                (physics.grounded && physics.ground_normal.y < 0.999);
+        }
+    }
+
+    std::fprintf(stderr,
+                 "Genesis3D Linux: real BSP player regression: floor %s, rest %s, fall/landing %s, jump/apex/edge %s, ceiling %s, wall slide %s, step/slope %s, 60/120 %s (floor %.3f, apex +%.3f)\n",
+                 found_floor ? "PASS" : "FAIL",
+                 stable_rest ? "PASS" : "FAIL",
+                 fall_landed ? "PASS" : "FAIL",
+                 jump_cycle ? "PASS" : "FAIL",
+                 ceiling_normal ? "PASS" : "FAIL",
+                 wall_slide ? "PASS" : "NOT OBSERVED",
+                 step_or_slope ? "PASS" : "NOT OBSERVED",
+                 presentation_invariant ? "PASS" : "FAIL",
+                 floor_position.y, apex - jump_start);
+    return found_floor && stable_rest && fall_landed && jump_cycle &&
+           ceiling_normal && presentation_invariant;
 }
 
 void look_at(const Vec3 &eye, const Vec3 &target) {
@@ -1375,12 +1701,19 @@ bool validate_sdl_keyboard_delivery(SDL_Window *window) {
     up.type = SDL_KEYUP;
     up.key.type = SDL_KEYUP;
     up.key.state = SDL_RELEASED;
-    if (SDL_PushEvent(&down) != 1 || SDL_PushEvent(&up) != 1)
+    SDL_Event jump_down = down;
+    jump_down.key.keysym.scancode = SDL_SCANCODE_SPACE;
+    SDL_Event jump_up = up;
+    jump_up.key.keysym.scancode = SDL_SCANCODE_SPACE;
+    if (SDL_PushEvent(&down) != 1 || SDL_PushEvent(&up) != 1 ||
+        SDL_PushEvent(&jump_down) != 1 || SDL_PushEvent(&jump_up) != 1)
         return false;
 
     HeldMovementInput input;
     bool saw_down = false;
     bool saw_up = false;
+    bool saw_jump_down = false;
+    bool saw_jump_up = false;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_KEYDOWN &&
@@ -1391,9 +1724,17 @@ bool validate_sdl_keyboard_delivery(SDL_Window *window) {
                    event.key.keysym.scancode == SDL_SCANCODE_W) {
             set_movement_key(&input, event.key.keysym.scancode, false);
             saw_up = !input.forward_w;
+        } else if (event.type == SDL_KEYDOWN &&
+                   event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
+            set_movement_key(&input, event.key.keysym.scancode, true);
+            saw_jump_down = input.jump_space;
+        } else if (event.type == SDL_KEYUP &&
+                   event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
+            set_movement_key(&input, event.key.keysym.scancode, false);
+            saw_jump_up = !input.jump_space;
         }
     }
-    return saw_down && saw_up;
+    return saw_down && saw_up && saw_jump_down && saw_jump_up;
 }
 
 std::string project_root() {
@@ -1527,6 +1868,12 @@ int main() {
     geWorld *world = load_world(map_file);
     if (!world)
         return 1;
+    if (!validate_player_physics(world)) {
+        std::fprintf(stderr,
+                     "Genesis3D Linux: real BSP player physics regression failed\n");
+        geWorld_Free(world);
+        return 1;
+    }
 
     // Fail closed for unattended launches: focus and pointer capture require
     // an explicit interactive opt-in. GENESIS3D_NO_INPUT_CAPTURE always wins.
@@ -1688,6 +2035,7 @@ int main() {
                      "Genesis3D Linux: input capture disabled for unattended testing\n");
 
     PlayerCamera camera = initial_camera(world);
+    PlayerPhysics player_physics;
     const CameraBasis actor_basis = camera_basis(camera);
     geXForm3d actor_transform;
     geXForm3d_SetIdentity(&actor_transform);
@@ -1703,7 +2051,10 @@ int main() {
     constexpr double mouse_sensitivity = 0.0025;
     constexpr double pitch_limit = 89.0 * kPi / 180.0;
     std::fprintf(stderr,
-                 "Genesis3D Linux: controls active (WASD/arrows move, mouse looks, Shift sprints, Esc exits)\n");
+                 "Genesis3D Linux: controls active (WASD/arrows move, mouse looks, Shift sprints, Space jumps, Esc exits)\n");
+    std::fprintf(stderr,
+                 "Genesis3D Linux: player hull 36x64, step %.1f, gravity %.1f, jump %.1f, walkable normal Y >= %.3f\n",
+                 kStepHeight, kGravity, kJumpSpeed, kWalkableNormalY);
 
     // Prime asset-backed command generation before cadence accounting.
     const CameraBasis warmup_basis = camera_basis(camera);
@@ -1820,8 +2171,9 @@ int main() {
 
         uint64_t simulation_steps = 0;
         while (simulation_accumulator >= fixed_dt) {
-            update_camera_movement(&camera, camera_basis(camera),
-                                   movement_input, fixed_dt);
+            update_player_movement(world, &camera, &player_physics,
+                                   camera_basis(camera), movement_input,
+                                   fixed_dt);
             advance_actor_motion(&native_actor, fixed_dt, &render_diagnostics);
             advance_light_styles(world, &world_textures, &lighting_state,
                                  fixed_dt, &render_diagnostics);
@@ -1894,6 +2246,17 @@ int main() {
                  static_cast<unsigned long long>(render_diagnostics.lightmap_upload_bytes),
                  render_diagnostics.lightmap_update_ms,
                  static_cast<unsigned long long>(render_diagnostics.animated_actor_steps));
+
+    std::fprintf(stderr,
+                 "Genesis3D Linux: player physics summary: position %.3f %.3f %.3f, grounded %s, vertical velocity %.3f, %llu collisions, %llu steps, %llu jumps, %llu landings, %llu ceiling hits\n",
+                 camera.position.x, camera.position.y, camera.position.z,
+                 player_physics.grounded ? "yes" : "no",
+                 player_physics.vertical_velocity,
+                 static_cast<unsigned long long>(player_physics.collision_count),
+                 static_cast<unsigned long long>(player_physics.step_count),
+                 static_cast<unsigned long long>(player_physics.jump_count),
+                 static_cast<unsigned long long>(player_physics.landing_count),
+                 static_cast<unsigned long long>(player_physics.ceiling_count));
 
     SDL_SetRelativeMouseMode(SDL_FALSE);
     destroy_native_actor(&native_actor);
