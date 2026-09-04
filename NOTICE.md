@@ -3,7 +3,7 @@
 ## Genesis3D lineage
 
 This repository is derived directly and indirectly from Genesis3D Original
-Code and later community modifications published in the
+Code and later source snapshots published in the
 [RealityFactory/Genesis3D](https://github.com/RealityFactory/Genesis3D)
 repository.
 

@@ -63,9 +63,9 @@ when reduced motion is requested.
 ### Historical lineage
 
 Removed the claim that nothing came after Genesis3D 1.1. The inherited Git
-history identifies a 1.1 import followed by community snapshots labelled
+history identifies a 1.1 import followed by inherited source snapshots labelled
 through 2009. The publication now describes the repository as a lineage of 1.1,
-later community work, and Kadaken's 2026 port.
+later inherited revisions, and Kadaken's 2026 port.
 
 Removed the unsupported absolute claim that this is the first native Linux
 port. Earlier Linux port attempts exist, and the available evidence does not
@@ -73,7 +73,14 @@ justify an absolute worldwide first.
 
 Removed the claim that the current tree is exactly where it was left in 1999.
 It is published source rather than a decompilation, but it includes later
-community modifications.
+inherited revisions.
+
+Removed the ambiguous label "community-maintained" from the lineage
+description. The evidence establishes later snapshots in the inherited
+RealityFactory repository, but that phrase could incorrectly imply outside
+community participation in Kadaken's Linux port. The publication now states
+explicitly that Kadaken developed the 2026 port with assistance from Gemini and
+Codex and does not claim outside community contributors to the port.
 
 ### Copyright and ownership
 
@@ -261,7 +268,7 @@ without weakening the asset boundary.
 
 > Genesis3D Native Linux is a source-available native 64-bit Linux runtime for
 > the Genesis3D 1.x engine lineage. It combines preserved
-> Eclipse/WildTangent and community-maintained engine code with Kadaken's 2026
+> Eclipse/WildTangent and later inherited engine code with Kadaken's 2026
 > SDL2/OpenGL Linux frontend. Its documented BSP rendering, actor animation,
 > input, collision, lightmap, timing, and teardown paths have been tested on one
 > Fedora AMD/Mesa system. It is an engine runtime, not a game or a complete port

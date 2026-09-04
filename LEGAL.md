@@ -29,8 +29,8 @@ different guidance.
 
 ## Provenance boundary
 
-The Git lineage contains a Genesis3D 1.1 import and later community snapshots
-labelled through 2009 before Kadaken's 2026 changes. It is inaccurate to
+The inherited Git lineage contains a Genesis3D 1.1 import and later source
+snapshots labelled through 2009 before Kadaken's 2026 changes. It is inaccurate to
 describe the present repository as an untouched 1999 tree or to assign all
 copyright in the combined tree to one current entity. Existing source notices
 identify Eclipse Entertainment, WildTangent, and other contributors; Kadaken
