@@ -55,6 +55,19 @@ struct CameraBasis {
     Vec3 right;
 };
 
+struct HeldMovementInput {
+    bool forward_w = false;
+    bool forward_up = false;
+    bool backward_s = false;
+    bool backward_down = false;
+    bool left_a = false;
+    bool left_arrow = false;
+    bool right_d = false;
+    bool right_arrow = false;
+    bool sprint_left = false;
+    bool sprint_right = false;
+};
+
 struct VFileRegistryGuard {
     ~VFileRegistryGuard() {
         geVFile_CloseAPI();
@@ -823,17 +836,40 @@ PlayerCamera initial_camera(geWorld *world) {
             (std::max)(200.0, radius * 0.35)};
 }
 
+bool set_movement_key(HeldMovementInput *input, SDL_Scancode scancode,
+                      bool held) {
+    if (!input)
+        return false;
+    bool *state = nullptr;
+    switch (scancode) {
+    case SDL_SCANCODE_W: state = &input->forward_w; break;
+    case SDL_SCANCODE_UP: state = &input->forward_up; break;
+    case SDL_SCANCODE_S: state = &input->backward_s; break;
+    case SDL_SCANCODE_DOWN: state = &input->backward_down; break;
+    case SDL_SCANCODE_A: state = &input->left_a; break;
+    case SDL_SCANCODE_LEFT: state = &input->left_arrow; break;
+    case SDL_SCANCODE_D: state = &input->right_d; break;
+    case SDL_SCANCODE_RIGHT: state = &input->right_arrow; break;
+    case SDL_SCANCODE_LSHIFT: state = &input->sprint_left; break;
+    case SDL_SCANCODE_RSHIFT: state = &input->sprint_right; break;
+    default: return false;
+    }
+    *state = held;
+    return true;
+}
+
 void update_camera_movement(PlayerCamera *camera, const CameraBasis &basis,
-                            const Uint8 *keys, double delta_seconds) {
-    if (!camera || !keys)
+                            const HeldMovementInput &input,
+                            double delta_seconds) {
+    if (!camera)
         return;
 
     const double forward_axis =
-        (keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP] ? 1.0 : 0.0) -
-        (keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN] ? 1.0 : 0.0);
+        (input.forward_w || input.forward_up ? 1.0 : 0.0) -
+        (input.backward_s || input.backward_down ? 1.0 : 0.0);
     const double strafe_axis =
-        (keys[SDL_SCANCODE_D] || keys[SDL_SCANCODE_RIGHT] ? 1.0 : 0.0) -
-        (keys[SDL_SCANCODE_A] || keys[SDL_SCANCODE_LEFT] ? 1.0 : 0.0);
+        (input.right_d || input.right_arrow ? 1.0 : 0.0) -
+        (input.left_a || input.left_arrow ? 1.0 : 0.0);
 
     Vec3 movement = {
         basis.planar_forward.x * forward_axis + basis.right.x * strafe_axis,
@@ -842,10 +878,61 @@ void update_camera_movement(PlayerCamera *camera, const CameraBasis &basis,
     };
     movement = normalized(movement);
     const double sprint =
-        keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT] ? 2.0 : 1.0;
+        input.sprint_left || input.sprint_right ? 2.0 : 1.0;
     const double distance = camera->move_speed * sprint * delta_seconds;
     camera->position.x += movement.x * distance;
     camera->position.z += movement.z * distance;
+}
+
+bool validate_camera_movement() {
+    constexpr double dt = 1.0 / 60.0;
+    constexpr double epsilon = 1.0e-9;
+    HeldMovementInput input;
+    PlayerCamera camera{{0.0, 0.0, 0.0}, 0.0, 0.0, 400.0};
+    set_movement_key(&input, SDL_SCANCODE_W, true);
+    for (int step = 0; step < 60; ++step)
+        update_camera_movement(&camera, camera_basis(camera), input, dt);
+    const bool sixty_hz = std::abs(camera.position.x - 400.0) < epsilon &&
+                          std::abs(camera.position.z) < epsilon;
+
+    camera.position = {0.0, 0.0, 0.0};
+    double accumulator = 0.0;
+    for (int frame = 0; frame < 120; ++frame) {
+        accumulator += 1.0 / 120.0;
+        while (accumulator + epsilon >= dt) {
+            update_camera_movement(&camera, camera_basis(camera), input, dt);
+            accumulator -= dt;
+        }
+    }
+    const bool one_twenty_hz = std::abs(camera.position.x - 400.0) < epsilon &&
+                                std::abs(camera.position.z) < epsilon;
+
+    camera.position = {0.0, 0.0, 0.0};
+    set_movement_key(&input, SDL_SCANCODE_D, true);
+    update_camera_movement(&camera, camera_basis(camera), input, dt);
+    const bool diagonal_normalized =
+        std::abs(std::sqrt(camera.position.x * camera.position.x +
+                           camera.position.z * camera.position.z) -
+                 400.0 * dt) < epsilon;
+
+    camera.position = {0.0, 0.0, 0.0};
+    set_movement_key(&input, SDL_SCANCODE_W, false);
+    set_movement_key(&input, SDL_SCANCODE_D, false);
+    set_movement_key(&input, SDL_SCANCODE_UP, true);
+    set_movement_key(&input, SDL_SCANCODE_LSHIFT, true);
+    update_camera_movement(&camera, camera_basis(camera), input, dt);
+    const bool aliases_and_sprint =
+        std::abs(camera.position.x - 800.0 * dt) < epsilon;
+
+    std::fprintf(stderr,
+                 "Genesis3D Linux: deterministic camera movement: 60 Hz %s, "
+                 "120 Hz %s, diagonal %s, aliases/sprint %s\n",
+                 sixty_hz ? "PASS" : "FAIL",
+                 one_twenty_hz ? "PASS" : "FAIL",
+                 diagonal_normalized ? "PASS" : "FAIL",
+                 aliases_and_sprint ? "PASS" : "FAIL");
+    return sixty_hz && one_twenty_hz && diagonal_normalized &&
+           aliases_and_sprint;
 }
 
 void look_at(const Vec3 &eye, const Vec3 &target) {
@@ -1388,6 +1475,8 @@ int main() {
     const int fps = target_fps();
     constexpr double fixed_dt = 1.0 / 60.0;
     const double frame_dt = 1.0 / static_cast<double>(fps);
+    if (!validate_camera_movement())
+        return 1;
     const std::string root = project_root();
     const std::string maps_path = root + "/Assets/Maps/";
     const std::string actors_path = root + "/Assets/Actors/";
@@ -1688,6 +1777,7 @@ int main() {
     uint64_t maximum_simulation_steps = 0;
     double maximum_render_lateness_ms = 0.0;
     bool running = true;
+    HeldMovementInput movement_input;
     RenderDiagnostics render_diagnostics;
     while (running && !stop_requested) {
         const FrameClock::time_point current_tick = FrameClock::now();
@@ -1711,6 +1801,12 @@ int main() {
                                 mouse_sensitivity;
                 camera.pitch = (std::max)(-pitch_limit,
                                           (std::min)(pitch_limit, camera.pitch));
+            } else if (event.type == SDL_KEYDOWN) {
+                set_movement_key(&movement_input, event.key.keysym.scancode,
+                                 true);
+            } else if (event.type == SDL_KEYUP) {
+                set_movement_key(&movement_input, event.key.keysym.scancode,
+                                 false);
             } else if (event.type == SDL_WINDOWEVENT) {
                 if (event.window.event == SDL_WINDOWEVENT_CLOSE)
                     running = false;
@@ -1722,15 +1818,15 @@ int main() {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                     SDL_SetRelativeMouseMode(SDL_FALSE);
+                    movement_input = HeldMovementInput{};
                 }
             }
         }
 
-        const CameraBasis basis = camera_basis(camera);
-        const Uint8 *keys = SDL_GetKeyboardState(nullptr);
         uint64_t simulation_steps = 0;
         while (simulation_accumulator >= fixed_dt) {
-            update_camera_movement(&camera, basis, keys, fixed_dt);
+            update_camera_movement(&camera, camera_basis(camera),
+                                   movement_input, fixed_dt);
             advance_actor_motion(&native_actor, fixed_dt, &render_diagnostics);
             advance_light_styles(world, &world_textures, &lighting_state,
                                  fixed_dt, &render_diagnostics);
@@ -1740,8 +1836,12 @@ int main() {
         }
         maximum_simulation_steps =
             (std::max)(maximum_simulation_steps, simulation_steps);
+        // Fixed steps can mutate camera position. Derive the render view only
+        // after those steps so culling and GL use this frame's camera state.
+        const CameraBasis render_basis = camera_basis(camera);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if (!render_world_geometry(world, world_textures, face_cache, camera, basis,
+        if (!render_world_geometry(world, world_textures, face_cache, camera,
+                                   render_basis,
                                    &native_actor, lighting_state, &render_diagnostics,
                                    framebuffer_width, framebuffer_height)) {
             std::fprintf(stderr,
