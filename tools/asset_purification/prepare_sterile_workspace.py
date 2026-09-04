@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Subject to the Genesis3D Public License v1.01 in g3dlicense.txt.
+# Original Code: Genesis3D, released March 25, 1999.
+# Copyright (C) 1996-1999 Eclipse Entertainment, L.L.C. All Rights Reserved.
+# Contributor(s): Kadaken (native Linux port, 2026). Provided without warranty.
 """Create a dereferenced asset workspace and a hash-addressed patch manifest."""
 from __future__ import annotations
 

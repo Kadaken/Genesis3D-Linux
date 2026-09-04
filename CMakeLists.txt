@@ -1,3 +1,9 @@
+# The contents of this file are subject to the Genesis3D Public License
+# Version 1.01. A copy is provided in g3dlicense.txt. Software is distributed
+# WITHOUT WARRANTY OF ANY KIND. The Original Code is Genesis3D, released
+# March 25, 1999. Copyright (C) 1996-1999 Eclipse Entertainment, L.L.C.
+# All Rights Reserved. Contributor(s): Kadaken (native Linux port, 2026).
+
 cmake_minimum_required(VERSION 3.16)
 project(Genesis3D_Linux LANGUAGES C CXX)
 

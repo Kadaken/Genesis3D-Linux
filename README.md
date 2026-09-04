@@ -1,58 +1,132 @@
-# Genesis3D
-Open Source 3D Game Development Engine
+# Genesis3D Native Linux
 
-This version of the Genesis3D engine is based on Genesis3D Version 1.1 released
-November 15, 1999, by WildTangent, Inc. and includes numerous modifications and
-improvements contributed by various authors.
+A source-available, native 64-bit Linux runtime for the Genesis3D 1.x engine
+lineage.
 
-## Native Linux asset layout
+This repository descends from the
+[RealityFactory/Genesis3D](https://github.com/RealityFactory/Genesis3D) tree. It
+contains Genesis3D 1.1 code released in 1999, subsequent community-maintained
+snapshots, and Kadaken's 2026 Linux port. Kadaken did not create the original
+engine and is not affiliated with or endorsed by Eclipse Entertainment,
+WildTangent, Reality Factory, or the owners of games made with Genesis3D.
 
-`genesis3d_linux` selects the alphabetically first readable compiled level from
-`Assets/Maps/` (`.bsp` or `.gbsp`) and validates that `Assets/Actors/` contains
-at least one readable `.act` character file. It reports the exact search path
-and exits before creating an X11 window when either required asset is missing.
+## Current scope
 
-Set `GENESIS3D_PROJECT_ROOT` to override the default asset root. The engine
-looks for assets in `$HOME/Genesis3D_Project/PurificationWorkspace` or
-`./PurificationWorkspace` if HOME is unset. The legacy external asset links
-were removed after the sterile copy was validated; normal launches now resolve
-only the isolated, project-owned asset tree.
+The native target is an engine runtime and validation sandbox, not a complete
+game or a finished replacement for every historical Genesis3D SDK tool.
 
-## Native Linux controls
+Verified on one Fedora KDE system with AMD/Mesa:
 
-The SDL2-owned X11/OpenGL renderer uses SDL2 for native input. Interactive play must opt in
-with `GENESIS3D_ENABLE_INPUT_CAPTURE=1`. Hold W/A/S/D or the arrow keys to
-move, hold Shift to sprint, press Space to jump, and move the mouse to look.
-Player movement uses swept BSP collision, stair/slope handling, gravity, floor
-snapping, wall sliding, and ceiling rejection. Press Escape or close the
-window to exit. With interactive input enabled, the mouse is captured
-while the window has focus and released when focus is lost.
+- native x86-64 C/C++ build;
+- SDL2-owned X11/XWayland window and input;
+- OpenGL BSP geometry, textures, baked lightmaps, PVS selection, and
+  translucent ordering;
+- ACT/BODY loading, skeletal posing, and fixed-step animation playback;
+- runtime lightmap updates;
+- swept-hull BSP collision, gravity, jumping, stairs, slopes, wall sliding, and
+  ceiling rejection in deterministic real-map fixtures;
+- 60 and 120 FPS presentation targets on the tested machine; and
+- normal SIGINT/SIGTERM teardown under the documented sanitizer checks.
 
-Input capture is disabled by default. `GENESIS3D_NO_INPUT_CAPTURE=1` is a hard
-override: the engine keeps its SDL window hidden, does not force keyboard
-focus, grab or confine the pointer, or enable relative mouse mode, and also
-advertises an X11 non-input window hint. Agent-run tests must never set
-`GENESIS3D_ENABLE_INPUT_CAPTURE`. The safe default window origin is the built-in
-eDP-1 panel at `892,1080`; `GENESIS3D_WINDOW_X` and `GENESIS3D_WINDOW_Y` may set
-a different initial position without preventing later movement.
+Known limitations and the exact evidence boundary are documented in
+[Reports/VERIFICATION_SCOPE.md](Reports/VERIFICATION_SCOPE.md). In particular,
+the project has not established exact pixel equivalence with the original
+Windows renderer, broad GPU/distribution support, or completion of every legacy
+engine subsystem.
 
-The renderer initializes the camera at the map's `PlayerSetup` origin (falling
-back to a bounds-derived overview only when that entity is absent), so sealed
-BSP maps open from their playable interior rather than showing their unlit
-outer hull. Material and lightmap textures are combined in one multitexture
-pass, with tightly packed RGB lightmaps uploaded using one-byte row alignment.
-Immutable BSP face geometry and both UV streams are cached in a static OpenGL
-vertex buffer. Actor motion and light-style time advance on a canonical 60 Hz
-fixed simulation clock, independently of 60/120 Hz presentation. Styled and
-dynamic light layers regenerate only dirty, visible lightmap textures with
-`glTexSubImage2D`; geometry is never rebuilt. Frame presentation is regulated with monotonic
-`sleep_until` deadlines at either 60 or 120 FPS. SIGINT and SIGTERM request a
-normal shutdown so graphics, world, SDL, X11, and VFile resources are released.
+## Licence and release status
 
-The native target treats pointer/integer narrowing, implicit C declarations,
-and incompatible C pointer arguments as build errors. Audit methodology and
-current validation limits are recorded in `PQPW_ARCHITECTURAL_AUDIT.md`.
+The covered source is distributed under the **Genesis3D Public License v1.01**.
+Read the complete, controlling text in [g3dlicense.txt](g3dlicense.txt) before
+using, modifying, or redistributing this code. This is a custom source-available
+licence; the project does not represent it as an OSI-approved licence.
 
-LeakSanitizer and Valgrind suppressions for the Fedora SDL2-compat/Mesa driver
-shutdown globals live in `tools/sanitizers/`. They are intentionally scoped to
-library frames and must not be broadened to engine call sites.
+Important obligations include publishing covered engine modifications under the
+same terms, documenting modifications, retaining required notices, and using the
+original Genesis3D logo as specified by the licence. The native validation
+executable does **not yet implement the required original animated startup
+logo**. Therefore this repository currently publishes source only and does not
+offer a redistributable binary release. Do not redistribute a compiled product,
+demo, or application from this branch without independently satisfying every
+licence condition.
+
+See [LICENSE](LICENSE), [LEGAL.md](LEGAL.md), [NOTICE.md](NOTICE.md), and
+[MODIFICATIONS.md](MODIFICATIONS.md) for discoverability, provenance, and
+release safeguards. Those summaries do not replace the controlling licence.
+
+## Assets are not included
+
+No commercial game, map, actor, music, voice, or other legacy game asset is
+distributed in this repository. You must provide compatible assets that you are
+legally entitled to use.
+
+At runtime, the engine selects the alphabetically first readable compiled level
+from `Assets/Maps/` (`.bsp` or `.gbsp`) and requires at least one readable
+`.act` file in `Assets/Actors/`. Point `GENESIS3D_PROJECT_ROOT` at a directory
+containing that `Assets/` layout. If the variable is unset, the development
+harness uses `./Assets` when present and otherwise checks the legacy local
+`./PurificationWorkspace/Assets` layout. Neither directory is tracked.
+
+## Build
+
+Fedora dependencies:
+
+```bash
+sudo dnf install gcc gcc-c++ cmake make pkgconf-pkg-config \
+  mesa-libGL-devel libX11-devel SDL2-devel
+```
+
+Ubuntu/Debian dependencies:
+
+```bash
+sudo apt install build-essential cmake pkg-config libgl1-mesa-dev \
+  libx11-dev libsdl2-dev
+```
+
+Configure and compile out of tree:
+
+```bash
+cmake -S . -B build
+cmake --build build --parallel
+```
+
+Compilation alone does not require proprietary game assets. Runtime validation
+does.
+
+## Development launch
+
+Headless or agent-run checks must never capture the desktop's keyboard or mouse:
+
+```bash
+GENESIS3D_NO_INPUT_CAPTURE=1 \
+GENESIS3D_PROJECT_ROOT=/path/to/compatible-assets \
+./build/genesis3d_linux
+```
+
+For a person intentionally testing input on their own desktop:
+
+```bash
+GENESIS3D_ENABLE_INPUT_CAPTURE=1 \
+GENESIS3D_PROJECT_ROOT=/path/to/compatible-assets \
+./build/genesis3d_linux
+```
+
+Controls are W/A/S/D or arrow keys to move, Shift to sprint, Space to jump,
+mouse motion to look, and Escape to exit. Interactive mode captures the mouse
+only while the engine window has focus and releases it when focus is lost.
+
+## Contributing
+
+Issues and pull requests are welcome. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md) and the
+[community engine roadmap](Reports/COMMUNITY_ENGINE_ROADMAP.md). Contributions
+must be original or properly licensed, must not include commercial game data,
+and are subject to the Contributor Grant in the Genesis3D Public License.
+
+## Historical material
+
+Some excluded Windows driver/project files are retained only as historical
+reference and are not part of the native build. Files carrying restrictive
+third-party SDK/header notices that were unnecessary for the Linux target have
+been removed from the current branch. Their former presence in inherited Git
+history is disclosed in [LEGAL.md](LEGAL.md).

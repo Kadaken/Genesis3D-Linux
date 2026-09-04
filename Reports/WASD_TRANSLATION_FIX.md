@@ -59,7 +59,7 @@ Implementation commit: `bcd5b2d`.
 ## User retest
 
 ```bash
-cd /home/user/Genesis3D_Project && GENESIS3D_ENABLE_INPUT_CAPTURE=1 ./genesis3d_linux
+cd /path/to/Genesis3D-Linux && GENESIS3D_ENABLE_INPUT_CAPTURE=1 ./build/genesis3d_linux
 ```
 
 Hold W/A/S/D and the arrow keys to verify translation, hold Shift to verify

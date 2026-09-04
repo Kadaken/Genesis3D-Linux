@@ -1,0 +1,15 @@
+GENESIS3D LEGAL NOTICE
+
+The controlling Genesis3D Public License v1.01 is in g3dlicense.txt.
+Provenance, third-party material, trademark, asset, and binary-release concerns
+are documented in LEGAL.md and NOTICE.md; those files are incorporated into
+this notice by reference.
+
+The inherited upstream Git history contained copies of Microsoft resource/MFC
+headers and an SGI OpenGL extension header carrying restrictive notices. These
+files are not used by the native build and have been removed from the current
+branch. Prior revisions remain reachable in inherited public history. No right
+to redistribute those third-party files is claimed by Kadaken.
+
+No commercial game assets are included. No affiliation with or endorsement by
+the original companies, community maintainers, or game publishers is claimed.

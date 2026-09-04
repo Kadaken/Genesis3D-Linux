@@ -109,7 +109,7 @@ conservative than a true rounded capsule around tight diagonal openings.
 Run exactly:
 
 ```bash
-cd /home/user/Genesis3D_Project && GENESIS3D_ENABLE_INPUT_CAPTURE=1 ./genesis3d_linux
+cd /path/to/Genesis3D-Linux && GENESIS3D_ENABLE_INPUT_CAPTURE=1 ./build/genesis3d_linux
 ```
 
 Verify walking into walls and along them, climbing stairs/slopes, walking off

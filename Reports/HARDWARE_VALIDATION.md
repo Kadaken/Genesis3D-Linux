@@ -48,7 +48,7 @@ reported material and lightmap uploads.
 
 ## Clean physical-GPU cadence
 
-All runs loaded `/home/user/Genesis3D_Project/Assets/Maps/rfedit1.bsp` and
+All runs loaded the local, non-distributed `Assets/Maps/rfedit1.bsp` fixture and
 reported 6,436 root faces, 97 materials, and 7,915 lightmaps.
 
 | Target | Frames | Seconds | Achieved FPS | Resyncs | Deadline misses | Max lateness | Elapsed clamps | Max steps/frame |
