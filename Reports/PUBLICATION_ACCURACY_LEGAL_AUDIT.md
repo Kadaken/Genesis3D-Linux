@@ -152,6 +152,21 @@ fully cleared.
 
 ## Verification evidence
 
+### Publication records
+
+```text
+Engine repository main: 9d9795093f3b1bcbc6bd2f05cb82bb0dc0e25d0f
+Website repository main: 6859ddc7f504a3bc1e953adf88ecda6bdfad1983
+Cloudflare production deployment: 5c210b77-6d67-4746-8d0d-3e951a36a7f0
+Cloudflare deployment source: 6859ddc
+GitHub visibility: PUBLIC
+GitHub binary releases: 0
+```
+
+The local and remote `main` hashes matched after publication. The GitHub
+description and homepage now use the scoped runtime language and point to the
+dedicated Kadaken Ports entry.
+
 ### Engine
 
 Fresh out-of-tree release configuration and build:
@@ -174,6 +189,7 @@ Personal absolute home-directory paths in public tree: none
 Obvious secret patterns in tracked text: none found
 Python asset/include tools: syntax PASS
 git diff --check: PASS
+Legacy toxic title/vocabulary in public source tree: none found
 ```
 
 ### Website
@@ -187,6 +203,10 @@ W3C validator errors — genesis3d.html: 0
 W3C validator errors — terms.html: 0
 Desktop headless rendering: PASS
 390 × 844 mobile headless rendering: PASS
+Live production routes `/`, `/ports`, `/games`, `/genesis3d`, `/terms`: HTTP 200
+Live fingerprinted stylesheet referenced by production HTML: HTTP 200
+Live GitHub README, LEGAL, CONTRIBUTING, and roadmap links: HTTP 200
+Live W3C validator errors across the five publication pages: 0
 ```
 
 ## Controlling sources consulted
