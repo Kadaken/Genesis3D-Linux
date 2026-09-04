@@ -19,16 +19,16 @@ launches now resolve only the isolated, project-owned asset tree.
 
 ## Native Linux controls
 
-The X11/GLX renderer uses SDL2 for native input. Interactive play must opt in
+The SDL2-owned X11/OpenGL renderer uses SDL2 for native input. Interactive play must opt in
 with `GENESIS3D_ENABLE_INPUT_CAPTURE=1`. Hold W/A/S/D or the arrow keys to
 move, hold Shift to sprint, and move the mouse to look. Press Escape or close
 the window to exit. With interactive input enabled, the mouse is captured
 while the window has focus and released when focus is lost.
 
 Input capture is disabled by default. `GENESIS3D_NO_INPUT_CAPTURE=1` is a hard
-override: the engine does not force keyboard focus, grab or confine the
-pointer, or enable relative mouse mode, and advertises an X11 non-input window
-hint so the window manager does not activate it. Agent-run tests must never set
+override: the engine keeps its SDL window hidden, does not force keyboard
+focus, grab or confine the pointer, or enable relative mouse mode, and also
+advertises an X11 non-input window hint. Agent-run tests must never set
 `GENESIS3D_ENABLE_INPUT_CAPTURE`. The safe default window origin is the built-in
 eDP-1 panel at `892,1080`; `GENESIS3D_WINDOW_X` and `GENESIS3D_WINDOW_Y` may set
 a different initial position without preventing later movement.

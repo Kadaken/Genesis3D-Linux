@@ -1,8 +1,8 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <GL/gl.h>
-#include <GL/glx.h>
 #include <SDL.h>
+#include <SDL_syswm.h>
 
 #include <algorithm>
 #include <chrono>
@@ -1364,6 +1364,38 @@ bool environment_enabled(const char *name) {
     return value && *value && std::string(value) != "0";
 }
 
+bool validate_sdl_keyboard_delivery(SDL_Window *window) {
+    SDL_Event down{};
+    down.type = SDL_KEYDOWN;
+    down.key.type = SDL_KEYDOWN;
+    down.key.windowID = SDL_GetWindowID(window);
+    down.key.state = SDL_PRESSED;
+    down.key.keysym.scancode = SDL_SCANCODE_W;
+    SDL_Event up = down;
+    up.type = SDL_KEYUP;
+    up.key.type = SDL_KEYUP;
+    up.key.state = SDL_RELEASED;
+    if (SDL_PushEvent(&down) != 1 || SDL_PushEvent(&up) != 1)
+        return false;
+
+    HeldMovementInput input;
+    bool saw_down = false;
+    bool saw_up = false;
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_KEYDOWN &&
+            event.key.keysym.scancode == SDL_SCANCODE_W) {
+            set_movement_key(&input, event.key.keysym.scancode, true);
+            saw_down = input.forward_w;
+        } else if (event.type == SDL_KEYUP &&
+                   event.key.keysym.scancode == SDL_SCANCODE_W) {
+            set_movement_key(&input, event.key.keysym.scancode, false);
+            saw_up = !input.forward_w;
+        }
+    }
+    return saw_down && saw_up;
+}
+
 std::string project_root() {
     const char *override_root = std::getenv("GENESIS3D_PROJECT_ROOT");
     if (override_root && *override_root)
@@ -1496,34 +1528,6 @@ int main() {
     if (!world)
         return 1;
 
-    Display *display = XOpenDisplay(nullptr);
-
-    if (!display) {
-        std::fprintf(stderr, "Genesis3D Linux: no X11 display; configuration validated (%dx%d, %d FPS, dt=%.9f)\n",
-                     kWidth, kHeight, fps, fixed_dt);
-        geWorld_Free(world);
-        return 0;
-    }
-
-    int screen = DefaultScreen(display);
-    static int visual_attributes[] = {GLX_RGBA, GLX_DOUBLEBUFFER,
-                                      GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8,
-                                      GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24,
-                                      None};
-    XVisualInfo *visual = glXChooseVisual(display, screen, visual_attributes);
-    if (!visual) {
-        XCloseDisplay(display);
-        std::fprintf(stderr, "Genesis3D Linux: no compatible GLX visual\n");
-        geWorld_Free(world);
-        return 1;
-    }
-
-    Colormap colormap = XCreateColormap(display, RootWindow(display, screen),
-                                        visual->visual, AllocNone);
-    XSetWindowAttributes attributes{};
-    attributes.colormap = colormap;
-    attributes.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask |
-                            FocusChangeMask | StructureNotifyMask;
     // Fail closed for unattended launches: focus and pointer capture require
     // an explicit interactive opt-in. GENESIS3D_NO_INPUT_CAPTURE always wins.
     const bool input_capture_enabled =
@@ -1531,37 +1535,91 @@ int main() {
         !environment_enabled("GENESIS3D_NO_INPUT_CAPTURE");
     const int window_x = window_coordinate("GENESIS3D_WINDOW_X", 892);
     const int window_y = window_coordinate("GENESIS3D_WINDOW_Y", 1080);
-    Window window = XCreateWindow(display, RootWindow(display, screen),
-                                  window_x, window_y,
-                                  kWidth, kHeight, 0, visual->depth,
-                                  InputOutput, visual->visual,
-                                  CWColormap | CWEventMask, &attributes);
-    XStoreName(display, window, "Genesis3D Linux");
-    XSizeHints size_hints{};
-    size_hints.flags = USPosition;
-    size_hints.x = window_x;
-    size_hints.y = window_y;
-    XSetWMNormalHints(display, window, &size_hints);
-    if (!input_capture_enabled) {
-        XWMHints wm_hints{};
-        wm_hints.flags = InputHint;
-        wm_hints.input = False;
-        XSetWMHints(display, window, &wm_hints);
+    SDL_SetHint(SDL_HINT_VIDEODRIVER, "x11");
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
+        std::fprintf(stderr, "Genesis3D Linux: no SDL video display; configuration validated (%dx%d, %d FPS, dt=%.9f): %s\n",
+                     kWidth, kHeight, fps, fixed_dt, SDL_GetError());
+        geWorld_Free(world);
+        return 0;
     }
-    XMapWindow(display, window);
-    // Mapping is mediated by the window manager. Wait until it has made this
-    // client viewable; merely synchronizing the request queue can still race
-    // KWin/Xwayland and make XSetInputFocus fail with BadMatch.
-    XEvent map_event{};
-    do {
-        XWindowEvent(display, window, StructureNotifyMask, &map_event);
-    } while (map_event.type != MapNotify);
-    if (input_capture_enabled)
-        XSetInputFocus(display, window, RevertToParent, CurrentTime);
-    XFlush(display);
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 
-    GLXContext context = glXCreateContext(display, visual, nullptr, True);
-    glXMakeCurrent(display, window, context);
+    SDL_Window *window = SDL_CreateWindow(
+        "Genesis3D Linux", window_x, window_y, kWidth, kHeight,
+        SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
+    if (!window) {
+        std::fprintf(stderr, "Genesis3D Linux: SDL2 OpenGL window creation failed: %s\n",
+                     SDL_GetError());
+        SDL_Quit();
+        geWorld_Free(world);
+        return 1;
+    }
+    // SDL owns the native window and event pump. The sole remaining X11 touch
+    // is a non-activating WM input hint for unattended launches; it neither
+    // creates the window nor consumes events.
+    if (!input_capture_enabled) {
+        SDL_SysWMinfo wm_info{};
+        SDL_VERSION(&wm_info.version);
+        if (SDL_GetWindowWMInfo(window, &wm_info) == SDL_TRUE &&
+            wm_info.subsystem == SDL_SYSWM_X11) {
+            XWMHints wm_hints{};
+            wm_hints.flags = InputHint;
+            wm_hints.input = False;
+            XSetWMHints(wm_info.info.x11.display, wm_info.info.x11.window,
+                        &wm_hints);
+            XFlush(wm_info.info.x11.display);
+        }
+    }
+    if (input_capture_enabled) {
+        SDL_ShowWindow(window);
+        if (SDL_SetWindowInputFocus(window) != 0)
+            std::fprintf(stderr, "Genesis3D Linux: could not acquire SDL2 input focus: %s\n",
+                         SDL_GetError());
+    }
+    SDL_GLContext context = SDL_GL_CreateContext(window);
+    if (!context || SDL_GL_MakeCurrent(window, context) != 0) {
+        std::fprintf(stderr, "Genesis3D Linux: SDL2 OpenGL context creation failed: %s\n",
+                     SDL_GetError());
+        if (context)
+            SDL_GL_DeleteContext(context);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        geWorld_Free(world);
+        return 1;
+    }
+    if (SDL_GL_SetSwapInterval(0) != 0)
+        std::fprintf(stderr, "Genesis3D Linux: could not disable swap interval: %s\n",
+                     SDL_GetError());
+    std::fprintf(stderr, "Genesis3D Linux: OpenGL renderer: %s (%s)\n",
+                 reinterpret_cast<const char *>(glGetString(GL_RENDERER)),
+                 reinterpret_cast<const char *>(glGetString(GL_VERSION)));
+    int actual_window_x = 0;
+    int actual_window_y = 0;
+    int actual_window_width = 0;
+    int actual_window_height = 0;
+    SDL_GetWindowPosition(window, &actual_window_x, &actual_window_y);
+    SDL_GL_GetDrawableSize(window, &actual_window_width, &actual_window_height);
+    std::fprintf(stderr,
+                 "Genesis3D Linux: SDL-owned OpenGL window at %d,%d, drawable %dx%d\n",
+                 actual_window_x, actual_window_y,
+                 actual_window_width, actual_window_height);
+    if (!validate_sdl_keyboard_delivery(window)) {
+        std::fprintf(stderr,
+                     "Genesis3D Linux: SDL keyboard event delivery validation failed\n");
+        SDL_GL_DeleteContext(context);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        geWorld_Free(world);
+        return 1;
+    }
+    std::fprintf(stderr,
+                 "Genesis3D Linux: SDL keyboard queue KEYDOWN/KEYUP delivery PASS\n");
     glViewport(0, 0, kWidth, kHeight);
     glClearColor(0.04f, 0.06f, 0.10f, 1.0f);
     glClearDepth(1.0);
@@ -1570,12 +1628,9 @@ int main() {
     if (!upload_world_textures(world, &world_textures)) {
         std::fprintf(stderr,
                      "Genesis3D Linux: could not upload world material textures\n");
-        glXMakeCurrent(display, None, nullptr);
-        glXDestroyContext(display, context);
-        XDestroyWindow(display, window);
-        XFreeColormap(display, colormap);
-        XFree(visual);
-        XCloseDisplay(display);
+        SDL_GL_DeleteContext(context);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
         geWorld_Free(world);
         return 1;
     }
@@ -1583,12 +1638,9 @@ int main() {
     if (!build_face_cache(world, &face_cache)) {
         std::fprintf(stderr, "Genesis3D Linux: could not build immutable face cache\n");
         destroy_world_textures(&world_textures);
-        glXMakeCurrent(display, None, nullptr);
-        glXDestroyContext(display, context);
-        XDestroyWindow(display, window);
-        XFreeColormap(display, colormap);
-        XFree(visual);
-        XCloseDisplay(display);
+        SDL_GL_DeleteContext(context);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
         geWorld_Free(world);
         return 1;
     }
@@ -1626,51 +1678,7 @@ int main() {
                      ? static_cast<double>(world_textures.lightmap_rgb_sum) /
                            (3.0 * world_textures.lightmap_pixel_count) : 0.0);
 
-    SDL_SetHint(SDL_HINT_VIDEODRIVER, "x11");
-    SDL_SetHint(SDL_HINT_VIDEO_FOREIGN_WINDOW_OPENGL, "1");
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
-        std::fprintf(stderr, "Genesis3D Linux: SDL2 input initialization failed: %s\n",
-                     SDL_GetError());
-        destroy_native_actor(&native_actor);
-        destroy_face_cache(&face_cache);
-        destroy_world_textures(&world_textures);
-        glXMakeCurrent(display, None, nullptr);
-        glXDestroyContext(display, context);
-        XDestroyWindow(display, window);
-        XFreeColormap(display, colormap);
-        XFree(visual);
-        XCloseDisplay(display);
-        geWorld_Free(world);
-        return 1;
-    }
-
-    SDL_Window *input_window = SDL_CreateWindowFrom(
-        reinterpret_cast<void *>(static_cast<uintptr_t>(window)));
-    if (!input_window) {
-        std::fprintf(stderr, "Genesis3D Linux: could not attach SDL2 input to X11 window: %s\n",
-                     SDL_GetError());
-        SDL_Quit();
-        destroy_native_actor(&native_actor);
-        destroy_face_cache(&face_cache);
-        destroy_world_textures(&world_textures);
-        glXMakeCurrent(display, None, nullptr);
-        glXDestroyContext(display, context);
-        XDestroyWindow(display, window);
-        XFreeColormap(display, colormap);
-        XFree(visual);
-        XCloseDisplay(display);
-        geWorld_Free(world);
-        return 1;
-    }
-
-    // X11 focus was assigned immediately after mapping, before SDL attached to
-    // this foreign window. Synchronize SDL's keyboard-focus bookkeeping now so
-    // SDL_GetKeyboardState receives held keys through SDL's X11 event queue.
-    if (input_capture_enabled && SDL_SetWindowInputFocus(input_window) != 0)
-        std::fprintf(stderr, "Genesis3D Linux: could not synchronize SDL2 input focus: %s\n",
-                     SDL_GetError());
-
-    SDL_SetWindowGrab(input_window,
+    SDL_SetWindowGrab(window,
                       input_capture_enabled ? SDL_TRUE : SDL_FALSE);
     if (input_capture_enabled && SDL_SetRelativeMouseMode(SDL_TRUE) != 0)
         std::fprintf(stderr, "Genesis3D Linux: relative mouse mode unavailable: %s\n",
@@ -1690,8 +1698,8 @@ int main() {
         camera.position.z + actor_basis.forward.z * 180.0);
     if (native_actor.actor)
         set_actor_root_transform(&native_actor, actor_transform);
-    int framebuffer_width = kWidth;
-    int framebuffer_height = kHeight;
+    int framebuffer_width = (std::max)(actual_window_width, 1);
+    int framebuffer_height = (std::max)(actual_window_height, 1);
     constexpr double mouse_sensitivity = 0.0025;
     constexpr double pitch_limit = 89.0 * kPi / 180.0;
     std::fprintf(stderr,
@@ -1707,17 +1715,12 @@ int main() {
     if (!validate_dynamic_light_cycle(world, &world_textures, &lighting_state)) {
         std::fprintf(stderr,
                      "Genesis3D Linux: dynamic lightmap validation failed\n");
-        SDL_DestroyWindow(input_window);
         destroy_native_actor(&native_actor);
         destroy_face_cache(&face_cache);
         destroy_world_textures(&world_textures);
-        glXMakeCurrent(display, None, nullptr);
-        glXDestroyContext(display, context);
+        SDL_GL_DeleteContext(context);
+        SDL_DestroyWindow(window);
         SDL_Quit();
-        XDestroyWindow(display, window);
-        XFreeColormap(display, colormap);
-        XFree(visual);
-        XCloseDisplay(display);
         geWorld_Free(world);
         return 1;
     }
@@ -1727,17 +1730,12 @@ int main() {
                                framebuffer_height)) {
         std::fprintf(stderr,
                      "Genesis3D Linux: loaded world has no renderable BSP geometry\n");
-        SDL_DestroyWindow(input_window);
         destroy_native_actor(&native_actor);
         destroy_face_cache(&face_cache);
         destroy_world_textures(&world_textures);
-        glXMakeCurrent(display, None, nullptr);
-        glXDestroyContext(display, context);
+        SDL_GL_DeleteContext(context);
+        SDL_DestroyWindow(window);
         SDL_Quit();
-        XDestroyWindow(display, window);
-        XFreeColormap(display, colormap);
-        XFree(visual);
-        XCloseDisplay(display);
         geWorld_Free(world);
         return 1;
     }
@@ -1745,21 +1743,16 @@ int main() {
                                  &warmup_diagnostics)) {
         std::fprintf(stderr,
                      "Genesis3D Linux: four-asset actor fixture validation failed\n");
-        SDL_DestroyWindow(input_window);
         destroy_native_actor(&native_actor);
         destroy_face_cache(&face_cache);
         destroy_world_textures(&world_textures);
-        glXMakeCurrent(display, None, nullptr);
-        glXDestroyContext(display, context);
+        SDL_GL_DeleteContext(context);
+        SDL_DestroyWindow(window);
         SDL_Quit();
-        XDestroyWindow(display, window);
-        XFreeColormap(display, colormap);
-        XFree(visual);
-        XCloseDisplay(display);
         geWorld_Free(world);
         return 1;
     }
-    glXSwapBuffers(display, window);
+    SDL_GL_SwapWindow(window);
     glFinish();
 
     using FrameClock = std::chrono::steady_clock;
@@ -1811,8 +1804,10 @@ int main() {
                 if (event.window.event == SDL_WINDOWEVENT_CLOSE)
                     running = false;
                 else if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
-                    framebuffer_width = (std::max)(event.window.data1, 1);
-                    framebuffer_height = (std::max)(event.window.data2, 1);
+                    SDL_GL_GetDrawableSize(window, &framebuffer_width,
+                                           &framebuffer_height);
+                    framebuffer_width = (std::max)(framebuffer_width, 1);
+                    framebuffer_height = (std::max)(framebuffer_height, 1);
                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
                     if (input_capture_enabled)
                         SDL_SetRelativeMouseMode(SDL_TRUE);
@@ -1848,7 +1843,7 @@ int main() {
                          "Genesis3D Linux: loaded world has no renderable BSP geometry\n");
             running = false;
         }
-        glXSwapBuffers(display, window);
+        SDL_GL_SwapWindow(window);
         ++rendered_frames;
         const FrameClock::time_point render_finished = FrameClock::now();
         if (render_finished > frame_deadline) {
@@ -1901,20 +1896,12 @@ int main() {
                  static_cast<unsigned long long>(render_diagnostics.animated_actor_steps));
 
     SDL_SetRelativeMouseMode(SDL_FALSE);
-    SDL_DestroyWindow(input_window);
     destroy_native_actor(&native_actor);
     destroy_face_cache(&face_cache);
     destroy_world_textures(&world_textures);
-    glXMakeCurrent(display, None, nullptr);
-    glXDestroyContext(display, context);
-    // SDL2-compat's video shutdown releases process-wide GLX display state.
-    // Tear down our independently-created GLX context first; reversing these
-    // calls makes Mesa's glXDestroyContext access state SDL has already freed.
+    SDL_GL_DeleteContext(context);
+    SDL_DestroyWindow(window);
     SDL_Quit();
-    XDestroyWindow(display, window);
-    XFreeColormap(display, colormap);
-    XFree(visual);
-    XCloseDisplay(display);
     geWorld_Free(world);
     return 0;
 }
