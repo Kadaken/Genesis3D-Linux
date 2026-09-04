@@ -5,8 +5,12 @@ Date: 2026-09-03
 ## Result
 
 The existing repository history was preserved and audited rather than replaced
-with a new `.git` directory. The production branch is now named `main`, with no
-upstream tracking branch configured until the new GitHub repository exists.
+with a new `.git` directory. The production branch is now named `main` and is
+published as a public GitHub repository:
+
+```text
+https://github.com/Kadaken/Genesis3D-Linux
+```
 
 Baseline commit:
 
@@ -44,24 +48,21 @@ upstream https://github.com/RealityFactory/Genesis3D.git
 
 ## GitHub publication commands
 
-After creating an empty GitHub repository, replace the two bracketed values and
-run exactly:
+The remote is already linked. Future updates require:
 
 ```bash
 cd /home/user/Genesis3D_Project
-git remote add origin git@github.com:<GITHUB_USERNAME>/<REPOSITORY_NAME>.git
-git push -u origin main
+git push origin main
 git push origin --tags
 ```
 
-For an HTTPS remote instead of SSH, use:
+The commands used to link a fresh clone of this local history to the existing
+public repository are:
 
 ```bash
-git remote add origin https://github.com/<GITHUB_USERNAME>/<REPOSITORY_NAME>.git
+git remote add origin https://github.com/Kadaken/Genesis3D-Linux.git
+git push -u origin main
 ```
-
-Do not use GitHub's “initialize with README” option when creating the remote;
-the local repository already contains the authoritative history.
 
 ## Locations
 
@@ -71,6 +72,12 @@ the local repository already contains the authoritative history.
 - Local Kadaken website project discovered during the audit:
   `/home/user/Projects/Open Projects/kadaken.com`
 
-No Kadaken website files were changed in this task. Publishing or adding a
-Genesis3D page/download to `www.kadaken.com` should be handled as a separate
-website-scoped change after the GitHub repository URL is known.
+The public project listing is live at:
+
+```text
+https://www.kadaken.com/games#genesis3d-linux
+```
+
+Kadaken site commit `d687489` adds the public-source listing and GitHub link.
+It was deployed to the `kadaken` Cloudflare Pages project serving
+`kadaken.com` and `www.kadaken.com`.
