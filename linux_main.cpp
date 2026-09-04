@@ -1743,8 +1743,10 @@ std::string project_root() {
         return override_root;
 
     const char *home = std::getenv("HOME");
-    return std::string(home && *home ? home : "/home/user") +
-           "/Genesis3D_Project/PurificationWorkspace";
+    if (home && *home) {
+        return std::string(home) + "/Genesis3D_Project/PurificationWorkspace";
+    }
+    return "./PurificationWorkspace";
 }
 
 bool has_extension(const std::string &name,
