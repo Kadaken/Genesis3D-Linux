@@ -5,20 +5,21 @@ Date: 2026-09-03
 ## Result
 
 The existing repository history was preserved and audited rather than replaced
-with a new `.git` directory. The production branch is now named `main` and is
+with a new `.git` directory. The primary branch is now named `main` and is
 published as a public GitHub repository:
 
 ```text
 https://github.com/Kadaken/Genesis3D-Linux
 ```
 
-Baseline commit:
+Baseline commit (its original subject used "feature-complete"; the narrower,
+current scope is defined by `VERIFICATION_SCOPE.md` and the public README):
 
 ```text
 0885b25 Establish feature-complete Genesis3D native Linux baseline
 ```
 
-That baseline records the production tree containing fixed-step physics pacing,
+That baseline records the native runtime tree containing fixed-step physics pacing,
 SDL-owned window and input handling, swept-hull BSP collision with stairs,
 gravity and jumping, actor parsing and animation playback, runtime lightmaps,
 PVS/translucent rendering, and the native OpenGL GPU cache.
@@ -51,7 +52,7 @@ upstream https://github.com/RealityFactory/Genesis3D.git
 The remote is already linked. Future updates require:
 
 ```bash
-cd /home/user/Genesis3D_Project
+cd /path/to/Genesis3D-Linux
 git push origin main
 git push origin --tags
 ```
@@ -66,16 +67,16 @@ git push -u origin main
 
 ## Locations
 
-- Native engine repository: `/home/user/Genesis3D_Project`
-- Built local executable: `/home/user/Genesis3D_Project/genesis3d_linux`
-- Project reports: `/home/user/Genesis3D_Project/Reports`
-- Local Kadaken website project discovered during the audit:
-  `/home/user/Projects/Open Projects/kadaken.com`
+- Native engine repository: the repository root
+- Built local executable: `./genesis3d_linux` for the historical in-source
+  build, or `./build/genesis3d_linux` for the documented out-of-tree build
+- Project reports: `./Reports`
+- Public Kadaken project page: <https://www.kadaken.com/ports#genesis3d>
 
 The public project listing is live at:
 
 ```text
-https://www.kadaken.com/games#genesis3d-linux
+https://www.kadaken.com/ports#genesis3d
 ```
 
 Kadaken site commit `d687489` adds the public-source listing and GitHub link.

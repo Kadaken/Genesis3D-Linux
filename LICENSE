@@ -1,0 +1,15 @@
+# Licence notice
+
+This repository's covered Genesis3D source and Kadaken modifications are
+distributed under the **Genesis3D Public License Version 1.01**.
+
+The complete, unmodified controlling licence text is included at:
+
+- [`g3dlicense.txt`](g3dlicense.txt)
+
+That file—not this short discoverability notice—defines the rights,
+restrictions, contributor grants, source-availability obligations, required
+notices, logo conditions, warranty disclaimer, and liability terms.
+
+Third-party components and system libraries remain subject to their own terms.
+See [`LEGAL.md`](LEGAL.md) and [`NOTICE.md`](NOTICE.md).
