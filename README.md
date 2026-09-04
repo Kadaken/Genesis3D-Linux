@@ -38,9 +38,11 @@ back to a bounds-derived overview only when that entity is absent), so sealed
 BSP maps open from their playable interior rather than showing their unlit
 outer hull. Material and lightmap textures are combined in one multitexture
 pass, with tightly packed RGB lightmaps uploaded using one-byte row alignment.
-The immutable BSP submission stream is cached in an OpenGL display list during
-an unmeasured warmup frame. Simulation advances through a bounded fixed-step
-accumulator, while frame presentation is regulated with monotonic
+Immutable BSP face geometry and both UV streams are cached in a static OpenGL
+vertex buffer. Actor motion and light-style time advance on a canonical 60 Hz
+fixed simulation clock, independently of 60/120 Hz presentation. Styled and
+dynamic light layers regenerate only dirty, visible lightmap textures with
+`glTexSubImage2D`; geometry is never rebuilt. Frame presentation is regulated with monotonic
 `sleep_until` deadlines at either 60 or 120 FPS. SIGINT and SIGTERM request a
 normal shutdown so graphics, world, SDL, X11, and VFile resources are released.
 
