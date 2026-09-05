@@ -9,6 +9,7 @@
 #include "LinuxRender.h"
 
 #include <cmath>
+#include <cctype>
 #include <cstring>
 #include <memory>
 #include <new>
@@ -136,6 +137,23 @@ bool valid_camera(const geLinuxRender_Camera &camera) {
 bool valid_vector(const geLinuxRender_Vec3 &point) {
     return std::isfinite(point.X) && std::isfinite(point.Y) &&
            std::isfinite(point.Z);
+}
+
+std::string normalized_motion_name(const char *name) {
+    if (!name)
+        return {};
+    std::string result(name);
+    const size_t separator = result.find_last_of("/\\");
+    if (separator != std::string::npos)
+        result.erase(0, separator + 1);
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char character) {
+                       return static_cast<char>(std::tolower(character));
+                   });
+    const size_t extension = result.rfind('.');
+    if (extension != std::string::npos)
+        result.erase(extension);
+    return result;
 }
 
 void export_collision(const GE_Collision &collision,
@@ -965,6 +983,83 @@ extern "C" int geLinuxRender_SetActorVisible(
     if (!actor || !actor->native.actor)
         return 0;
     actor->visible = visible != 0;
+    return 1;
+}
+
+extern "C" size_t geLinuxRender_GetActorMotionCount(
+    const geLinuxRender_Runtime *runtime, size_t actor_index) {
+    const RuntimeActor *actor = runtime_actor_at(runtime, actor_index);
+    return actor && actor->native.motion_count > 0
+        ? static_cast<size_t>(actor->native.motion_count) : 0U;
+}
+
+extern "C" size_t geLinuxRender_GetActorMotionName(
+    const geLinuxRender_Runtime *runtime, size_t actor_index,
+    size_t motion_index, char *buffer, size_t buffer_size) {
+    const RuntimeActor *actor = runtime_actor_at(runtime, actor_index);
+    if (!actor || !actor->native.definition ||
+        motion_index >= static_cast<size_t>(actor->native.motion_count))
+        return 0;
+    return copy_api_string(
+        geActor_GetMotionName(actor->native.definition,
+                              static_cast<int>(motion_index)),
+        buffer, buffer_size);
+}
+
+extern "C" int geLinuxRender_SetActorMotion(
+    geLinuxRender_Runtime *runtime, size_t actor_index,
+    const char *motion_name, int restart) {
+    RuntimeActor *actor = runtime_actor_at(runtime, actor_index);
+    if (!actor || !actor->native.definition || !actor->native.actor ||
+        !motion_name || !*motion_name)
+        return 0;
+    geMotion *motion = geActor_GetMotionByName(actor->native.definition,
+                                               motion_name);
+    if (!motion) {
+        const std::string requested = normalized_motion_name(motion_name);
+        for (int index = 0; index < actor->native.motion_count; ++index) {
+            const char *candidate = geActor_GetMotionName(
+                actor->native.definition, index);
+            if (candidate &&
+                normalized_motion_name(candidate) == requested) {
+                motion = geActor_GetMotionByIndex(actor->native.definition,
+                                                  index);
+                break;
+            }
+        }
+    }
+    geFloat start = 0.0f;
+    geFloat end = 0.0f;
+    if (!motion || geMotion_GetTimeExtents(motion, &start, &end) != GE_TRUE ||
+        end <= start)
+        return 0;
+    if (actor->native.motion == motion && !restart)
+        return 1;
+    actor->native.motion = motion;
+    actor->native.motion_start = start;
+    actor->native.motion_end = end;
+    actor->native.motion_time = start;
+    for (int index = 0; index < actor->native.motion_count; ++index) {
+        if (geActor_GetMotionByIndex(actor->native.definition, index) == motion) {
+            actor->native.motion_index = index;
+            break;
+        }
+    }
+    geActor_SetPose(actor->native.actor, motion, start,
+                    &actor->native.root_transform);
+    return 1;
+}
+
+extern "C" int geLinuxRender_SetActorScale(
+    geLinuxRender_Runtime *runtime, size_t actor_index,
+    const geLinuxRender_Vec3 *scale) {
+    RuntimeActor *actor = runtime_actor_at(runtime, actor_index);
+    if (!actor || !scale || !valid_vector(*scale) ||
+        scale->X <= 0.0 || scale->Y <= 0.0 || scale->Z <= 0.0)
+        return 0;
+    actor->native.scale = {static_cast<geFloat>(scale->X),
+                           static_cast<geFloat>(scale->Y),
+                           static_cast<geFloat>(scale->Z)};
     return 1;
 }
 

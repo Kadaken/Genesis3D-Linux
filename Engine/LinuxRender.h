@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 7u
+#define GE_LINUX_RENDER_API_VERSION 8u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -203,6 +203,22 @@ int geLinuxRender_GetActorBounds(const geLinuxRender_Runtime *Runtime,
 int geLinuxRender_SetActorVisible(geLinuxRender_Runtime *Runtime,
                                   size_t ActorIndex,
                                   int Visible);
+size_t geLinuxRender_GetActorMotionCount(
+    const geLinuxRender_Runtime *Runtime,
+    size_t ActorIndex);
+size_t geLinuxRender_GetActorMotionName(
+    const geLinuxRender_Runtime *Runtime,
+    size_t ActorIndex,
+    size_t MotionIndex,
+    char *Buffer,
+    size_t BufferSize);
+int geLinuxRender_SetActorMotion(geLinuxRender_Runtime *Runtime,
+                                 size_t ActorIndex,
+                                 const char *MotionName,
+                                 int Restart);
+int geLinuxRender_SetActorScale(geLinuxRender_Runtime *Runtime,
+                                size_t ActorIndex,
+                                const geLinuxRender_Vec3 *Scale);
 int geLinuxRender_SetOverlayCallback(geLinuxRender_Runtime *Runtime,
                                      geLinuxRender_OverlayCallback Callback,
                                      void *Context);
