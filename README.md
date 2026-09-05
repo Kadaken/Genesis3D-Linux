@@ -106,9 +106,9 @@ The versioned C ABI provides opaque runtime ownership, exact-map loading,
 generic entity queries, multi-actor ownership and motion/scale selection, BSP
 submodel lookup and authored
 motion sampling, per-model render visibility, SDL input polling, fixed-step BSP
-player collision, explicit
-camera submission, simulation advancement, and single-frame rendering. Game
-code remains outside the engine target.
+player collision, bounded world-material inspection/replacement, explicit
+camera submission, simulation advancement, and single-frame rendering. Dynamic
+surface decoding and all other game policy remain outside the engine target.
 
 The intended per-frame order is:
 

@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 16u
+#define GE_LINUX_RENDER_API_VERSION 17u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -115,6 +115,11 @@ typedef struct geLinuxRender_PlayerMedium {
     double SwimAcceleration;
 } geLinuxRender_PlayerMedium;
 
+typedef struct geLinuxRender_MaterialInfo {
+    int Width;
+    int Height;
+} geLinuxRender_MaterialInfo;
+
 typedef struct geLinuxRender_Config {
     uint32_t StructSize;
     uint32_t ApiVersion;
@@ -187,6 +192,26 @@ int geLinuxRender_RemoveDynamicLight(geLinuxRender_Runtime *Runtime,
                                      size_t LightIndex);
 int geLinuxRender_SubmitBillboard(geLinuxRender_Runtime *Runtime,
                                   const geLinuxRender_Billboard *Billboard);
+
+/* Bounded world-material inspection and replacement. This lets an application
+ * layer drive video/procedural surfaces without exposing renderer internals.
+ * Names are copied using the same required-size convention as entity strings.
+ * RGBA pixels are top-to-bottom, eight bits per channel. */
+size_t geLinuxRender_GetMaterialCount(const geLinuxRender_Runtime *Runtime);
+size_t geLinuxRender_GetMaterialName(const geLinuxRender_Runtime *Runtime,
+                                     size_t MaterialIndex,
+                                     char *Buffer,
+                                     size_t BufferSize);
+int geLinuxRender_GetMaterialInfo(const geLinuxRender_Runtime *Runtime,
+                                  size_t MaterialIndex,
+                                  geLinuxRender_MaterialInfo *Info);
+int geLinuxRender_UpdateMaterialRGBA(geLinuxRender_Runtime *Runtime,
+                                     const char *MaterialName,
+                                     int Width,
+                                     int Height,
+                                     const uint8_t *Pixels,
+                                     size_t ByteCount,
+                                     size_t RowStride);
 
 int geLinuxRender_GetEntityOrigin(const geLinuxRender_Runtime *Runtime,
                                   const char *ClassName,
