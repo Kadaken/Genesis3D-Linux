@@ -2,7 +2,7 @@
 
 ## Result
 
-The renderer API is version 14. It exposes bounded input edges, one lifecycle
+The renderer API is version 15. It exposes bounded input edges, one lifecycle
 operation needed by an external game layer while retaining all save data and
 serialization outside the public engine.
 
@@ -26,6 +26,9 @@ serialization outside the public engine.
 - A renderer-neutral transient billboard primitive supports camera-facing,
   alpha-blended or additive game effects without exposing private textures or
   game entity classes to the public engine.
+- A bounded player-medium contract supplies speed, gravity, and held-jump swim
+  acceleration coefficients to the existing swept-hull solver. `{1,1,0}` is
+  the neutral default; the renderer does not interpret liquid entity classes.
 
 The API does not know about save or screenshot directories, game entities,
 inventory, or private assets. Those remain responsibilities of the sibling

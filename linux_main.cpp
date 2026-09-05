@@ -90,6 +90,9 @@ struct PlayerPhysics {
     uint64_t jump_count = 0;
     uint64_t landing_count = 0;
     uint64_t ceiling_count = 0;
+    double speed_scale = 1.0;
+    double gravity_scale = 1.0;
+    double swim_acceleration = 0.0;
 };
 
 struct VFileRegistryGuard {
@@ -1022,8 +1025,9 @@ void update_player_movement(geWorld *world, PlayerCamera *camera,
         0.0,
         basis.planar_forward.z * forward_axis + basis.right.z * strafe_axis});
     const double sprint = input.sprint_left || input.sprint_right ? 2.0 : 1.0;
-    const Vec3 horizontal = scaled(direction,
-        camera->move_speed * sprint * delta_seconds);
+    const Vec3 horizontal = scaled(
+        direction, camera->move_speed * physics->speed_scale * sprint *
+            delta_seconds);
     const Vec3 horizontal_start = camera->position;
     SlideResult direct = slide_player(world, horizontal_start, horizontal);
     SlideResult chosen = direct;
@@ -1057,7 +1061,13 @@ void update_player_movement(geWorld *world, PlayerCamera *camera,
     camera->position = chosen.position;
     if (chosen.collided)
         ++physics->collision_count;
-    physics->vertical_velocity -= kGravity * delta_seconds;
+    physics->vertical_velocity -=
+        kGravity * physics->gravity_scale * delta_seconds;
+    if (!physics->grounded && input.jump_space &&
+        physics->swim_acceleration > 0.0) {
+        physics->vertical_velocity +=
+            physics->swim_acceleration * delta_seconds;
+    }
     SlideResult vertical = slide_player(
         world, camera->position,
         {0.0, physics->vertical_velocity * delta_seconds, 0.0});

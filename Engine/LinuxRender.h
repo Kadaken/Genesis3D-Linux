@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 14u
+#define GE_LINUX_RENDER_API_VERSION 15u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -104,6 +104,12 @@ typedef struct geLinuxRender_Billboard {
     int Additive;
 } geLinuxRender_Billboard;
 
+typedef struct geLinuxRender_PlayerMedium {
+    double SpeedScale;
+    double GravityScale;
+    double SwimAcceleration;
+} geLinuxRender_PlayerMedium;
+
 typedef struct geLinuxRender_Config {
     uint32_t StructSize;
     uint32_t ApiVersion;
@@ -141,6 +147,11 @@ int geLinuxRender_StepPlayer(geLinuxRender_Runtime *Runtime,
                              const geLinuxRender_Input *Input,
                              double FixedDeltaSeconds,
                              geLinuxRender_Camera *Camera);
+/* Sets bounded movement coefficients for the next and subsequent player steps.
+ * Use {1,1,0} for ordinary air. A positive swim acceleration is applied only
+ * while Jump is held and the player is not grounded. */
+int geLinuxRender_SetPlayerMedium(geLinuxRender_Runtime *Runtime,
+                                 const geLinuxRender_PlayerMedium *Medium);
 /* Clears transient velocity/contact/key-edge state after a game-owned restore. */
 int geLinuxRender_ResetPlayerPhysics(geLinuxRender_Runtime *Runtime);
 int geLinuxRender_AdvanceSimulation(geLinuxRender_Runtime *Runtime,
