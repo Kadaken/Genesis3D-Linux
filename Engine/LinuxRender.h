@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 8u
+#define GE_LINUX_RENDER_API_VERSION 9u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -44,6 +44,8 @@ typedef struct geLinuxRender_Input {
     int Sprint;
     int Jump;
     int Fire;
+    int QuickSave;
+    int QuickLoad;
     int QuitRequested;
 } geLinuxRender_Input;
 
@@ -105,6 +107,8 @@ int geLinuxRender_StepPlayer(geLinuxRender_Runtime *Runtime,
                              const geLinuxRender_Input *Input,
                              double FixedDeltaSeconds,
                              geLinuxRender_Camera *Camera);
+/* Clears transient velocity/contact/key-edge state after a game-owned restore. */
+int geLinuxRender_ResetPlayerPhysics(geLinuxRender_Runtime *Runtime);
 int geLinuxRender_AdvanceSimulation(geLinuxRender_Runtime *Runtime,
                                     double FixedDeltaSeconds);
 int geLinuxRender_RenderFrame(geLinuxRender_Runtime *Runtime);
