@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 2u
+#define GE_LINUX_RENDER_API_VERSION 3u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -83,6 +83,11 @@ typedef void (*geLinuxRender_OverlayCallback)(void *Context,
 
 geLinuxRender_Runtime *geLinuxRender_Create(const geLinuxRender_Config *Config);
 void geLinuxRender_Destroy(geLinuxRender_Runtime *Runtime);
+
+/* Atomically replaces world-owned resources while preserving the SDL/OpenGL
+ * runtime. On failure, the previous world remains active. */
+int geLinuxRender_LoadMap(geLinuxRender_Runtime *Runtime,
+                          const char *MapPath);
 
 int geLinuxRender_PollInput(geLinuxRender_Runtime *Runtime,
                             geLinuxRender_Input *Input);
