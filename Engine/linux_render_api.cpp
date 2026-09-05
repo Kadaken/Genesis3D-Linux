@@ -8,6 +8,7 @@
 
 #include "LinuxRender.h"
 
+#include <climits>
 #include <cmath>
 #include <cctype>
 #include <cstring>
@@ -47,6 +48,7 @@ struct geLinuxRender_Runtime {
     HeldMovementInput movement_input;
     bool fire_button = false;
     bool use_requested = false;
+    bool screenshot_requested = false;
     bool quick_save_requested = false;
     bool quick_load_requested = false;
     int weapon_slot_requested = -1;
@@ -447,6 +449,7 @@ extern "C" int geLinuxRender_LoadMap(geLinuxRender_Runtime *runtime,
     runtime->movement_input = HeldMovementInput{};
     runtime->fire_button = false;
     runtime->use_requested = false;
+    runtime->screenshot_requested = false;
     runtime->quick_save_requested = false;
     runtime->quick_load_requested = false;
     runtime->weapon_slot_requested = -1;
@@ -495,6 +498,9 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
                 event.key.keysym.scancode == SDL_SCANCODE_E)
                 runtime->use_requested = true;
             if (event.key.repeat == 0 &&
+                event.key.keysym.scancode == SDL_SCANCODE_F12)
+                runtime->screenshot_requested = true;
+            if (event.key.repeat == 0 &&
                 event.key.keysym.scancode == SDL_SCANCODE_F9)
                 runtime->quick_save_requested = true;
             if (event.key.repeat == 0 &&
@@ -541,10 +547,12 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
     input->Jump = held.jump_space;
     input->Fire = runtime->fire_button;
     input->Use = runtime->use_requested ? 1 : 0;
+    input->Screenshot = runtime->screenshot_requested ? 1 : 0;
     input->QuickSave = runtime->quick_save_requested ? 1 : 0;
     input->QuickLoad = runtime->quick_load_requested ? 1 : 0;
     input->WeaponSlot = runtime->weapon_slot_requested;
     runtime->use_requested = false;
+    runtime->screenshot_requested = false;
     runtime->quick_save_requested = false;
     runtime->quick_load_requested = false;
     runtime->weapon_slot_requested = -1;
@@ -666,6 +674,80 @@ extern "C" int geLinuxRender_RenderFrame(geLinuxRender_Runtime *runtime) {
                                   runtime->framebuffer_width,
                                   runtime->framebuffer_height);
     SDL_GL_SwapWindow(runtime->window);
+    return 1;
+}
+
+extern "C" int geLinuxRender_SaveScreenshot(
+    geLinuxRender_Runtime *runtime, const char *path) {
+    if (!runtime || runtime->headless || !runtime->window ||
+        !runtime->context || !path || !*path ||
+        runtime->framebuffer_width <= 0 || runtime->framebuffer_height <= 0)
+        return 0;
+    if (SDL_GL_MakeCurrent(runtime->window, runtime->context) != 0) {
+        set_api_error(std::string("could not activate screenshot context: ") +
+                      SDL_GetError());
+        return 0;
+    }
+    const size_t width = static_cast<size_t>(runtime->framebuffer_width);
+    const size_t height = static_cast<size_t>(runtime->framebuffer_height);
+    if (width > SIZE_MAX / 3U || height > SIZE_MAX / (width * 3U) ||
+        width > static_cast<size_t>(INT_MAX) / 3U) {
+        set_api_error("screenshot dimensions overflow the pixel buffer");
+        return 0;
+    }
+    std::vector<Uint8> pixels(width * height * 3U);
+    GLint previous_pack_alignment = 0;
+    GLint previous_read_buffer = 0;
+    glGetIntegerv(GL_PACK_ALIGNMENT, &previous_pack_alignment);
+    glGetIntegerv(GL_READ_BUFFER, &previous_read_buffer);
+    while (glGetError() != GL_NO_ERROR) {}
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_FRONT);
+    glFinish();
+    glReadPixels(0, 0, runtime->framebuffer_width,
+                 runtime->framebuffer_height, GL_RGB, GL_UNSIGNED_BYTE,
+                 pixels.data());
+    const GLenum read_error = glGetError();
+    glReadBuffer(static_cast<GLenum>(previous_read_buffer));
+    glPixelStorei(GL_PACK_ALIGNMENT, previous_pack_alignment);
+    if (read_error != GL_NO_ERROR) {
+        set_api_error("OpenGL framebuffer read failed");
+        return 0;
+    }
+    const size_t row_bytes = width * 3U;
+    std::vector<Uint8> row(row_bytes);
+    for (size_t top = 0; top < height / 2U; ++top) {
+        Uint8 *upper = pixels.data() + top * row_bytes;
+        Uint8 *lower = pixels.data() + (height - top - 1U) * row_bytes;
+        std::memcpy(row.data(), upper, row_bytes);
+        std::memcpy(upper, lower, row_bytes);
+        std::memcpy(lower, row.data(), row_bytes);
+    }
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+    constexpr Uint32 red_mask = 0xff0000U;
+    constexpr Uint32 green_mask = 0x00ff00U;
+    constexpr Uint32 blue_mask = 0x0000ffU;
+#else
+    constexpr Uint32 red_mask = 0x0000ffU;
+    constexpr Uint32 green_mask = 0x00ff00U;
+    constexpr Uint32 blue_mask = 0xff0000U;
+#endif
+    SDL_Surface *surface = SDL_CreateRGBSurfaceFrom(
+        pixels.data(), runtime->framebuffer_width,
+        runtime->framebuffer_height, 24,
+        static_cast<int>(row_bytes), red_mask, green_mask, blue_mask, 0U);
+    if (!surface) {
+        set_api_error(std::string("could not create screenshot surface: ") +
+                      SDL_GetError());
+        return 0;
+    }
+    const int saved = SDL_SaveBMP(surface, path);
+    SDL_FreeSurface(surface);
+    if (saved != 0) {
+        set_api_error(std::string("could not save screenshot: ") +
+                      SDL_GetError());
+        return 0;
+    }
     return 1;
 }
 

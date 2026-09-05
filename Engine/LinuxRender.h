@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 11u
+#define GE_LINUX_RENDER_API_VERSION 12u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -45,6 +45,7 @@ typedef struct geLinuxRender_Input {
     int Jump;
     int Fire;
     int Use;
+    int Screenshot;
     int QuickSave;
     int QuickLoad;
     int WeaponSlot;
@@ -126,6 +127,10 @@ int geLinuxRender_ResetPlayerPhysics(geLinuxRender_Runtime *Runtime);
 int geLinuxRender_AdvanceSimulation(geLinuxRender_Runtime *Runtime,
                                     double FixedDeltaSeconds);
 int geLinuxRender_RenderFrame(geLinuxRender_Runtime *Runtime);
+/* Saves the currently displayed framebuffer as a 24-bit BMP. The caller owns
+ * path selection and directory policy. Not available in headless mode. */
+int geLinuxRender_SaveScreenshot(geLinuxRender_Runtime *Runtime,
+                                 const char *Path);
 int geLinuxRender_ShouldClose(const geLinuxRender_Runtime *Runtime);
 int geLinuxRender_GetFrameStats(const geLinuxRender_Runtime *Runtime,
                                 geLinuxRender_FrameStats *Stats);
