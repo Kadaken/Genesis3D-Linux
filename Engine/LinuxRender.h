@@ -109,6 +109,23 @@ int geLinuxRender_TraceWorld(const geLinuxRender_Runtime *Runtime,
                              const geLinuxRender_Vec3 *Start,
                              const geLinuxRender_Vec3 *End,
                              geLinuxRender_TraceResult *Result);
+int geLinuxRender_SweepWorld(const geLinuxRender_Runtime *Runtime,
+                             const geLinuxRender_Aabb *LocalBounds,
+                             const geLinuxRender_Vec3 *Start,
+                             const geLinuxRender_Vec3 *End,
+                             geLinuxRender_TraceResult *Result);
+
+size_t geLinuxRender_GetActorCount(const geLinuxRender_Runtime *Runtime);
+int geLinuxRender_SetActorTransform(geLinuxRender_Runtime *Runtime,
+                                    size_t ActorIndex,
+                                    const geLinuxRender_Vec3 *Position,
+                                    double YawRadians);
+int geLinuxRender_GetActorBounds(const geLinuxRender_Runtime *Runtime,
+                                 size_t ActorIndex,
+                                 geLinuxRender_Aabb *Bounds);
+int geLinuxRender_SetActorVisible(geLinuxRender_Runtime *Runtime,
+                                  size_t ActorIndex,
+                                  int Visible);
 
 const char *geLinuxRender_GetLastError(void);
 

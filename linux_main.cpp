@@ -392,7 +392,8 @@ void destroy_face_cache(NativeFaceCache *cache) {
     }
 }
 
-bool load_native_actor(const std::string &path, NativeActor *native_actor) {
+bool load_native_actor(const std::string &path, NativeActor *native_actor,
+                       bool upload_materials = true) {
     if (!native_actor)
         return false;
     geVFile *file = geVFile_OpenNewSystem(nullptr, GE_VFILE_TYPE_DOS,
@@ -429,6 +430,9 @@ bool load_native_actor(const std::string &path, NativeActor *native_actor) {
     native_actor->body_instance = geBodyInst_Create(body);
     if (!native_actor->body_instance)
         return false;
+
+    if (!upload_materials)
+        return true;
 
     const int material_count = geBody_GetMaterialCount(body);
     native_actor->materials.assign(static_cast<size_t>(material_count), 0);

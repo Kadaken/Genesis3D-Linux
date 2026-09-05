@@ -30,6 +30,7 @@ struct geLinuxRender_Runtime {
     PlayerPhysics player_physics;
     HeldMovementInput movement_input;
     bool fire_button = false;
+    bool actor_visible = true;
 };
 
 namespace {
@@ -96,6 +97,58 @@ bool valid_camera(const geLinuxRender_Camera &camera) {
            std::isfinite(camera.MoveSpeed) && camera.MoveSpeed > 0.0;
 }
 
+bool valid_vector(const geLinuxRender_Vec3 &point) {
+    return std::isfinite(point.X) && std::isfinite(point.Y) &&
+           std::isfinite(point.Z);
+}
+
+void export_collision(const GE_Collision &collision,
+                      geLinuxRender_TraceResult *result) {
+    result->Hit = 1;
+    result->Kind = collision.Actor ? GE_LINUX_RENDER_HIT_ACTOR
+                   : collision.Mesh ? GE_LINUX_RENDER_HIT_MESH
+                   : GE_LINUX_RENDER_HIT_WORLD_MODEL;
+    result->Impact = {collision.Impact.X, collision.Impact.Y,
+                      collision.Impact.Z};
+    result->Normal = {collision.Plane.Normal.X, collision.Plane.Normal.Y,
+                      collision.Plane.Normal.Z};
+    result->Fraction = (std::max)(0.0, (std::min)(1.0,
+        static_cast<double>(collision.Ratio)));
+}
+
+bool load_runtime_actor(geLinuxRender_Runtime *runtime,
+                        const char *actor_directory,
+                        bool upload_materials) {
+    if (!runtime || !actor_directory || !*actor_directory)
+        return false;
+    std::string directory(actor_directory);
+    if (directory.back() != '/')
+        directory.push_back('/');
+    for (const std::string &candidate : neutral_actor_assets(directory)) {
+        if (load_native_actor(candidate, &runtime->native_actor,
+                              upload_materials))
+            return true;
+        destroy_native_actor(&runtime->native_actor);
+        runtime->native_actor = NativeActor{};
+    }
+    return false;
+}
+
+void place_runtime_actor_at_default(geLinuxRender_Runtime *runtime) {
+    if (!runtime || !runtime->native_actor.actor)
+        return;
+    const CameraBasis basis = camera_basis(runtime->camera);
+    geXForm3d transform;
+    geXForm3d_SetIdentity(&transform);
+    transform.Translation.X = static_cast<geFloat>(
+        runtime->camera.position.x + basis.forward.x * 180.0);
+    transform.Translation.Y = static_cast<geFloat>(
+        runtime->camera.position.y - 48.0);
+    transform.Translation.Z = static_cast<geFloat>(
+        runtime->camera.position.z + basis.forward.z * 180.0);
+    set_actor_root_transform(&runtime->native_actor, transform);
+}
+
 } // namespace
 
 extern "C" geLinuxRender_Runtime *
@@ -123,8 +176,11 @@ geLinuxRender_Create(const geLinuxRender_Config *config) {
         return nullptr;
     }
     runtime->camera = initial_camera(runtime->world);
-    if (runtime->headless)
+    if (runtime->headless) {
+        load_runtime_actor(runtime, config->ActorDirectory, false);
+        place_runtime_actor_at_default(runtime);
         return runtime;
+    }
 
     SDL_SetHint(SDL_HINT_VIDEODRIVER, "x11");
     constexpr Uint32 requested_subsystems = SDL_INIT_VIDEO | SDL_INIT_EVENTS;
@@ -202,30 +258,8 @@ geLinuxRender_Create(const geLinuxRender_Config *config) {
         return nullptr;
     }
 
-    if (config->ActorDirectory && *config->ActorDirectory) {
-        std::string actor_directory(config->ActorDirectory);
-        if (actor_directory.back() != '/')
-            actor_directory.push_back('/');
-        const std::vector<std::string> actors = neutral_actor_assets(actor_directory);
-        for (const std::string &candidate : actors) {
-            if (load_native_actor(candidate, &runtime->native_actor))
-                break;
-            destroy_native_actor(&runtime->native_actor);
-            runtime->native_actor = NativeActor{};
-        }
-    }
-
-    const CameraBasis actor_basis = camera_basis(runtime->camera);
-    geXForm3d actor_transform;
-    geXForm3d_SetIdentity(&actor_transform);
-    actor_transform.Translation.X = static_cast<geFloat>(
-        runtime->camera.position.x + actor_basis.forward.x * 180.0);
-    actor_transform.Translation.Y = static_cast<geFloat>(
-        runtime->camera.position.y - 48.0);
-    actor_transform.Translation.Z = static_cast<geFloat>(
-        runtime->camera.position.z + actor_basis.forward.z * 180.0);
-    if (runtime->native_actor.actor)
-        set_actor_root_transform(&runtime->native_actor, actor_transform);
+    load_runtime_actor(runtime, config->ActorDirectory, true);
+    place_runtime_actor_at_default(runtime);
 
     advance_light_styles(runtime->world, &runtime->world_textures,
                          &runtime->lighting_state, 0.0, &runtime->diagnostics);
@@ -374,7 +408,9 @@ extern "C" int geLinuxRender_RenderFrame(geLinuxRender_Runtime *runtime) {
     const CameraBasis basis = camera_basis(runtime->camera);
     if (!render_world_geometry(runtime->world, runtime->world_textures,
                                runtime->face_cache, runtime->camera, basis,
-                               &runtime->native_actor, runtime->lighting_state,
+                               runtime->actor_visible ? &runtime->native_actor
+                                                      : nullptr,
+                               runtime->lighting_state,
                                &runtime->diagnostics,
                                runtime->framebuffer_width,
                                runtime->framebuffer_height)) {
@@ -427,11 +463,7 @@ extern "C" int geLinuxRender_TraceWorld(
     const geLinuxRender_Vec3 *end, geLinuxRender_TraceResult *result) {
     if (!runtime || !runtime->world || !start || !end || !result)
         return 0;
-    const auto finite = [](const geLinuxRender_Vec3 &point) {
-        return std::isfinite(point.X) && std::isfinite(point.Y) &&
-               std::isfinite(point.Z);
-    };
-    if (!finite(*start) || !finite(*end))
+    if (!valid_vector(*start) || !valid_vector(*end))
         return 0;
 
     *result = geLinuxRender_TraceResult{};
@@ -449,16 +481,86 @@ extern "C" int geLinuxRender_TraceWorld(
         return 1;
     }
 
-    result->Hit = 1;
-    result->Kind = collision.Actor ? GE_LINUX_RENDER_HIT_ACTOR
-                   : collision.Mesh ? GE_LINUX_RENDER_HIT_MESH
-                   : GE_LINUX_RENDER_HIT_WORLD_MODEL;
-    result->Impact = {collision.Impact.X, collision.Impact.Y,
-                      collision.Impact.Z};
-    result->Normal = {collision.Plane.Normal.X, collision.Plane.Normal.Y,
-                      collision.Plane.Normal.Z};
-    result->Fraction = (std::max)(0.0, (std::min)(1.0,
-        static_cast<double>(collision.Ratio)));
+    export_collision(collision, result);
+    return 1;
+}
+
+extern "C" int geLinuxRender_SweepWorld(
+    const geLinuxRender_Runtime *runtime,
+    const geLinuxRender_Aabb *local_bounds,
+    const geLinuxRender_Vec3 *start, const geLinuxRender_Vec3 *end,
+    geLinuxRender_TraceResult *result) {
+    if (!runtime || !runtime->world || !local_bounds || !start || !end ||
+        !result || !valid_vector(local_bounds->Minimum) ||
+        !valid_vector(local_bounds->Maximum) || !valid_vector(*start) ||
+        !valid_vector(*end) ||
+        local_bounds->Minimum.X > local_bounds->Maximum.X ||
+        local_bounds->Minimum.Y > local_bounds->Maximum.Y ||
+        local_bounds->Minimum.Z > local_bounds->Maximum.Z)
+        return 0;
+
+    *result = geLinuxRender_TraceResult{};
+    const geVec3d minimum{static_cast<geFloat>(local_bounds->Minimum.X),
+                          static_cast<geFloat>(local_bounds->Minimum.Y),
+                          static_cast<geFloat>(local_bounds->Minimum.Z)};
+    const geVec3d maximum{static_cast<geFloat>(local_bounds->Maximum.X),
+                          static_cast<geFloat>(local_bounds->Maximum.Y),
+                          static_cast<geFloat>(local_bounds->Maximum.Z)};
+    const geVec3d front{static_cast<geFloat>(start->X),
+                        static_cast<geFloat>(start->Y),
+                        static_cast<geFloat>(start->Z)};
+    const geVec3d back{static_cast<geFloat>(end->X),
+                       static_cast<geFloat>(end->Y),
+                       static_cast<geFloat>(end->Z)};
+    GE_Collision collision{};
+    if (geWorld_Collision(runtime->world, &minimum, &maximum, &front, &back,
+                          GE_CONTENTS_SOLID_CLIP, GE_COLLIDE_MODELS,
+                          0xffffffffU, nullptr, nullptr,
+                          &collision) == GE_FALSE) {
+        return 1;
+    }
+    export_collision(collision, result);
+    return 1;
+}
+
+extern "C" size_t geLinuxRender_GetActorCount(
+    const geLinuxRender_Runtime *runtime) {
+    return runtime && runtime->native_actor.actor ? 1U : 0U;
+}
+
+extern "C" int geLinuxRender_SetActorTransform(
+    geLinuxRender_Runtime *runtime, size_t actor_index,
+    const geLinuxRender_Vec3 *position, double yaw_radians) {
+    if (!runtime || actor_index != 0 || !runtime->native_actor.actor ||
+        !position || !valid_vector(*position) || !std::isfinite(yaw_radians))
+        return 0;
+    geXForm3d transform;
+    geXForm3d_SetYRotation(&transform, static_cast<geFloat>(yaw_radians));
+    transform.Translation = {static_cast<geFloat>(position->X),
+                             static_cast<geFloat>(position->Y),
+                             static_cast<geFloat>(position->Z)};
+    set_actor_root_transform(&runtime->native_actor, transform);
+    return 1;
+}
+
+extern "C" int geLinuxRender_GetActorBounds(
+    const geLinuxRender_Runtime *runtime, size_t actor_index,
+    geLinuxRender_Aabb *bounds) {
+    if (!runtime || actor_index != 0 || !runtime->native_actor.actor || !bounds)
+        return 0;
+    geExtBox box{};
+    if (geActor_GetDynamicExtBox(runtime->native_actor.actor, &box) == GE_FALSE)
+        return 0;
+    bounds->Minimum = {box.Min.X, box.Min.Y, box.Min.Z};
+    bounds->Maximum = {box.Max.X, box.Max.Y, box.Max.Z};
+    return 1;
+}
+
+extern "C" int geLinuxRender_SetActorVisible(
+    geLinuxRender_Runtime *runtime, size_t actor_index, int visible) {
+    if (!runtime || actor_index != 0 || !runtime->native_actor.actor)
+        return 0;
+    runtime->actor_visible = visible != 0;
     return 1;
 }
 
