@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 13u
+#define GE_LINUX_RENDER_API_VERSION 14u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -93,6 +93,17 @@ typedef struct geLinuxRender_Color3 {
     float Blue;
 } geLinuxRender_Color3;
 
+typedef struct geLinuxRender_Billboard {
+    geLinuxRender_Vec3 Position;
+    float Red;
+    float Green;
+    float Blue;
+    float Alpha;
+    float Size;
+    double LifetimeSeconds;
+    int Additive;
+} geLinuxRender_Billboard;
+
 typedef struct geLinuxRender_Config {
     uint32_t StructSize;
     uint32_t ApiVersion;
@@ -158,6 +169,8 @@ int geLinuxRender_SetDynamicLight(geLinuxRender_Runtime *Runtime,
                                   double Radius);
 int geLinuxRender_RemoveDynamicLight(geLinuxRender_Runtime *Runtime,
                                      size_t LightIndex);
+int geLinuxRender_SubmitBillboard(geLinuxRender_Runtime *Runtime,
+                                  const geLinuxRender_Billboard *Billboard);
 
 int geLinuxRender_GetEntityOrigin(const geLinuxRender_Runtime *Runtime,
                                   const char *ClassName,

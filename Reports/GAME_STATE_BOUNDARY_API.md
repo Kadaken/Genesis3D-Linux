@@ -2,7 +2,7 @@
 
 ## Result
 
-The renderer API is version 13. It exposes bounded input edges, one lifecycle
+The renderer API is version 14. It exposes bounded input edges, one lifecycle
 operation needed by an external game layer while retaining all save data and
 serialization outside the public engine.
 
@@ -23,14 +23,19 @@ serialization outside the public engine.
   bounded point lights while the renderer owns lightmap invalidation and
   regeneration.
 - A renderer-neutral transient beam primitive supports bounded game effects.
+- A renderer-neutral transient billboard primitive supports camera-facing,
+  alpha-blended or additive game effects without exposing private textures or
+  game entity classes to the public engine.
 
 The API does not know about save or screenshot directories, game entities,
 inventory, or private assets. Those remain responsibilities of the sibling
 private game layer.
 
-Beam lifetime advances on the fixed simulation clock. The API rejects non-finite
-coordinates/colors, out-of-range colors, invalid width, and invalid lifetime.
-The compatibility OpenGL draw restores every render-state category it modifies.
+Beam and billboard lifetimes advance on the fixed simulation clock. The API
+rejects non-finite coordinates/colors, out-of-range colors, invalid dimensions,
+and invalid lifetimes. The compatibility OpenGL draw restores every render-state
+category it modifies. Billboards use the camera's orthonormal right/up basis so
+they remain camera-facing under both yaw and pitch.
 
 ## Safety
 
