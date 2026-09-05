@@ -49,3 +49,14 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
   same shared engine implementation.
 - Added a headless API mode for world/entity/collision tests without creating a
   window or capturing desktop input.
+
+## 2026-09-05 — BSP submodels and authored motion
+
+- Extended the renderer command stream to submit non-root BSP models with
+  their runtime transforms, materials, lightmaps, and translucent ordering.
+- Added bounded C API queries for world-model count, lookup, bounds, entity
+  model references, authored motion extents, and motion-time sampling.
+- Routed authored motion samples through `geWorld_SetModelXForm` so drawing,
+  traces, and collision observe the same transform and updated bounds.
+- Added cumulative frame diagnostics for root-visible faces, submodel face
+  submissions, and actor primitives.
