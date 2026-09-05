@@ -20,6 +20,11 @@ struct RuntimeActor {
     bool visible = true;
 };
 
+struct RuntimeBeam {
+    geLinuxRender_Beam beam{};
+    double remaining = 0.0;
+};
+
 struct geLinuxRender_Runtime {
     geWorld *world = nullptr;
     SDL_Window *window = nullptr;
@@ -33,6 +38,7 @@ struct geLinuxRender_Runtime {
     NativeTextureSet world_textures;
     NativeFaceCache face_cache;
     std::vector<std::unique_ptr<RuntimeActor>> actors;
+    std::vector<RuntimeBeam> beams;
     std::vector<uint8_t> model_visibility;
     NativeLightingState lighting_state;
     RenderDiagnostics diagnostics;
@@ -42,6 +48,7 @@ struct geLinuxRender_Runtime {
     bool fire_button = false;
     bool quick_save_requested = false;
     bool quick_load_requested = false;
+    int weapon_slot_requested = -1;
     geLinuxRender_OverlayCallback overlay_callback = nullptr;
     void *overlay_context = nullptr;
 };
@@ -139,6 +146,47 @@ bool valid_camera(const geLinuxRender_Camera &camera) {
 bool valid_vector(const geLinuxRender_Vec3 &point) {
     return std::isfinite(point.X) && std::isfinite(point.Y) &&
            std::isfinite(point.Z);
+}
+
+bool valid_beam(const geLinuxRender_Beam &beam) {
+    return valid_vector(beam.Start) && valid_vector(beam.End) &&
+           std::isfinite(beam.Red) && std::isfinite(beam.Green) &&
+           std::isfinite(beam.Blue) && std::isfinite(beam.Alpha) &&
+           std::isfinite(beam.Width) &&
+           std::isfinite(beam.LifetimeSeconds) && beam.Width > 0.0f &&
+           beam.Red >= 0.0f && beam.Red <= 1.0f &&
+           beam.Green >= 0.0f && beam.Green <= 1.0f &&
+           beam.Blue >= 0.0f && beam.Blue <= 1.0f &&
+           beam.Alpha >= 0.0f && beam.Alpha <= 1.0f &&
+           beam.Width <= 1024.0f && beam.LifetimeSeconds > 0.0 &&
+           beam.LifetimeSeconds <= 60.0;
+}
+
+void render_runtime_beams(const geLinuxRender_Runtime *runtime,
+                          const CameraBasis &basis) {
+    if (!runtime || runtime->beams.empty())
+        return;
+    glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
+                 GL_TEXTURE_BIT | GL_CURRENT_BIT);
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    glBegin(GL_QUADS);
+    for (const RuntimeBeam &runtime_beam : runtime->beams) {
+        const geLinuxRender_Beam &beam = runtime_beam.beam;
+        const double half_width = static_cast<double>(beam.Width) * 0.5;
+        const double rx = basis.right.x * half_width;
+        const double ry = basis.right.y * half_width;
+        const double rz = basis.right.z * half_width;
+        glColor4f(beam.Red, beam.Green, beam.Blue, beam.Alpha);
+        glVertex3d(beam.Start.X - rx, beam.Start.Y - ry, beam.Start.Z - rz);
+        glVertex3d(beam.Start.X + rx, beam.Start.Y + ry, beam.Start.Z + rz);
+        glVertex3d(beam.End.X + rx, beam.End.Y + ry, beam.End.Z + rz);
+        glVertex3d(beam.End.X - rx, beam.End.Y - ry, beam.End.Z - rz);
+    }
+    glEnd();
+    glPopAttrib();
 }
 
 std::string normalized_motion_name(const char *name) {
@@ -393,11 +441,13 @@ extern "C" int geLinuxRender_LoadMap(geLinuxRender_Runtime *runtime,
     runtime->face_cache = std::move(replacement_cache);
     runtime->lighting_state = NativeLightingState{};
     runtime->diagnostics = RenderDiagnostics{};
+    runtime->beams.clear();
     runtime->player_physics = PlayerPhysics{};
     runtime->movement_input = HeldMovementInput{};
     runtime->fire_button = false;
     runtime->quick_save_requested = false;
     runtime->quick_load_requested = false;
+    runtime->weapon_slot_requested = -1;
     runtime->camera = initial_camera(runtime->world);
     runtime->model_visibility.assign(
         geLinuxRender_GetWorldModelCount(runtime), 1U);
@@ -419,6 +469,7 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
     if (!runtime || !input)
         return 0;
     *input = geLinuxRender_Input{};
+    input->WeaponSlot = -1;
     if (runtime->headless)
         return 1;
 
@@ -444,6 +495,13 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
             if (event.key.repeat == 0 &&
                 event.key.keysym.scancode == SDL_SCANCODE_F10)
                 runtime->quick_load_requested = true;
+            if (event.key.repeat == 0 &&
+                event.key.keysym.scancode >= SDL_SCANCODE_1 &&
+                event.key.keysym.scancode <= SDL_SCANCODE_9) {
+                runtime->weapon_slot_requested =
+                    static_cast<int>(event.key.keysym.scancode -
+                                     SDL_SCANCODE_1);
+            }
             set_movement_key(&runtime->movement_input,
                              event.key.keysym.scancode, true);
         } else if (event.type == SDL_KEYUP) {
@@ -479,8 +537,10 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
     input->Fire = runtime->fire_button;
     input->QuickSave = runtime->quick_save_requested ? 1 : 0;
     input->QuickLoad = runtime->quick_load_requested ? 1 : 0;
+    input->WeaponSlot = runtime->weapon_slot_requested;
     runtime->quick_save_requested = false;
     runtime->quick_load_requested = false;
+    runtime->weapon_slot_requested = -1;
     input->QuitRequested = runtime->close_requested;
     return 1;
 }
@@ -531,6 +591,14 @@ extern "C" int geLinuxRender_AdvanceSimulation(
     if (!runtime || !std::isfinite(fixed_delta_seconds) ||
         fixed_delta_seconds < 0.0)
         return 0;
+    for (RuntimeBeam &beam : runtime->beams)
+        beam.remaining -= fixed_delta_seconds;
+    runtime->beams.erase(
+        std::remove_if(runtime->beams.begin(), runtime->beams.end(),
+                       [](const RuntimeBeam &beam) {
+                           return beam.remaining <= 0.0;
+                       }),
+        runtime->beams.end());
     if (!runtime->headless) {
         for (auto &actor : runtime->actors) {
             if (actor)
@@ -585,6 +653,7 @@ extern "C" int geLinuxRender_RenderFrame(geLinuxRender_Runtime *runtime) {
         if (actor && actor->visible)
             render_native_actor(&actor->native, &runtime->diagnostics);
     }
+    render_runtime_beams(runtime, basis);
     if (runtime->overlay_callback)
         runtime->overlay_callback(runtime->overlay_context,
                                   runtime->framebuffer_width,
@@ -605,7 +674,24 @@ extern "C" int geLinuxRender_GetFrameStats(
     stats->VisibleFaces = runtime->diagnostics.visible_faces;
     stats->SubmodelFaces = runtime->diagnostics.submodel_faces;
     stats->ActorPrimitives = runtime->diagnostics.actor_submissions;
+    stats->EffectPrimitives = static_cast<uint64_t>(runtime->beams.size());
     return 1;
+}
+
+extern "C" int geLinuxRender_SubmitBeam(
+    geLinuxRender_Runtime *runtime, const geLinuxRender_Beam *beam) {
+    if (!runtime || !beam || !valid_beam(*beam))
+        return 0;
+    RuntimeBeam runtime_beam;
+    runtime_beam.beam = *beam;
+    runtime_beam.remaining = beam->LifetimeSeconds;
+    runtime->beams.push_back(runtime_beam);
+    return 1;
+}
+
+extern "C" size_t geLinuxRender_GetTransientEffectCount(
+    const geLinuxRender_Runtime *runtime) {
+    return runtime ? runtime->beams.size() : 0U;
 }
 
 extern "C" int geLinuxRender_GetEntityOrigin(

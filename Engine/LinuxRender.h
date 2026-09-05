@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 9u
+#define GE_LINUX_RENDER_API_VERSION 10u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -46,6 +46,7 @@ typedef struct geLinuxRender_Input {
     int Fire;
     int QuickSave;
     int QuickLoad;
+    int WeaponSlot;
     int QuitRequested;
 } geLinuxRender_Input;
 
@@ -68,7 +69,19 @@ typedef struct geLinuxRender_FrameStats {
     uint64_t VisibleFaces;
     uint64_t SubmodelFaces;
     uint64_t ActorPrimitives;
+    uint64_t EffectPrimitives;
 } geLinuxRender_FrameStats;
+
+typedef struct geLinuxRender_Beam {
+    geLinuxRender_Vec3 Start;
+    geLinuxRender_Vec3 End;
+    float Red;
+    float Green;
+    float Blue;
+    float Alpha;
+    float Width;
+    double LifetimeSeconds;
+} geLinuxRender_Beam;
 
 typedef struct geLinuxRender_Config {
     uint32_t StructSize;
@@ -115,6 +128,10 @@ int geLinuxRender_RenderFrame(geLinuxRender_Runtime *Runtime);
 int geLinuxRender_ShouldClose(const geLinuxRender_Runtime *Runtime);
 int geLinuxRender_GetFrameStats(const geLinuxRender_Runtime *Runtime,
                                 geLinuxRender_FrameStats *Stats);
+int geLinuxRender_SubmitBeam(geLinuxRender_Runtime *Runtime,
+                             const geLinuxRender_Beam *Beam);
+size_t geLinuxRender_GetTransientEffectCount(
+    const geLinuxRender_Runtime *Runtime);
 
 int geLinuxRender_GetEntityOrigin(const geLinuxRender_Runtime *Runtime,
                                   const char *ClassName,
