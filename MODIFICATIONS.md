@@ -82,3 +82,5 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
 - Added the version-20 protected world-space callback. Applications can draw
   transient world presentation after BSP geometry while the renderer brackets
   the callback with complete OpenGL attribute and matrix restoration.
+- Enabled negotiated 4x multisample anti-aliasing in both the reusable runtime
+  and standalone harness, with a non-MSAA window-format fallback.
