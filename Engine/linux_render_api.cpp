@@ -29,6 +29,7 @@ struct geLinuxRender_Runtime {
     PlayerCamera camera{{0.0, 0.0, 0.0}, 0.0, 0.0, 400.0};
     PlayerPhysics player_physics;
     HeldMovementInput movement_input;
+    bool fire_button = false;
 };
 
 namespace {
@@ -259,6 +260,12 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
         } else if (event.type == SDL_MOUSEMOTION) {
             input->LookDeltaX += static_cast<double>(event.motion.xrel);
             input->LookDeltaY += static_cast<double>(event.motion.yrel);
+        } else if (event.type == SDL_MOUSEBUTTONDOWN &&
+                   event.button.button == SDL_BUTTON_LEFT) {
+            runtime->fire_button = true;
+        } else if (event.type == SDL_MOUSEBUTTONUP &&
+                   event.button.button == SDL_BUTTON_LEFT) {
+            runtime->fire_button = false;
         } else if (event.type == SDL_KEYDOWN) {
             set_movement_key(&runtime->movement_input,
                              event.key.keysym.scancode, true);
@@ -280,6 +287,7 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
             } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                 SDL_SetRelativeMouseMode(SDL_FALSE);
                 runtime->movement_input = HeldMovementInput{};
+                runtime->fire_button = false;
             }
         }
     }
@@ -291,6 +299,7 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
                        (held.left_a || held.left_arrow ? 1.0 : 0.0);
     input->Sprint = held.sprint_left || held.sprint_right;
     input->Jump = held.jump_space;
+    input->Fire = runtime->fire_button;
     input->QuitRequested = runtime->close_requested;
     return 1;
 }
@@ -410,6 +419,46 @@ extern "C" int geLinuxRender_GetEntityModelBounds(
     const geWorld_Model &model = runtime->world->CurrentBSP->Models[model_number];
     bounds->Minimum = {model.Mins.X, model.Mins.Y, model.Mins.Z};
     bounds->Maximum = {model.Maxs.X, model.Maxs.Y, model.Maxs.Z};
+    return 1;
+}
+
+extern "C" int geLinuxRender_TraceWorld(
+    const geLinuxRender_Runtime *runtime, const geLinuxRender_Vec3 *start,
+    const geLinuxRender_Vec3 *end, geLinuxRender_TraceResult *result) {
+    if (!runtime || !runtime->world || !start || !end || !result)
+        return 0;
+    const auto finite = [](const geLinuxRender_Vec3 &point) {
+        return std::isfinite(point.X) && std::isfinite(point.Y) &&
+               std::isfinite(point.Z);
+    };
+    if (!finite(*start) || !finite(*end))
+        return 0;
+
+    *result = geLinuxRender_TraceResult{};
+    const geVec3d front{static_cast<geFloat>(start->X),
+                        static_cast<geFloat>(start->Y),
+                        static_cast<geFloat>(start->Z)};
+    const geVec3d back{static_cast<geFloat>(end->X),
+                       static_cast<geFloat>(end->Y),
+                       static_cast<geFloat>(end->Z)};
+    GE_Collision collision{};
+    if (geWorld_Collision(runtime->world, nullptr, nullptr, &front, &back,
+                          GE_CONTENTS_SOLID_CLIP, GE_COLLIDE_ALL,
+                          0xffffffffU, nullptr, nullptr,
+                          &collision) == GE_FALSE) {
+        return 1;
+    }
+
+    result->Hit = 1;
+    result->Kind = collision.Actor ? GE_LINUX_RENDER_HIT_ACTOR
+                   : collision.Mesh ? GE_LINUX_RENDER_HIT_MESH
+                   : GE_LINUX_RENDER_HIT_WORLD_MODEL;
+    result->Impact = {collision.Impact.X, collision.Impact.Y,
+                      collision.Impact.Z};
+    result->Normal = {collision.Plane.Normal.X, collision.Plane.Normal.Y,
+                      collision.Plane.Normal.Z};
+    result->Fraction = (std::max)(0.0, (std::min)(1.0,
+        static_cast<double>(collision.Ratio)));
     return 1;
 }
 
