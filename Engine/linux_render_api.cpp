@@ -279,6 +279,65 @@ extern "C" void geLinuxRender_Destroy(geLinuxRender_Runtime *runtime) {
     release_runtime(runtime);
 }
 
+extern "C" int geLinuxRender_LoadMap(geLinuxRender_Runtime *runtime,
+                                      const char *map_path) {
+    render_api_error.clear();
+    if (!runtime || !map_path || !*map_path) {
+        set_api_error("invalid map reload request");
+        return 0;
+    }
+
+    geWorld *replacement_world = load_world(map_path);
+    if (!replacement_world) {
+        set_api_error("Genesis3D could not load the replacement map");
+        return 0;
+    }
+
+    NativeTextureSet replacement_textures;
+    NativeFaceCache replacement_cache;
+    if (!runtime->headless) {
+        if (SDL_GL_MakeCurrent(runtime->window, runtime->context) != 0) {
+            set_api_error(std::string("could not activate OpenGL context for map reload: ") +
+                          SDL_GetError());
+            geWorld_Free(replacement_world);
+            return 0;
+        }
+        if (!upload_world_textures(replacement_world, &replacement_textures) ||
+            !build_face_cache(replacement_world, &replacement_cache)) {
+            destroy_face_cache(&replacement_cache);
+            destroy_world_textures(&replacement_textures);
+            geWorld_Free(replacement_world);
+            set_api_error("could not initialize replacement world caches");
+            return 0;
+        }
+    }
+
+    destroy_face_cache(&runtime->face_cache);
+    destroy_world_textures(&runtime->world_textures);
+    geWorld_Free(runtime->world);
+    runtime->world = replacement_world;
+    runtime->world_textures = std::move(replacement_textures);
+    runtime->face_cache = std::move(replacement_cache);
+    runtime->lighting_state = NativeLightingState{};
+    runtime->diagnostics = RenderDiagnostics{};
+    runtime->player_physics = PlayerPhysics{};
+    runtime->movement_input = HeldMovementInput{};
+    runtime->fire_button = false;
+    runtime->actor_visible = true;
+    runtime->camera = initial_camera(runtime->world);
+    place_runtime_actor_at_default(runtime);
+    if (!runtime->headless) {
+        advance_light_styles(runtime->world, &runtime->world_textures,
+                             &runtime->lighting_state, 0.0,
+                             &runtime->diagnostics);
+        mark_dynamic_lightmaps(runtime->world, &runtime->world_textures,
+                               &runtime->lighting_state);
+    }
+    std::fprintf(stderr,
+                 "Genesis3D render API: replacement map committed atomically\n");
+    return 1;
+}
+
 extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
                                         geLinuxRender_Input *input) {
     if (!runtime || !input)

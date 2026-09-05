@@ -11,7 +11,7 @@ engine structures.
 
 ## Solution
 
-Render API version 2 adds `geLinuxRender_TraceWorld`. The call accepts finite
+Render API version 3 includes `geLinuxRender_TraceWorld`. The call accepts finite
 world-space endpoints and returns API success independently from hit/miss. A hit
 contains a normalized engine hit category, impact point, surface normal, and
 segment fraction; it never exposes engine-owned pointers across the shared
@@ -28,7 +28,8 @@ game-state tests use the real ACT parser safely without creating a window.
 
 A generic pre-swap overlay callback lets an application render its own 2D UI
 while the engine's OpenGL context is current. The engine stores no health, ammo,
-crosshair, menu, or other game-specific presentation state.
+crosshair, menu, or other game-specific presentation state. Version 3 also
+adds the atomic map reload described in `MAP_RELOAD_API.md`.
 
 ## Verification
 
