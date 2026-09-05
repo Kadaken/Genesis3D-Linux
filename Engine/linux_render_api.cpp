@@ -510,6 +510,8 @@ geLinuxRender_Create(const geLinuxRender_Config *config) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
     const int width = config->Width > 0 ? config->Width : kWidth;
     const int height = config->Height > 0 ? config->Height : kHeight;
@@ -518,6 +520,14 @@ geLinuxRender_Create(const geLinuxRender_Config *config) {
     runtime->window = SDL_CreateWindow(
         title, config->WindowX, config->WindowY, width, height,
         SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
+    if (!runtime->window) {
+        SDL_ClearError();
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+        runtime->window = SDL_CreateWindow(
+            title, config->WindowX, config->WindowY, width, height,
+            SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
+    }
     if (!runtime->window) {
         set_api_error(std::string("SDL window creation failed: ") + SDL_GetError());
         release_runtime(runtime);
@@ -561,6 +571,12 @@ geLinuxRender_Create(const geLinuxRender_Config *config) {
     glViewport(0, 0, runtime->framebuffer_width, runtime->framebuffer_height);
     glClearColor(0.04f, 0.06f, 0.10f, 1.0f);
     glClearDepth(1.0);
+    int multisample_buffers = 0;
+    int multisample_samples = 0;
+    SDL_GL_GetAttribute(SDL_GL_MULTISAMPLEBUFFERS, &multisample_buffers);
+    SDL_GL_GetAttribute(SDL_GL_MULTISAMPLESAMPLES, &multisample_samples);
+    if (multisample_buffers > 0 && multisample_samples > 0)
+        glEnable(GL_MULTISAMPLE);
 
     if (!upload_world_textures(runtime->world, &runtime->world_textures) ||
         !build_face_cache(runtime->world, &runtime->face_cache)) {
@@ -577,8 +593,9 @@ geLinuxRender_Create(const geLinuxRender_Config *config) {
     mark_dynamic_lightmaps(runtime->world, &runtime->world_textures,
                            &runtime->lighting_state);
     std::fprintf(stderr,
-                 "Genesis3D render API: initialized in-process runtime (%s)\n",
-                 runtime->input_capture_enabled ? "interactive" : "no input capture");
+                 "Genesis3D render API: initialized in-process runtime (%s, MSAA %dx)\n",
+                 runtime->input_capture_enabled ? "interactive" : "no input capture",
+                 multisample_buffers > 0 ? multisample_samples : 0);
     return runtime;
 }
 

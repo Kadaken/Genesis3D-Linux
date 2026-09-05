@@ -116,6 +116,11 @@ geometry with camera matrices active; the renderer restores its OpenGL state and
 matrices before continuing. Dynamic
 surface decoding and all other game policy remain outside the engine target.
 
+Visible runtimes request a four-sample multisampled framebuffer and enable
+OpenGL multisampling when the driver grants it. Window creation automatically
+retries without multisampling on systems that cannot provide that format, so
+anti-aliasing improves supported hardware without becoming a startup gate.
+
 The intended per-frame order is:
 
 1. `geLinuxRender_PollInput`;

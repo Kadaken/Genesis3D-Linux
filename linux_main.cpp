@@ -2007,10 +2007,20 @@ int main() {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
     SDL_Window *window = SDL_CreateWindow(
         "Genesis3D Linux", window_x, window_y, kWidth, kHeight,
         SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
+    if (!window) {
+        SDL_ClearError();
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+        window = SDL_CreateWindow(
+            "Genesis3D Linux", window_x, window_y, kWidth, kHeight,
+            SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
+    }
     if (!window) {
         std::fprintf(stderr, "Genesis3D Linux: SDL2 OpenGL window creation failed: %s\n",
                      SDL_GetError());
@@ -2081,6 +2091,14 @@ int main() {
     glViewport(0, 0, kWidth, kHeight);
     glClearColor(0.04f, 0.06f, 0.10f, 1.0f);
     glClearDepth(1.0);
+    int multisample_buffers = 0;
+    int multisample_samples = 0;
+    SDL_GL_GetAttribute(SDL_GL_MULTISAMPLEBUFFERS, &multisample_buffers);
+    SDL_GL_GetAttribute(SDL_GL_MULTISAMPLESAMPLES, &multisample_samples);
+    if (multisample_buffers > 0 && multisample_samples > 0)
+        glEnable(GL_MULTISAMPLE);
+    std::fprintf(stderr, "Genesis3D Linux: MSAA %dx\n",
+                 multisample_buffers > 0 ? multisample_samples : 0);
 
     NativeTextureSet world_textures;
     if (!upload_world_textures(world, &world_textures)) {
