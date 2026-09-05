@@ -22,3 +22,5 @@ descriptions.
 - `COMMUNITY_ENGINE_ROADMAP.md` lists engine-only contribution priorities.
 - `PUBLICATION_ACCURACY_LEGAL_AUDIT.md` records the public-site, provenance,
   licensing, and claims review completed before wider promotion.
+- `GAME_INTEGRATION_READINESS.md` records the boundary between the working
+  native engine sandbox and a complete playable game.
