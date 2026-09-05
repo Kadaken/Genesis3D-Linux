@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 1u
+#define GE_LINUX_RENDER_API_VERSION 2u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -43,8 +43,24 @@ typedef struct geLinuxRender_Input {
     double LookDeltaY;
     int Sprint;
     int Jump;
+    int Fire;
     int QuitRequested;
 } geLinuxRender_Input;
+
+typedef enum geLinuxRender_HitKind {
+    GE_LINUX_RENDER_HIT_NONE = 0,
+    GE_LINUX_RENDER_HIT_WORLD_MODEL = 1,
+    GE_LINUX_RENDER_HIT_MESH = 2,
+    GE_LINUX_RENDER_HIT_ACTOR = 3
+} geLinuxRender_HitKind;
+
+typedef struct geLinuxRender_TraceResult {
+    int Hit;
+    geLinuxRender_HitKind Kind;
+    geLinuxRender_Vec3 Impact;
+    geLinuxRender_Vec3 Normal;
+    double Fraction;
+} geLinuxRender_TraceResult;
 
 typedef struct geLinuxRender_Config {
     uint32_t StructSize;
@@ -87,6 +103,12 @@ int geLinuxRender_GetEntityModelBounds(const geLinuxRender_Runtime *Runtime,
                                        const char *ClassName,
                                        size_t EntityIndex,
                                        geLinuxRender_Aabb *Bounds);
+
+/* Returns API success separately from Result->Hit so a clean miss is valid. */
+int geLinuxRender_TraceWorld(const geLinuxRender_Runtime *Runtime,
+                             const geLinuxRender_Vec3 *Start,
+                             const geLinuxRender_Vec3 *End,
+                             geLinuxRender_TraceResult *Result);
 
 const char *geLinuxRender_GetLastError(void);
 
