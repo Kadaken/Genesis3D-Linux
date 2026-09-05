@@ -26,6 +26,10 @@ struct RuntimeBeam {
     double remaining = 0.0;
 };
 
+struct RuntimeLight {
+    geLight *native = nullptr;
+};
+
 struct geLinuxRender_Runtime {
     geWorld *world = nullptr;
     SDL_Window *window = nullptr;
@@ -40,6 +44,7 @@ struct geLinuxRender_Runtime {
     NativeFaceCache face_cache;
     std::vector<std::unique_ptr<RuntimeActor>> actors;
     std::vector<RuntimeBeam> beams;
+    std::vector<RuntimeLight> dynamic_lights;
     std::vector<uint8_t> model_visibility;
     NativeLightingState lighting_state;
     RenderDiagnostics diagnostics;
@@ -65,6 +70,18 @@ void set_api_error(const std::string &message) {
     std::fprintf(stderr, "Genesis3D render API: %s\n", message.c_str());
 }
 
+void clear_runtime_lights(geLinuxRender_Runtime *runtime) {
+    if (!runtime)
+        return;
+    if (runtime->world) {
+        for (RuntimeLight &light : runtime->dynamic_lights) {
+            if (light.native)
+                geWorld_RemoveLight(runtime->world, light.native);
+        }
+    }
+    runtime->dynamic_lights.clear();
+}
+
 void release_runtime(geLinuxRender_Runtime *runtime) {
     if (!runtime)
         return;
@@ -75,6 +92,7 @@ void release_runtime(geLinuxRender_Runtime *runtime) {
             destroy_native_actor(&actor->native);
     }
     runtime->actors.clear();
+    clear_runtime_lights(runtime);
     destroy_face_cache(&runtime->face_cache);
     destroy_world_textures(&runtime->world_textures);
     if (runtime->context)
@@ -163,6 +181,38 @@ bool valid_beam(const geLinuxRender_Beam &beam) {
            beam.Alpha >= 0.0f && beam.Alpha <= 1.0f &&
            beam.Width <= 1024.0f && beam.LifetimeSeconds > 0.0 &&
            beam.LifetimeSeconds <= 60.0;
+}
+
+bool valid_light(const geLinuxRender_Vec3 &position,
+                 const geLinuxRender_Color3 &color, double radius) {
+    return valid_vector(position) && std::isfinite(color.Red) &&
+           std::isfinite(color.Green) && std::isfinite(color.Blue) &&
+           color.Red >= 0.0f && color.Red <= 255.0f &&
+           color.Green >= 0.0f && color.Green <= 255.0f &&
+           color.Blue >= 0.0f && color.Blue <= 255.0f &&
+           std::isfinite(radius) && radius > 0.0 && radius <= 65536.0;
+}
+
+int set_runtime_light(geLinuxRender_Runtime *runtime, RuntimeLight &light,
+                      const geLinuxRender_Vec3 &position,
+                      const geLinuxRender_Color3 &color, double radius) {
+    if (!runtime || !runtime->world || !light.native ||
+        !valid_light(position, color, radius))
+        return 0;
+    const geVec3d native_position{
+        static_cast<geFloat>(position.X),
+        static_cast<geFloat>(position.Y),
+        static_cast<geFloat>(position.Z)};
+    const GE_RGBA native_color{color.Red, color.Green, color.Blue, 255.0f};
+    if (!geWorld_SetLightAttributes(runtime->world, light.native,
+                                    &native_position, &native_color,
+                                    static_cast<geFloat>(radius), GE_FALSE))
+        return 0;
+    if (!runtime->headless) {
+        mark_dynamic_lightmaps(runtime->world, &runtime->world_textures,
+                               &runtime->lighting_state);
+    }
+    return 1;
 }
 
 void render_runtime_beams(const geLinuxRender_Runtime *runtime,
@@ -436,6 +486,7 @@ extern "C" int geLinuxRender_LoadMap(geLinuxRender_Runtime *runtime,
         }
     }
 
+    clear_runtime_lights(runtime);
     destroy_face_cache(&runtime->face_cache);
     destroy_world_textures(&runtime->world_textures);
     geWorld_Free(runtime->world);
@@ -764,6 +815,8 @@ extern "C" int geLinuxRender_GetFrameStats(
     stats->SubmodelFaces = runtime->diagnostics.submodel_faces;
     stats->ActorPrimitives = runtime->diagnostics.actor_submissions;
     stats->EffectPrimitives = static_cast<uint64_t>(runtime->beams.size());
+    stats->DynamicLights = runtime->diagnostics.dynamic_lights;
+    stats->RegeneratedLightmaps = runtime->diagnostics.regenerated_lightmaps;
     return 1;
 }
 
@@ -781,6 +834,51 @@ extern "C" int geLinuxRender_SubmitBeam(
 extern "C" size_t geLinuxRender_GetTransientEffectCount(
     const geLinuxRender_Runtime *runtime) {
     return runtime ? runtime->beams.size() : 0U;
+}
+
+extern "C" int geLinuxRender_CreateDynamicLight(
+    geLinuxRender_Runtime *runtime, const geLinuxRender_Vec3 *position,
+    const geLinuxRender_Color3 *color, double radius, size_t *light_index) {
+    if (!runtime || !runtime->world || !position || !color || !light_index ||
+        !valid_light(*position, *color, radius))
+        return 0;
+    RuntimeLight light;
+    light.native = geWorld_AddLight(runtime->world);
+    if (!light.native)
+        return 0;
+    if (!set_runtime_light(runtime, light, *position, *color, radius)) {
+        geWorld_RemoveLight(runtime->world, light.native);
+        return 0;
+    }
+    runtime->dynamic_lights.push_back(light);
+    *light_index = runtime->dynamic_lights.size() - 1U;
+    return 1;
+}
+
+extern "C" int geLinuxRender_SetDynamicLight(
+    geLinuxRender_Runtime *runtime, size_t light_index,
+    const geLinuxRender_Vec3 *position,
+    const geLinuxRender_Color3 *color, double radius) {
+    if (!runtime || !position || !color ||
+        light_index >= runtime->dynamic_lights.size())
+        return 0;
+    return set_runtime_light(runtime, runtime->dynamic_lights[light_index],
+                             *position, *color, radius);
+}
+
+extern "C" int geLinuxRender_RemoveDynamicLight(
+    geLinuxRender_Runtime *runtime, size_t light_index) {
+    if (!runtime || !runtime->world ||
+        light_index >= runtime->dynamic_lights.size() ||
+        !runtime->dynamic_lights[light_index].native)
+        return 0;
+    geWorld_RemoveLight(runtime->world,
+                        runtime->dynamic_lights[light_index].native);
+    runtime->dynamic_lights[light_index].native = nullptr;
+    if (!runtime->headless)
+        mark_dynamic_lightmaps(runtime->world, &runtime->world_textures,
+                               &runtime->lighting_state);
+    return 1;
 }
 
 extern "C" int geLinuxRender_GetEntityOrigin(
