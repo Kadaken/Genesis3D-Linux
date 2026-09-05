@@ -4,68 +4,72 @@ Date: 2026-09-04
 
 ## Current state
 
-The scrolling bar contains one current news item:
+The scrolling bar carries the three current Kadaken updates:
 
-> CodeOp 4.0 Beta 34 is now open for testing
+1. Agent Workbench Native 4.17.0 is available.
+2. Genesis3D now has a native Linux runtime.
+3. CodeOp 4.0 Beta 34 is open for testing.
 
-The duplicate seen in the HTML is only an `aria-hidden` animation clone used to
-make the same sentence scroll continuously. It is not a second news item.
+The whole set is duplicated once in the HTML only to make the animation loop
+smoothly. The copy is hidden from assistive technology and is not a second set
+of news.
 
 ## Single source of truth
 
-Edit this file in the Kadaken website repository:
+The ordered news list lives in `news.json` in the Kadaken website repository.
+Remove stale items, add timely ones, and arrange them in display order there.
 
-```text
-news.json
-```
+Agent Workbench and CodeOp use version placeholders. The website fills those
+from each application's live update manifest—the same sources that supply the
+download versions. When CodeOp's manifest moves from `4.0.0-beta+34` to
+`4.0.0-beta+35`, the public wording automatically changes from “CodeOp 4.0
+Beta 34” to “CodeOp 4.0 Beta 35.” Agent Workbench updates the same way. The
+edge cache may take approximately 60 seconds to refresh.
 
-Current contents:
-
-```json
-{
-  "text": "CodeOp {{codeop.major_minor}} Beta {{codeop.beta}} is now open for testing",
-  "href": "#codeop"
-}
-```
-
-The placeholders are filled from CodeOp's live update manifest—the same source
-that supplies the website's download-button versions. When the manifest changes
-from `4.0.0-beta+34` to `4.0.0-beta+35`, the bar changes from Beta 34 to Beta 35
-automatically. The edge cache may take up to approximately 60 seconds to refresh.
-No Kadaken website edit or deployment is required for a normal CodeOp beta.
-
-If the manifest is temporarily unavailable, the page uses the generic fallback
-“CodeOp 4.0 beta testing is open” rather than displaying an obsolete number.
+The raw HTML uses version-free fallback wording. If a manifest is temporarily
+unavailable, the page does not advertise an obsolete version number.
 
 ## What to tell Codex or Claude
 
-For a normal CodeOp release:
+For a normal Agent Workbench or CodeOp release:
 
-> Publish the new CodeOp release and update its live release manifest. Verify
-> that Kadaken `/versions` and the homepage news bar show the new beta number.
+> Publish the application release and update its live release manifest. Verify
+> Kadaken `/versions` and the live news bar show the new version. Keep the other
+> current news items intact.
 
-For a completely different headline:
+To change which projects or announcements appear:
 
-> Update Kadaken headline news in `news.json`. Keep exactly one news item,
-> update its link, deploy the website, and verify `/versions` and the live
+> Update Kadaken news in `news.json`, retain all still-current items, remove
+> only stale items, deploy the website, and verify `/versions` and the live
 > homepage.
 
-For a non-CodeOp item, replace the `text` with ordinary text containing no
-placeholders and change `href` to its page or section. Changing `news.json`
-requires a website deployment.
+Editing `news.json` requires a website deployment. A routine version change
+does not require a website deployment after its application manifest is live.
 
-## Implementation and verification
+## CodeOp version wording
 
-- `functions/versions.js` reads `news.json` and the CodeOp manifest.
-- `functions/_middleware.js` inserts the current headline before HTML is sent.
-- `fill-versions.js` provides a browser-side refresh as a second path.
-- The HTML contains one meaningful headline plus one assistive-technology-hidden
-  copy for continuous animation.
-- Beta 34 live-manifest rendering: PASS.
-- Simulated manifest update to Beta 35 without an HTML edit: PASS.
+CodeOp's established Flutter/updater form is `4.0.0-beta+34`:
+
+- `4.0.0-beta` is the version name;
+- `34` is the build number; and
+- “CodeOp 4.0 Beta 34” is the intended reader-facing form.
+
+At the time of this check, `codeop-flutter/lib/main.dart`, the Rust package, and
+the live updater identify Beta 34. The checked-in Flutter `pubspec.yaml` and
+Rust lockfile still contain Beta 30 metadata. Those files should be synchronized
+by the next CodeOp release pass; they were not edited here to avoid colliding
+with concurrent CodeOp work.
+
+## Verification
+
+- Live-manifest rendering of all three news items: PASS.
+- Simulated Agent Workbench 4.18.0 update: PASS.
+- Simulated CodeOp Beta 35 update: PASS.
 - Desktop headless visual check: PASS.
+- JavaScript syntax checks: PASS.
 - HTML validation errors: 0.
 - Production `/versions` response: PASS.
 - Production homepage rendering: PASS.
 
-Website commits: `b696972`, `55c9e0e`.
+Website commit: `e6c3fef`.
+Cloudflare production deployment: `c59682a9`.
