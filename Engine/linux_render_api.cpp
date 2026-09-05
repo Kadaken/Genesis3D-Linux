@@ -723,6 +723,23 @@ extern "C" int geLinuxRender_StepPlayer(
     return 1;
 }
 
+extern "C" int geLinuxRender_SetPlayerMedium(
+    geLinuxRender_Runtime *runtime,
+    const geLinuxRender_PlayerMedium *medium) {
+    if (!runtime || !medium || !std::isfinite(medium->SpeedScale) ||
+        !std::isfinite(medium->GravityScale) ||
+        !std::isfinite(medium->SwimAcceleration) ||
+        medium->SpeedScale < 0.05 || medium->SpeedScale > 4.0 ||
+        medium->GravityScale < 0.0 || medium->GravityScale > 4.0 ||
+        medium->SwimAcceleration < 0.0 ||
+        medium->SwimAcceleration > 4000.0)
+        return 0;
+    runtime->player_physics.speed_scale = medium->SpeedScale;
+    runtime->player_physics.gravity_scale = medium->GravityScale;
+    runtime->player_physics.swim_acceleration = medium->SwimAcceleration;
+    return 1;
+}
+
 extern "C" int geLinuxRender_AdvanceSimulation(
     geLinuxRender_Runtime *runtime, double fixed_delta_seconds) {
     if (!runtime || !std::isfinite(fixed_delta_seconds) ||
