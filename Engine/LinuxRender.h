@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 12u
+#define GE_LINUX_RENDER_API_VERSION 13u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -72,6 +72,8 @@ typedef struct geLinuxRender_FrameStats {
     uint64_t SubmodelFaces;
     uint64_t ActorPrimitives;
     uint64_t EffectPrimitives;
+    uint64_t DynamicLights;
+    uint64_t RegeneratedLightmaps;
 } geLinuxRender_FrameStats;
 
 typedef struct geLinuxRender_Beam {
@@ -84,6 +86,12 @@ typedef struct geLinuxRender_Beam {
     float Width;
     double LifetimeSeconds;
 } geLinuxRender_Beam;
+
+typedef struct geLinuxRender_Color3 {
+    float Red;
+    float Green;
+    float Blue;
+} geLinuxRender_Color3;
 
 typedef struct geLinuxRender_Config {
     uint32_t StructSize;
@@ -138,6 +146,18 @@ int geLinuxRender_SubmitBeam(geLinuxRender_Runtime *Runtime,
                              const geLinuxRender_Beam *Beam);
 size_t geLinuxRender_GetTransientEffectCount(
     const geLinuxRender_Runtime *Runtime);
+int geLinuxRender_CreateDynamicLight(geLinuxRender_Runtime *Runtime,
+                                     const geLinuxRender_Vec3 *Position,
+                                     const geLinuxRender_Color3 *Color,
+                                     double Radius,
+                                     size_t *LightIndex);
+int geLinuxRender_SetDynamicLight(geLinuxRender_Runtime *Runtime,
+                                  size_t LightIndex,
+                                  const geLinuxRender_Vec3 *Position,
+                                  const geLinuxRender_Color3 *Color,
+                                  double Radius);
+int geLinuxRender_RemoveDynamicLight(geLinuxRender_Runtime *Runtime,
+                                     size_t LightIndex);
 
 int geLinuxRender_GetEntityOrigin(const geLinuxRender_Runtime *Runtime,
                                   const char *ClassName,
