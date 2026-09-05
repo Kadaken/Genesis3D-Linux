@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 17u
+#define GE_LINUX_RENDER_API_VERSION 18u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -115,6 +115,12 @@ typedef struct geLinuxRender_PlayerMedium {
     double SwimAcceleration;
 } geLinuxRender_PlayerMedium;
 
+typedef struct geLinuxRender_PlayerMovement {
+    double Gravity;
+    double JumpSpeed;
+    double StepHeight;
+} geLinuxRender_PlayerMovement;
+
 typedef struct geLinuxRender_MaterialInfo {
     int Width;
     int Height;
@@ -162,6 +168,11 @@ int geLinuxRender_StepPlayer(geLinuxRender_Runtime *Runtime,
  * while Jump is held and the player is not grounded. */
 int geLinuxRender_SetPlayerMedium(geLinuxRender_Runtime *Runtime,
                                  const geLinuxRender_PlayerMedium *Medium);
+/* Overrides bounded map-level movement coefficients. Values use native world
+ * units per second (or per second squared for gravity). */
+int geLinuxRender_SetPlayerMovement(
+    geLinuxRender_Runtime *Runtime,
+    const geLinuxRender_PlayerMovement *Movement);
 /* Clears transient velocity/contact/key-edge state after a game-owned restore. */
 int geLinuxRender_ResetPlayerPhysics(geLinuxRender_Runtime *Runtime);
 int geLinuxRender_AdvanceSimulation(geLinuxRender_Runtime *Runtime,

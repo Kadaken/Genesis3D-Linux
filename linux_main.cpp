@@ -93,6 +93,9 @@ struct PlayerPhysics {
     double speed_scale = 1.0;
     double gravity_scale = 1.0;
     double swim_acceleration = 0.0;
+    double gravity = 1200.0;
+    double jump_speed = 480.0;
+    double step_height = 18.0;
 };
 
 struct VFileRegistryGuard {
@@ -1010,7 +1013,7 @@ void update_player_movement(geWorld *world, PlayerCamera *camera,
     const bool jump_pressed = input.jump_space && !physics->jump_was_held;
     physics->jump_was_held = input.jump_space;
     if (jump_pressed && physics->grounded) {
-        physics->vertical_velocity = kJumpSpeed;
+        physics->vertical_velocity = physics->jump_speed;
         physics->grounded = false;
         ++physics->jump_count;
     }
@@ -1034,13 +1037,13 @@ void update_player_movement(geWorld *world, PlayerCamera *camera,
     if (physics->grounded && direct.blocked_horizontally &&
         length_squared(horizontal) > 1.0e-8) {
         const SlideResult raised = slide_player(
-            world, horizontal_start, {0.0, kStepHeight, 0.0});
+            world, horizontal_start, {0.0, physics->step_height, 0.0});
         if (!raised.hit_ceiling) {
             SlideResult stepped = slide_player(world, raised.position, horizontal);
             Vec3 step_floor{};
             Vec3 step_normal{};
             if (trace_support(world, stepped.position,
-                              kStepHeight + kGroundSnap,
+                              physics->step_height + kGroundSnap,
                               &step_floor, &step_normal)) {
                 const Vec3 direct_delta = subtract(direct.position, horizontal_start);
                 const Vec3 step_delta = subtract(step_floor, horizontal_start);
@@ -1062,7 +1065,7 @@ void update_player_movement(geWorld *world, PlayerCamera *camera,
     if (chosen.collided)
         ++physics->collision_count;
     physics->vertical_velocity -=
-        kGravity * physics->gravity_scale * delta_seconds;
+        physics->gravity * physics->gravity_scale * delta_seconds;
     if (!physics->grounded && input.jump_space &&
         physics->swim_acceleration > 0.0) {
         physics->vertical_velocity +=
