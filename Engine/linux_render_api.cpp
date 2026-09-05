@@ -584,6 +584,10 @@ geLinuxRender_Create(const geLinuxRender_Config *config) {
         release_runtime(runtime);
         return nullptr;
     }
+    std::fprintf(stderr,
+                 "Genesis3D render API: material filtering %s, anisotropy %.0fx\n",
+                 generate_mipmap_function() ? "trilinear mipmaps" : "bilinear",
+                 (std::min)(8.0f, material_anisotropy_limit()));
 
     load_runtime_actor(runtime, config->ActorDirectory, true);
     place_runtime_actor_at_default(runtime);
@@ -1260,6 +1264,7 @@ extern "C" int geLinuxRender_UpdateMaterialRGBA(
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA,
                     GL_UNSIGNED_BYTE, upload);
+    refresh_material_mipmaps();
     const GLenum upload_error = glGetError();
     glPixelStorei(GL_UNPACK_ALIGNMENT, previous_unpack_alignment);
     glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previous_binding));

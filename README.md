@@ -120,6 +120,10 @@ Visible runtimes request a four-sample multisampled framebuffer and enable
 OpenGL multisampling when the driver grants it. Window creation automatically
 retries without multisampling on systems that cannot provide that format, so
 anti-aliasing improves supported hardware without becoming a startup gate.
+World material textures also receive generated mip chains, trilinear minification,
+and up to 8x anisotropic filtering when supported. Runtime material replacement
+regenerates the mip chain so animated surfaces never sample stale lower levels.
+Lightmaps retain their original linear sampling and update path.
 
 The intended per-frame order is:
 

@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <dirent.h>
 #include <string>
 #include <sys/stat.h>
@@ -117,6 +118,55 @@ struct NativeTextureSet {
     std::vector<std::vector<uint8_t>> lightmap_pixels;
     std::vector<uint8_t> lightmap_dirty;
 };
+
+using GenerateMipmapFunction = void (*)(GLenum);
+
+GenerateMipmapFunction generate_mipmap_function() {
+    static GenerateMipmapFunction function = [] {
+        void *address = SDL_GL_GetProcAddress("glGenerateMipmap");
+        if (!address)
+            address = SDL_GL_GetProcAddress("glGenerateMipmapEXT");
+        return reinterpret_cast<GenerateMipmapFunction>(address);
+    }();
+    return function;
+}
+
+float material_anisotropy_limit() {
+    static const float limit = [] {
+        const auto *extensions = reinterpret_cast<const char *>(
+            glGetString(GL_EXTENSIONS));
+        if (!extensions || !std::strstr(
+                extensions, "GL_EXT_texture_filter_anisotropic"))
+            return 1.0f;
+        constexpr GLenum max_anisotropy = 0x84FF;
+        GLfloat maximum = 1.0f;
+        glGetFloatv(max_anisotropy, &maximum);
+        return (std::max)(1.0f, maximum);
+    }();
+    return limit;
+}
+
+void configure_material_sampling() {
+    GenerateMipmapFunction generate = generate_mipmap_function();
+    if (!generate) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        return;
+    }
+    generate(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_LINEAR_MIPMAP_LINEAR);
+    const float anisotropy = material_anisotropy_limit();
+    if (anisotropy > 1.0f) {
+        constexpr GLenum texture_anisotropy = 0x84FE;
+        glTexParameterf(GL_TEXTURE_2D, texture_anisotropy,
+                        (std::min)(8.0f, anisotropy));
+    }
+}
+
+void refresh_material_mipmaps() {
+    if (GenerateMipmapFunction generate = generate_mipmap_function())
+        generate(GL_TEXTURE_2D);
+}
 
 struct RenderDiagnostics {
     uint64_t visible_faces = 0;
@@ -234,12 +284,12 @@ bool upload_bitmap_texture(geBitmap *bitmap, GLuint *texture,
     while (glGetError() != GL_NO_ERROR) {}
     glGenTextures(1, texture);
     glBindTexture(GL_TEXTURE_2D, *texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, info.Width, info.Height, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+    configure_material_sampling();
     geBitmap_UnLock(lock);
     if (glGetError() != GL_NO_ERROR) {
         glDeleteTextures(1, texture);
@@ -2153,6 +2203,10 @@ int main() {
                  world_textures.lightmap_pixel_count
                      ? static_cast<double>(world_textures.lightmap_rgb_sum) /
                            (3.0 * world_textures.lightmap_pixel_count) : 0.0);
+    std::fprintf(stderr,
+                 "Genesis3D Linux: material filtering %s, anisotropy %.0fx\n",
+                 generate_mipmap_function() ? "trilinear mipmaps" : "bilinear",
+                 (std::min)(8.0f, material_anisotropy_limit()));
 
     SDL_SetWindowGrab(window,
                       input_capture_enabled ? SDL_TRUE : SDL_FALSE);
