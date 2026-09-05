@@ -110,7 +110,10 @@ submodel lookup and authored
 motion sampling, per-model render visibility, SDL input polling, fixed-step BSP
 player collision and bounded map-level movement coefficients, bounded
 world-material inspection/replacement, explicit
-camera submission, simulation advancement, and single-frame rendering. Dynamic
+camera submission, simulation advancement, protected world-space and 2D overlay
+callbacks, and single-frame rendering. The world callback executes after BSP
+geometry with camera matrices active; the renderer restores its OpenGL state and
+matrices before continuing. Dynamic
 surface decoding and all other game policy remain outside the engine target.
 
 The intended per-frame order is:
