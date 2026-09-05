@@ -1852,6 +1852,7 @@ geWorld *load_world(const std::string &map_path) {
 }
 }
 
+#ifndef GENESIS3D_RENDER_LIBRARY_IMPLEMENTATION
 int main() {
     std::signal(SIGINT, request_stop);
     std::signal(SIGTERM, request_stop);
@@ -2279,3 +2280,4 @@ int main() {
     geWorld_Free(world);
     return 0;
 }
+#endif

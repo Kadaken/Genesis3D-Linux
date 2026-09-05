@@ -29,6 +29,7 @@ Verified on one Fedora KDE system with AMD/Mesa:
   ceiling rejection in deterministic real-map fixtures;
 - 60 and 120 FPS presentation targets on the tested machine; and
 - normal SIGINT/SIGTERM teardown under the documented sanitizer checks.
+- a versioned in-process C renderer API exposed by `libgenesis3d_render.so`.
 
 Known limitations and the exact evidence boundary are documented in
 [Reports/VERIFICATION_SCOPE.md](Reports/VERIFICATION_SCOPE.md). In particular,
@@ -94,6 +95,29 @@ cmake --build build --parallel
 
 Compilation alone does not require proprietary game assets. Runtime validation
 does.
+
+## Native render library
+
+The CMake build produces both the original `genesis3d_linux` validation
+executable and `libgenesis3d_render.so.1`. Applications should include
+`Engine/LinuxRender.h` and link the `genesis3d_render` CMake target.
+
+The versioned C ABI provides opaque runtime ownership, exact-map loading,
+generic entity origin/model-bound queries, SDL input polling, fixed-step BSP
+player collision, explicit camera submission, simulation advancement, and
+single-frame rendering. Game code remains outside the engine target.
+
+The intended per-frame order is:
+
+1. `geLinuxRender_PollInput`;
+2. application-owned fixed-step state/physics updates, optionally using
+   `geLinuxRender_StepPlayer`;
+3. `geLinuxRender_SetCamera`;
+4. `geLinuxRender_AdvanceSimulation`; and
+5. `geLinuxRender_RenderFrame`.
+
+Create the runtime with `Headless = 1` for entity, collision, and lifecycle
+tests that must not initialize SDL/OpenGL or capture input.
 
 ## Development launch
 
