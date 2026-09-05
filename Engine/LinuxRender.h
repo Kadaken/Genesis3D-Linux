@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 5u
+#define GE_LINUX_RENDER_API_VERSION 6u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -62,6 +62,12 @@ typedef struct geLinuxRender_TraceResult {
     double Fraction;
 } geLinuxRender_TraceResult;
 
+typedef struct geLinuxRender_FrameStats {
+    uint64_t VisibleFaces;
+    uint64_t SubmodelFaces;
+    uint64_t ActorPrimitives;
+} geLinuxRender_FrameStats;
+
 typedef struct geLinuxRender_Config {
     uint32_t StructSize;
     uint32_t ApiVersion;
@@ -103,6 +109,8 @@ int geLinuxRender_AdvanceSimulation(geLinuxRender_Runtime *Runtime,
                                     double FixedDeltaSeconds);
 int geLinuxRender_RenderFrame(geLinuxRender_Runtime *Runtime);
 int geLinuxRender_ShouldClose(const geLinuxRender_Runtime *Runtime);
+int geLinuxRender_GetFrameStats(const geLinuxRender_Runtime *Runtime,
+                                geLinuxRender_FrameStats *Stats);
 
 int geLinuxRender_GetEntityOrigin(const geLinuxRender_Runtime *Runtime,
                                   const char *ClassName,
@@ -112,6 +120,30 @@ int geLinuxRender_GetEntityModelBounds(const geLinuxRender_Runtime *Runtime,
                                        const char *ClassName,
                                        size_t EntityIndex,
                                        geLinuxRender_Aabb *Bounds);
+int geLinuxRender_GetEntityModelIndex(const geLinuxRender_Runtime *Runtime,
+                                      const char *ClassName,
+                                      size_t EntityIndex,
+                                      size_t *ModelIndex);
+
+size_t geLinuxRender_GetWorldModelCount(const geLinuxRender_Runtime *Runtime);
+int geLinuxRender_FindWorldModel(const geLinuxRender_Runtime *Runtime,
+                                 const char *ModelName,
+                                 size_t *ModelIndex);
+int geLinuxRender_GetWorldModelBounds(const geLinuxRender_Runtime *Runtime,
+                                      size_t ModelIndex,
+                                      geLinuxRender_Aabb *Bounds);
+int geLinuxRender_SetWorldModelTransform(geLinuxRender_Runtime *Runtime,
+                                         size_t ModelIndex,
+                                         const geLinuxRender_Vec3 *Translation,
+                                         const geLinuxRender_Vec3 *EulerRadians);
+int geLinuxRender_GetWorldModelMotionExtents(
+    const geLinuxRender_Runtime *Runtime,
+    size_t ModelIndex,
+    double *StartSeconds,
+    double *EndSeconds);
+int geLinuxRender_SetWorldModelMotionTime(geLinuxRender_Runtime *Runtime,
+                                          size_t ModelIndex,
+                                          double TimeSeconds);
 
 /* Generic entity inspection. String functions return the required byte count
  * including the terminating NUL, or zero when the item does not exist. */

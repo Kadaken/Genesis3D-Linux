@@ -12,6 +12,7 @@
 #include <cstring>
 #include <memory>
 #include <new>
+#include <strings.h>
 
 struct RuntimeActor {
     NativeActor native;
@@ -549,6 +550,16 @@ extern "C" int geLinuxRender_ShouldClose(
     return !runtime || runtime->close_requested;
 }
 
+extern "C" int geLinuxRender_GetFrameStats(
+    const geLinuxRender_Runtime *runtime, geLinuxRender_FrameStats *stats) {
+    if (!runtime || !stats)
+        return 0;
+    stats->VisibleFaces = runtime->diagnostics.visible_faces;
+    stats->SubmodelFaces = runtime->diagnostics.submodel_faces;
+    stats->ActorPrimitives = runtime->diagnostics.actor_submissions;
+    return 1;
+}
+
 extern "C" int geLinuxRender_GetEntityOrigin(
     const geLinuxRender_Runtime *runtime, const char *class_name,
     size_t entity_index, geLinuxRender_Vec3 *origin) {
@@ -579,6 +590,130 @@ extern "C" int geLinuxRender_GetEntityModelBounds(
     bounds->Minimum = {model.Mins.X, model.Mins.Y, model.Mins.Z};
     bounds->Maximum = {model.Maxs.X, model.Maxs.Y, model.Maxs.Z};
     return 1;
+}
+
+extern "C" int geLinuxRender_GetEntityModelIndex(
+    const geLinuxRender_Runtime *runtime, const char *class_name,
+    size_t entity_index, size_t *model_index) {
+    geEntity *entity = entity_at(runtime, class_name, entity_index);
+    int32 model_number = -1;
+    if (!entity || !model_index || !runtime->world ||
+        !runtime->world->CurrentBSP ||
+        geEntity_GetModelNumForKey(entity, "Model", &model_number) != GE_TRUE ||
+        model_number <= 0 ||
+        model_number >= runtime->world->CurrentBSP->BSPData.NumGFXModels)
+        return 0;
+    *model_index = static_cast<size_t>(model_number);
+    return 1;
+}
+
+extern "C" size_t geLinuxRender_GetWorldModelCount(
+    const geLinuxRender_Runtime *runtime) {
+    return runtime && runtime->world && runtime->world->CurrentBSP &&
+                   runtime->world->CurrentBSP->BSPData.NumGFXModels > 0
+        ? static_cast<size_t>(
+              runtime->world->CurrentBSP->BSPData.NumGFXModels) : 0U;
+}
+
+extern "C" int geLinuxRender_FindWorldModel(
+    const geLinuxRender_Runtime *runtime, const char *model_name,
+    size_t *model_index) {
+    const size_t model_count = geLinuxRender_GetWorldModelCount(runtime);
+    if (!model_name || !*model_name || !model_index)
+        return 0;
+    for (size_t index = 1; index < model_count; ++index) {
+        const char *name = runtime->world->CurrentBSP->Models[index].Name;
+        if (name && strcasecmp(name, model_name) == 0) {
+            *model_index = index;
+            return 1;
+        }
+    }
+    geEntity_EntitySet *all_entities = geWorld_GetEntitySet(
+        runtime->world, nullptr);
+    geEntity *named_entity = all_entities
+        ? geEntity_EntitySetFindEntityByName(all_entities, model_name)
+        : nullptr;
+    int32 named_model = -1;
+    if (named_entity &&
+        geEntity_GetModelNumForKey(named_entity, "Model", &named_model) ==
+            GE_TRUE &&
+        named_model > 0 && static_cast<size_t>(named_model) < model_count) {
+        *model_index = static_cast<size_t>(named_model);
+        return 1;
+    }
+    return 0;
+}
+
+extern "C" int geLinuxRender_GetWorldModelBounds(
+    const geLinuxRender_Runtime *runtime, size_t model_index,
+    geLinuxRender_Aabb *bounds) {
+    const size_t model_count = geLinuxRender_GetWorldModelCount(runtime);
+    if (!bounds || model_index >= model_count)
+        return 0;
+    const geWorld_Model &model = runtime->world->CurrentBSP->Models[model_index];
+    bounds->Minimum = {model.TMins.X, model.TMins.Y, model.TMins.Z};
+    bounds->Maximum = {model.TMaxs.X, model.TMaxs.Y, model.TMaxs.Z};
+    return 1;
+}
+
+extern "C" int geLinuxRender_SetWorldModelTransform(
+    geLinuxRender_Runtime *runtime, size_t model_index,
+    const geLinuxRender_Vec3 *translation,
+    const geLinuxRender_Vec3 *euler_radians) {
+    const size_t model_count = geLinuxRender_GetWorldModelCount(runtime);
+    if (!translation || !euler_radians || model_index == 0 ||
+        model_index >= model_count || !valid_vector(*translation) ||
+        !valid_vector(*euler_radians))
+        return 0;
+    const geVec3d angles{static_cast<geFloat>(euler_radians->X),
+                         static_cast<geFloat>(euler_radians->Y),
+                         static_cast<geFloat>(euler_radians->Z)};
+    geXForm3d transform;
+    geXForm3d_SetEulerAngles(&transform, &angles);
+    transform.Translation = {static_cast<geFloat>(translation->X),
+                             static_cast<geFloat>(translation->Y),
+                             static_cast<geFloat>(translation->Z)};
+    return geWorld_SetModelXForm(
+               runtime->world,
+               &runtime->world->CurrentBSP->Models[model_index],
+               &transform) == GE_TRUE;
+}
+
+extern "C" int geLinuxRender_GetWorldModelMotionExtents(
+    const geLinuxRender_Runtime *runtime, size_t model_index,
+    double *start_seconds, double *end_seconds) {
+    const size_t model_count = geLinuxRender_GetWorldModelCount(runtime);
+    if (!start_seconds || !end_seconds || model_index == 0 ||
+        model_index >= model_count)
+        return 0;
+    geMotion *motion = geWorld_ModelGetMotion(
+        &runtime->world->CurrentBSP->Models[model_index]);
+    geFloat start = 0.0f;
+    geFloat end = 0.0f;
+    if (!motion || !geMotion_GetTimeExtents(motion, &start, &end) ||
+        end <= start || !geMotion_GetPath(motion, 0))
+        return 0;
+    *start_seconds = start;
+    *end_seconds = end;
+    return 1;
+}
+
+extern "C" int geLinuxRender_SetWorldModelMotionTime(
+    geLinuxRender_Runtime *runtime, size_t model_index,
+    double time_seconds) {
+    const size_t model_count = geLinuxRender_GetWorldModelCount(runtime);
+    if (model_index == 0 || model_index >= model_count ||
+        !std::isfinite(time_seconds))
+        return 0;
+    geWorld_Model *model =
+        &runtime->world->CurrentBSP->Models[model_index];
+    geMotion *motion = geWorld_ModelGetMotion(model);
+    gePath *path = motion ? geMotion_GetPath(motion, 0) : nullptr;
+    geXForm3d transform;
+    if (!path)
+        return 0;
+    gePath_Sample(path, static_cast<geFloat>(time_seconds), &transform);
+    return geWorld_SetModelXForm(runtime->world, model, &transform) == GE_TRUE;
 }
 
 extern "C" size_t geLinuxRender_GetEntityClassCount(

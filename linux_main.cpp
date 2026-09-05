@@ -115,6 +115,7 @@ struct RenderDiagnostics {
     uint64_t visible_faces = 0;
     uint64_t culled_faces = 0;
     uint64_t actor_submissions = 0;
+    uint64_t submodel_faces = 0;
     uint64_t translucent_submissions = 0;
     uint64_t animated_surfaces = 0;
     uint64_t dynamic_lights = 0;
@@ -128,6 +129,7 @@ struct RenderDiagnostics {
 struct FaceCommand {
     int32 index;
     double distance_squared;
+    int32 model_index;
 };
 
 struct NativeFaceCache {
@@ -771,7 +773,7 @@ bool validate_dynamic_light_cycle(geWorld *world, NativeTextureSet *textures,
         return false;
     }
     const std::vector<uint8_t> baseline = textures->lightmap_pixels[affected];
-    std::vector<FaceCommand> command {{affected, 0.0}};
+    std::vector<FaceCommand> command {{affected, 0.0, 0}};
     RenderDiagnostics ignored;
     regenerate_visible_lightmaps(world, textures, *state, command, &ignored);
     const bool brightened = textures->lightmap_pixels[affected] != baseline;
@@ -1596,7 +1598,44 @@ bool render_world_geometry(const geWorld *world,
             face.TexInfo < bsp.NumGFXTexInfo &&
             (bsp.GFXTexInfo[face.TexInfo].Flags & TEXINFO_TRANS);
         (is_translucent ? translucent : opaque).push_back(
-            {face_index, distance_squared});
+            {face_index, distance_squared, 0});
+    }
+    for (int32 model_index = 1; model_index < bsp.NumGFXModels;
+         ++model_index) {
+        const GFX_Model &bsp_model = bsp.GFXModels[model_index];
+        const int32 model_first = (std::max)(0, bsp_model.FirstFace);
+        const int32 model_final = (std::min)(
+            bsp.NumGFXFaces,
+            model_first + (std::max)(0, bsp_model.NumFaces));
+        for (int32 face_index = model_first; face_index < model_final;
+             ++face_index) {
+            const GFX_Face &face = bsp.GFXFaces[face_index];
+            double distance_squared = 0.0;
+            if (face.NumVerts > 0 && face.FirstVert >= 0 &&
+                face.FirstVert < bsp.NumGFXVertIndexList) {
+                const int32 vertex_index = bsp.GFXVertIndexList[face.FirstVert];
+                if (vertex_index >= 0 && vertex_index < bsp.NumGFXVerts) {
+                    geVec3d relative;
+                    geVec3d transformed;
+                    geVec3d_Subtract(&bsp.GFXVerts[vertex_index],
+                                     &bsp_model.Origin, &relative);
+                    geXForm3d_Transform(
+                        &world->CurrentBSP->Models[model_index].XForm,
+                        &relative, &transformed);
+                    geVec3d_Add(&transformed, &bsp_model.Origin,
+                                &transformed);
+                    const double dx = transformed.X - camera.position.x;
+                    const double dy = transformed.Y - camera.position.y;
+                    const double dz = transformed.Z - camera.position.z;
+                    distance_squared = dx * dx + dy * dy + dz * dz;
+                }
+            }
+            const bool is_translucent = face.TexInfo >= 0 &&
+                face.TexInfo < bsp.NumGFXTexInfo &&
+                (bsp.GFXTexInfo[face.TexInfo].Flags & TEXINFO_TRANS);
+            (is_translucent ? translucent : opaque).push_back(
+                {face_index, distance_squared, model_index});
+        }
     }
     std::sort(translucent.begin(), translucent.end(),
               [](const FaceCommand &left, const FaceCommand &right) {
@@ -1612,6 +1651,10 @@ bool render_world_geometry(const geWorld *world,
                                  diagnostics);
 
     diagnostics->visible_faces += commands.size();
+    for (const FaceCommand &command : commands) {
+        if (command.model_index > 0)
+            ++diagnostics->submodel_faces;
+    }
     diagnostics->translucent_submissions += translucent.size();
     diagnostics->dynamic_lights += world->LightInfo
         ? static_cast<uint64_t>(world->LightInfo->NumDynamicLights) : 0;
@@ -1627,7 +1670,33 @@ bool render_world_geometry(const geWorld *world,
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
     glTexCoordPointer(2, GL_FLOAT, sizeof(CachedFaceVertex),
                     reinterpret_cast<const void *>(offsetof(CachedFaceVertex, lightmap_uv)));
+    int32 active_model = 0;
+    const auto set_model_transform = [&](int32 model_index) {
+        if (model_index == active_model)
+            return;
+        if (active_model > 0)
+            glPopMatrix();
+        active_model = model_index;
+        if (active_model <= 0)
+            return;
+        const GFX_Model &bsp_model = bsp.GFXModels[active_model];
+        const geXForm3d &transform =
+            world->CurrentBSP->Models[active_model].XForm;
+        const GLfloat matrix[16] = {
+            transform.AX, transform.BX, transform.CX, 0.0f,
+            transform.AY, transform.BY, transform.CY, 0.0f,
+            transform.AZ, transform.BZ, transform.CZ, 0.0f,
+            transform.Translation.X, transform.Translation.Y,
+            transform.Translation.Z, 1.0f};
+        glPushMatrix();
+        glTranslatef(bsp_model.Origin.X, bsp_model.Origin.Y,
+                     bsp_model.Origin.Z);
+        glMultMatrixf(matrix);
+        glTranslatef(-bsp_model.Origin.X, -bsp_model.Origin.Y,
+                     -bsp_model.Origin.Z);
+    };
     for (const FaceCommand &command : commands) {
+        set_model_transform(command.model_index);
         const int32 face_index = command.index;
         const GFX_Face &face = bsp.GFXFaces[face_index];
         if (face.NumVerts < 3 || face.PlaneNum < 0 ||
@@ -1671,6 +1740,8 @@ bool render_world_geometry(const geWorld *world,
         }
     }
 
+    if (active_model > 0)
+        glPopMatrix();
     glClientActiveTexture(GL_TEXTURE1);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glClientActiveTexture(GL_TEXTURE0);

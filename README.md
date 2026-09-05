@@ -22,7 +22,7 @@ Verified on one Fedora KDE system with AMD/Mesa:
 - native x86-64 C/C++ build;
 - SDL2-owned X11/XWayland window and input;
 - OpenGL BSP geometry, textures, baked lightmaps, PVS selection, and
-  translucent ordering;
+  translucent ordering, including transformed door/platform submodels;
 - ACT/BODY loading, skeletal posing, and fixed-step animation playback;
 - runtime lightmap updates;
 - swept-hull BSP collision, gravity, jumping, stairs, slopes, wall sliding, and
@@ -103,9 +103,10 @@ executable and `libgenesis3d_render.so.1`. Applications should include
 `Engine/LinuxRender.h` and link the `genesis3d_render` CMake target.
 
 The versioned C ABI provides opaque runtime ownership, exact-map loading,
-generic entity origin/model-bound queries, SDL input polling, fixed-step BSP
-player collision, explicit camera submission, simulation advancement, and
-single-frame rendering. Game code remains outside the engine target.
+generic entity queries, multi-actor ownership, BSP submodel lookup and authored
+motion sampling, SDL input polling, fixed-step BSP player collision, explicit
+camera submission, simulation advancement, and single-frame rendering. Game
+code remains outside the engine target.
 
 The intended per-frame order is:
 
