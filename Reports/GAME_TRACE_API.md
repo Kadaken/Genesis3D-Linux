@@ -26,6 +26,10 @@ actor transform, dynamic-bounds, and visibility controls. Headless runtimes load
 actor geometry without issuing OpenGL texture calls, which lets collision and
 game-state tests use the real ACT parser safely without creating a window.
 
+A generic pre-swap overlay callback lets an application render its own 2D UI
+while the engine's OpenGL context is current. The engine stores no health, ammo,
+crosshair, menu, or other game-specific presentation state.
+
 ## Verification
 
 - Engine and standalone runtime build: PASS.
@@ -35,4 +39,5 @@ game-state tests use the real ACT parser safely without creating a window.
 - Clang ASan/UBSan trace lifecycle: PASS.
 - Actor load, transform, dynamic bounds, and death visibility submission: PASS.
 - Swept enemy hull movement against the real BSP: PASS.
+- Hidden Xvfb frame submission with a game-owned overlay callback: PASS.
 - Graphical window and input capture during automated tests: disabled.

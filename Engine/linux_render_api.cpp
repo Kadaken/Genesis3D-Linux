@@ -31,6 +31,8 @@ struct geLinuxRender_Runtime {
     HeldMovementInput movement_input;
     bool fire_button = false;
     bool actor_visible = true;
+    geLinuxRender_OverlayCallback overlay_callback = nullptr;
+    void *overlay_context = nullptr;
 };
 
 namespace {
@@ -417,6 +419,10 @@ extern "C" int geLinuxRender_RenderFrame(geLinuxRender_Runtime *runtime) {
         set_api_error("world has no renderable BSP geometry");
         return 0;
     }
+    if (runtime->overlay_callback)
+        runtime->overlay_callback(runtime->overlay_context,
+                                  runtime->framebuffer_width,
+                                  runtime->framebuffer_height);
     SDL_GL_SwapWindow(runtime->window);
     return 1;
 }
@@ -561,6 +567,16 @@ extern "C" int geLinuxRender_SetActorVisible(
     if (!runtime || actor_index != 0 || !runtime->native_actor.actor)
         return 0;
     runtime->actor_visible = visible != 0;
+    return 1;
+}
+
+extern "C" int geLinuxRender_SetOverlayCallback(
+    geLinuxRender_Runtime *runtime, geLinuxRender_OverlayCallback callback,
+    void *context) {
+    if (!runtime)
+        return 0;
+    runtime->overlay_callback = callback;
+    runtime->overlay_context = callback ? context : nullptr;
     return 1;
 }
 

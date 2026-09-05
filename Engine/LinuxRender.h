@@ -77,6 +77,10 @@ typedef struct geLinuxRender_Config {
     int Headless;
 } geLinuxRender_Config;
 
+typedef void (*geLinuxRender_OverlayCallback)(void *Context,
+                                              int FramebufferWidth,
+                                              int FramebufferHeight);
+
 geLinuxRender_Runtime *geLinuxRender_Create(const geLinuxRender_Config *Config);
 void geLinuxRender_Destroy(geLinuxRender_Runtime *Runtime);
 
@@ -126,6 +130,9 @@ int geLinuxRender_GetActorBounds(const geLinuxRender_Runtime *Runtime,
 int geLinuxRender_SetActorVisible(geLinuxRender_Runtime *Runtime,
                                   size_t ActorIndex,
                                   int Visible);
+int geLinuxRender_SetOverlayCallback(geLinuxRender_Runtime *Runtime,
+                                     geLinuxRender_OverlayCallback Callback,
+                                     void *Context);
 
 const char *geLinuxRender_GetLastError(void);
 
