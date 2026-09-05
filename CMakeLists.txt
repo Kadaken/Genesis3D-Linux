@@ -91,22 +91,30 @@ list(SORT ENGINE_INCLUDE_DIRS)
 list(REMOVE_ITEM ENGINE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
 list(PREPEND ENGINE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
 
-# Native Linux bootstrap executable.  It provides the 1920x1080 OpenGL/X11
-# canvas and a fixed-step render loop while the historical engine modules are
-# ported away from DirectDraw/Direct3D and Win32.
-add_executable(genesis3d_linux linux_main.cpp ${ENGINE_SOURCES})
-target_compile_definitions(genesis3d_linux PRIVATE GL_GLEXT_PROTOTYPES)
-target_compile_options(genesis3d_linux PRIVATE
+# Reusable in-process native renderer. The public C ABI owns world loading,
+# SDL/OpenGL presentation, input polling, fixed-step collision, and explicit
+# camera submission without embedding application/game logic.
+add_library(genesis3d_render SHARED
+    Engine/linux_render_api.cpp
+    ${ENGINE_SOURCES}
+)
+set_target_properties(genesis3d_render PROPERTIES
+    OUTPUT_NAME genesis3d_render
+    VERSION 1.0.0
+    SOVERSION 1
+)
+target_compile_definitions(genesis3d_render PRIVATE GL_GLEXT_PROTOTYPES)
+target_compile_options(genesis3d_render PRIVATE
     $<$<COMPILE_LANGUAGE:C>:-Werror=pointer-to-int-cast>
     $<$<COMPILE_LANGUAGE:C>:-Werror=int-to-pointer-cast>
     $<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
     $<$<COMPILE_LANGUAGE:C>:-Werror=incompatible-pointer-types>
 )
-target_include_directories(genesis3d_linux PRIVATE
+target_include_directories(genesis3d_render PUBLIC
     ${ENGINE_INCLUDE_DIRS}
     ${X11_INCLUDE_DIR}
 )
-target_link_libraries(genesis3d_linux PRIVATE
+target_link_libraries(genesis3d_render PUBLIC
     OpenGL::GL
     PkgConfig::SDL2
     ${X11_LIBRARIES}
@@ -115,8 +123,19 @@ target_link_libraries(genesis3d_linux PRIVATE
 )
 
 if(UNIX AND NOT APPLE)
-    target_link_libraries(genesis3d_linux PRIVATE m)
+    target_link_libraries(genesis3d_render PUBLIC m)
 endif()
+
+# Preserve the original standalone validation executable. It now resolves the
+# engine implementation through the same shared object consumed by clients.
+add_executable(genesis3d_linux linux_main.cpp)
+target_compile_definitions(genesis3d_linux PRIVATE GL_GLEXT_PROTOTYPES)
+target_include_directories(genesis3d_linux PRIVATE
+    ${ENGINE_INCLUDE_DIRS}
+    ${X11_INCLUDE_DIR}
+)
+target_link_libraries(genesis3d_linux PRIVATE genesis3d_render)
+set_target_properties(genesis3d_linux PROPERTIES BUILD_RPATH "$ORIGIN")
 
 message(STATUS "Genesis3D native canvas: 1920x1080")
 message(STATUS "Genesis3D fixed-step rates: 60 FPS and 120 FPS")

@@ -37,3 +37,15 @@ authorship or ownership of the original engine.
 
 The commit history contains a more granular record. Verification results and
 known gaps are in `Reports/VERIFICATION_SCOPE.md`.
+
+## 2026-09-04 — Native shared render API
+
+- Added the versioned `Engine/LinuxRender.h` C ABI and opaque renderer runtime.
+- Added `libgenesis3d_render.so.1` as a reusable CMake shared-library target.
+- Exposed exact-map loading, generic entity queries, SDL input state, BSP
+  player stepping, application-owned camera submission, simulation advancement,
+  and single-frame presentation.
+- Preserved `genesis3d_linux` as a standalone executable linked against the
+  same shared engine implementation.
+- Added a headless API mode for world/entity/collision tests without creating a
+  window or capturing desktop input.
