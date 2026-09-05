@@ -156,8 +156,9 @@ GENESIS3D_PROJECT_ROOT=/path/to/compatible-assets \
 ```
 
 Controls are W/A/S/D or arrow keys to move, Shift to sprint, Space to jump,
-mouse motion to look, and Escape to exit. Interactive mode captures the mouse
-only while the engine window has focus and releases it when focus is lost.
+mouse motion to look, the mouse wheel to emit neutral next/previous selection
+edges, and Escape to exit. Interactive mode captures the mouse only while the
+engine window has focus and releases it when focus is lost.
 
 ## Contributing
 
