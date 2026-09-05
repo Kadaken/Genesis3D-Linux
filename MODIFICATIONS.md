@@ -60,3 +60,5 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
   traces, and collision observe the same transform and updated bounds.
 - Added cumulative frame diagnostics for root-visible faces, submodel face
   submissions, and actor primitives.
+- Added application-controlled submodel render visibility so private gameplay
+  code can suppress logical brush volumes without removing their query data.

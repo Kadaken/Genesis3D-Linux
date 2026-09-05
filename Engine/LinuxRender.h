@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 6u
+#define GE_LINUX_RENDER_API_VERSION 7u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -144,6 +144,9 @@ int geLinuxRender_GetWorldModelMotionExtents(
 int geLinuxRender_SetWorldModelMotionTime(geLinuxRender_Runtime *Runtime,
                                           size_t ModelIndex,
                                           double TimeSeconds);
+int geLinuxRender_SetWorldModelVisible(geLinuxRender_Runtime *Runtime,
+                                       size_t ModelIndex,
+                                       int Visible);
 
 /* Generic entity inspection. String functions return the required byte count
  * including the terminating NUL, or zero when the item does not exist. */
