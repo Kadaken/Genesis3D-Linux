@@ -69,3 +69,13 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
   importing game-specific decoders or assets into the engine.
 - Added bounded player gravity, jump-speed, and step-height configuration so an
   application can apply authored map movement without renderer coupling.
+- Added version-19 generic actor Euler transforms and a view-model render flag.
+  View actors render after the world with an isolated depth buffer while asset
+  choice, offsets, animation policy, and weapon behavior remain application-owned.
+- Completed actor scale propagation through both pose attachment/motion
+  translations and body vertices, preventing scaled skeletal pieces from
+  separating.
+- Added binary-alpha rejection for actor materials and a dedicated close-range
+  view projection.
+- Made framebuffer capture redraw into the owned back buffer before readback,
+  avoiding driver-dependent post-swap buffer retention.

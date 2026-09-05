@@ -19,6 +19,7 @@
 struct RuntimeActor {
     NativeActor native;
     bool visible = true;
+    bool view_model = false;
 };
 
 struct RuntimeBeam {
@@ -79,6 +80,32 @@ thread_local std::string render_api_error;
 void set_api_error(const std::string &message) {
     render_api_error = message;
     std::fprintf(stderr, "Genesis3D render API: %s\n", message.c_str());
+}
+
+void prepare_view_model_projection(const PlayerCamera &camera,
+                                   const CameraBasis &basis,
+                                   int framebuffer_width,
+                                   int framebuffer_height) {
+    const int width = (std::max)(framebuffer_width, 1);
+    const int height = (std::max)(framebuffer_height, 1);
+    constexpr double near_plane = 0.01;
+    constexpr double far_plane = 1024.0;
+    const double aspect = static_cast<double>(width) /
+                          static_cast<double>(height);
+    const double half_height = near_plane *
+        std::tan(60.0 * kPi / 360.0);
+    const double half_width = half_height * aspect;
+    glViewport(0, 0, width, height);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glFrustum(-half_width, half_width, -half_height, half_height,
+              near_plane, far_plane);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    const Vec3 target{camera.position.x + basis.forward.x,
+                      camera.position.y + basis.forward.y,
+                      camera.position.z + basis.forward.z};
+    look_at(camera.position, target);
 }
 
 void clear_runtime_lights(geLinuxRender_Runtime *runtime) {
@@ -872,18 +899,13 @@ extern "C" int geLinuxRender_ResetPlayerPhysics(
     return 1;
 }
 
-extern "C" int geLinuxRender_RenderFrame(geLinuxRender_Runtime *runtime) {
-    if (!runtime || runtime->headless || runtime->close_requested)
-        return 0;
-    if (SDL_GL_MakeCurrent(runtime->window, runtime->context) != 0) {
-        set_api_error(std::string("could not activate OpenGL context: ") + SDL_GetError());
-        return 0;
-    }
+static int render_runtime_scene(geLinuxRender_Runtime *runtime) {
     glViewport(0, 0, runtime->framebuffer_width, runtime->framebuffer_height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     const CameraBasis basis = camera_basis(runtime->camera);
     RuntimeActor *primary = runtime_actor_at(runtime, 0);
-    NativeActor *primary_native = primary && primary->visible
+    NativeActor *primary_native = primary && primary->visible &&
+        !primary->view_model
         ? &primary->native : nullptr;
     if (!render_world_geometry(runtime->world, runtime->world_textures,
                                runtime->face_cache, runtime->camera, basis,
@@ -896,17 +918,45 @@ extern "C" int geLinuxRender_RenderFrame(geLinuxRender_Runtime *runtime) {
         set_api_error("world has no renderable BSP geometry");
         return 0;
     }
-    for (size_t index = 1; index < runtime->actors.size(); ++index) {
+    const size_t first_world_actor = primary_native ? 1U : 0U;
+    for (size_t index = first_world_actor;
+         index < runtime->actors.size(); ++index) {
         RuntimeActor *actor = runtime_actor_at(runtime, index);
-        if (actor && actor->visible)
+        if (actor && actor->visible && !actor->view_model)
             render_native_actor(&actor->native, &runtime->diagnostics);
     }
     render_runtime_beams(runtime, basis);
     render_runtime_billboards(runtime, basis);
+    bool cleared_view_depth = false;
+    for (size_t index = 0; index < runtime->actors.size(); ++index) {
+        RuntimeActor *actor = runtime_actor_at(runtime, index);
+        if (!actor || !actor->visible || !actor->view_model)
+            continue;
+        if (!cleared_view_depth) {
+            glClear(GL_DEPTH_BUFFER_BIT);
+            prepare_view_model_projection(
+                runtime->camera, basis, runtime->framebuffer_width,
+                runtime->framebuffer_height);
+            cleared_view_depth = true;
+        }
+        render_native_actor(&actor->native, &runtime->diagnostics);
+    }
     if (runtime->overlay_callback)
         runtime->overlay_callback(runtime->overlay_context,
                                   runtime->framebuffer_width,
                                   runtime->framebuffer_height);
+    return 1;
+}
+
+extern "C" int geLinuxRender_RenderFrame(geLinuxRender_Runtime *runtime) {
+    if (!runtime || runtime->headless || runtime->close_requested)
+        return 0;
+    if (SDL_GL_MakeCurrent(runtime->window, runtime->context) != 0) {
+        set_api_error(std::string("could not activate OpenGL context: ") + SDL_GetError());
+        return 0;
+    }
+    if (!render_runtime_scene(runtime))
+        return 0;
     SDL_GL_SwapWindow(runtime->window);
     return 1;
 }
@@ -935,8 +985,13 @@ extern "C" int geLinuxRender_SaveScreenshot(
     glGetIntegerv(GL_PACK_ALIGNMENT, &previous_pack_alignment);
     glGetIntegerv(GL_READ_BUFFER, &previous_read_buffer);
     while (glGetError() != GL_NO_ERROR) {}
+    /* Redraw into the owned back buffer so capture never depends on whether a
+     * platform preserves front/back contents after SwapWindow. Screenshots
+     * are rare and the extra render is intentionally paid only here. */
+    if (!render_runtime_scene(runtime))
+        return 0;
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadBuffer(GL_FRONT);
+    glReadBuffer(GL_BACK);
     glFinish();
     glReadPixels(0, 0, runtime->framebuffer_width,
                  runtime->framebuffer_height, GL_RGB, GL_UNSIGNED_BYTE,
@@ -1555,6 +1610,29 @@ extern "C" int geLinuxRender_SetActorTransform(
     return 1;
 }
 
+extern "C" int geLinuxRender_SetActorTransformEuler(
+    geLinuxRender_Runtime *runtime, size_t actor_index,
+    const geLinuxRender_Vec3 *position,
+    const geLinuxRender_Vec3 *euler_radians) {
+    RuntimeActor *actor = runtime_actor_at(runtime, actor_index);
+    if (!actor || !actor->native.actor || !position || !euler_radians ||
+        !valid_vector(*position) || !valid_vector(*euler_radians) ||
+        std::abs(euler_radians->X) > 1000.0 ||
+        std::abs(euler_radians->Y) > 1000.0 ||
+        std::abs(euler_radians->Z) > 1000.0)
+        return 0;
+    const geVec3d angles{static_cast<geFloat>(euler_radians->X),
+                         static_cast<geFloat>(euler_radians->Y),
+                         static_cast<geFloat>(euler_radians->Z)};
+    geXForm3d transform;
+    geXForm3d_SetEulerAngles(&transform, &angles);
+    transform.Translation = {static_cast<geFloat>(position->X),
+                             static_cast<geFloat>(position->Y),
+                             static_cast<geFloat>(position->Z)};
+    set_actor_root_transform(&actor->native, transform);
+    return 1;
+}
+
 extern "C" int geLinuxRender_GetActorBounds(
     const geLinuxRender_Runtime *runtime, size_t actor_index,
     geLinuxRender_Aabb *bounds) {
@@ -1575,6 +1653,16 @@ extern "C" int geLinuxRender_SetActorVisible(
     if (!actor || !actor->native.actor)
         return 0;
     actor->visible = visible != 0;
+    return 1;
+}
+
+extern "C" int geLinuxRender_SetActorViewModel(
+    geLinuxRender_Runtime *runtime, size_t actor_index, int view_model) {
+    RuntimeActor *actor = runtime_actor_at(runtime, actor_index);
+    if (!actor || !actor->native.actor ||
+        (view_model != 0 && view_model != 1))
+        return 0;
+    actor->view_model = view_model != 0;
     return 1;
 }
 
@@ -1652,6 +1740,10 @@ extern "C" int geLinuxRender_SetActorScale(
     actor->native.scale = {static_cast<geFloat>(scale->X),
                            static_cast<geFloat>(scale->Y),
                            static_cast<geFloat>(scale->Z)};
+    geActor_SetScale(actor->native.actor,
+                     static_cast<geFloat>(scale->X),
+                     static_cast<geFloat>(scale->Y),
+                     static_cast<geFloat>(scale->Z));
     return 1;
 }
 

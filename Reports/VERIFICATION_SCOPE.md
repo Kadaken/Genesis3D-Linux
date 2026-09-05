@@ -23,10 +23,11 @@ harness, not a feature-complete game.
 | Shared renderer ABI | Directly linked game-layer integration and symbol/link audit | PASS for the current versioned API on the tested system |
 | Dynamic material API | Bounds/stride checks plus hidden OpenGL frame uploads | PASS for the generic API; media decoding remains application-owned |
 | Player movement configuration | Bounded gravity, jump, and step overrides with reset preservation | PASS for the generic API; map interpretation remains application-owned |
+| First-person actor pass | Versioned view-model flag, Euler transform bounds, isolated post-world depth submission, and Xvfb/Mesa framebuffer inspection | PASS; private application composition remains outside this repository |
 | Application camera ownership | Fixed-step position/yaw submission followed by in-process frame rendering | PASS |
 | Mouse look and planar WASD | Maintainer physical test after SDL migration | PASS, confirmed by the maintainer |
 | Actor BODY/ACT parsing | Four purified real actor files | PASS |
-| Skeletal animation | Pose-time advancement and measured posed-vertex changes on all four actors | PASS |
+| Skeletal animation | Pose-time advancement, measured posed-vertex changes, and sub-unit-scale attachment/vertex propagation | PASS; the scale defect found by first-person rendering is corrected |
 | Runtime dynamic lightmaps | Real lightmap byte changes through controlled add/remove fixture | PASS; removal restores baked bytes exactly |
 | BSP collision and movement physics | Deterministic tests against real `rfedit1.bsp` | PASS |
 | Stairs, slopes, gravity, jumping and ceilings | Real-map automated collision regressions | PASS structurally; physical gameplay feel has not yet been confirmed by the maintainer |
