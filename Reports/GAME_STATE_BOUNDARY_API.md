@@ -2,7 +2,7 @@
 
 ## Result
 
-The renderer API is version 10. It exposes two input edges and one lifecycle
+The renderer API is version 11. It exposes bounded input edges and one lifecycle
 operation needed by an external game layer while retaining all save data and
 serialization outside the public engine.
 
@@ -14,6 +14,8 @@ serialization outside the public engine.
   held movement, and held fire after a game-owned restore.
 - Map replacement also clears pending save/load edges.
 - Numeric weapon-slot input is delivered as a one-poll selection edge.
+- E is delivered as a one-poll, repeat-filtered `Use` interaction edge. The
+  public renderer does not assign gameplay meaning to that edge.
 - A renderer-neutral transient beam primitive supports bounded game effects.
 
 The API does not know about save paths, game entities, inventory, or private

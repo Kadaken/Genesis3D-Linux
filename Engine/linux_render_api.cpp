@@ -46,6 +46,7 @@ struct geLinuxRender_Runtime {
     PlayerPhysics player_physics;
     HeldMovementInput movement_input;
     bool fire_button = false;
+    bool use_requested = false;
     bool quick_save_requested = false;
     bool quick_load_requested = false;
     int weapon_slot_requested = -1;
@@ -445,6 +446,7 @@ extern "C" int geLinuxRender_LoadMap(geLinuxRender_Runtime *runtime,
     runtime->player_physics = PlayerPhysics{};
     runtime->movement_input = HeldMovementInput{};
     runtime->fire_button = false;
+    runtime->use_requested = false;
     runtime->quick_save_requested = false;
     runtime->quick_load_requested = false;
     runtime->weapon_slot_requested = -1;
@@ -489,6 +491,9 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
                    event.button.button == SDL_BUTTON_LEFT) {
             runtime->fire_button = false;
         } else if (event.type == SDL_KEYDOWN) {
+            if (event.key.repeat == 0 &&
+                event.key.keysym.scancode == SDL_SCANCODE_E)
+                runtime->use_requested = true;
             if (event.key.repeat == 0 &&
                 event.key.keysym.scancode == SDL_SCANCODE_F9)
                 runtime->quick_save_requested = true;
@@ -535,9 +540,11 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
     input->Sprint = held.sprint_left || held.sprint_right;
     input->Jump = held.jump_space;
     input->Fire = runtime->fire_button;
+    input->Use = runtime->use_requested ? 1 : 0;
     input->QuickSave = runtime->quick_save_requested ? 1 : 0;
     input->QuickLoad = runtime->quick_load_requested ? 1 : 0;
     input->WeaponSlot = runtime->weapon_slot_requested;
+    runtime->use_requested = false;
     runtime->quick_save_requested = false;
     runtime->quick_load_requested = false;
     runtime->weapon_slot_requested = -1;
