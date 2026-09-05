@@ -64,3 +64,6 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
   code can suppress logical brush volumes without removing their query data.
 - Added bounded actor motion enumeration/selection and per-instance scale
   controls for application-owned animation state machines.
+- Added bounded material name/dimension inspection and stride-aware RGBA texture
+  replacement so application layers can implement animated surfaces without
+  importing game-specific decoders or assets into the engine.

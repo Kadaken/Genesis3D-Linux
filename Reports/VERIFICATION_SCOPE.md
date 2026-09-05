@@ -20,7 +20,8 @@ harness, not a feature-complete game.
 | Textures and baked lightmaps | Hardware-rendered compositor capture | PASS visually; exact pixel equivalence lacks an original-renderer reference image |
 | PVS selection and translucent ordering | Runtime counters and hardware rendering | PASS as implemented |
 | SDL window and OpenGL ownership | Native XWayland hardware runs | PASS |
-| Shared renderer ABI | Directly linked game-layer integration and symbol/link audit | PASS for API v1 on the tested system |
+| Shared renderer ABI | Directly linked game-layer integration and symbol/link audit | PASS for the current versioned API on the tested system |
+| Dynamic material API | Bounds/stride checks plus hidden OpenGL frame uploads | PASS for the generic API; media decoding remains application-owned |
 | Application camera ownership | Fixed-step position/yaw submission followed by in-process frame rendering | PASS |
 | Mouse look and planar WASD | Maintainer physical test after SDL migration | PASS, confirmed by the maintainer |
 | Actor BODY/ACT parsing | Four purified real actor files | PASS |

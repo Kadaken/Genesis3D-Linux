@@ -156,6 +156,37 @@ size_t copy_api_string(const char *source, char *buffer, size_t buffer_size) {
     return required;
 }
 
+size_t copy_api_span(const char *source, size_t length, char *buffer,
+                     size_t buffer_size) {
+    if (!source || length == SIZE_MAX)
+        return 0;
+    const size_t required = length + 1U;
+    if (buffer && buffer_size > 0) {
+        const size_t copied = (std::min)(length, buffer_size - 1U);
+        std::memcpy(buffer, source, copied);
+        buffer[copied] = '\0';
+    }
+    return required;
+}
+
+int material_index(const geLinuxRender_Runtime *runtime, const char *name) {
+    if (!runtime || !runtime->world || !runtime->world->CurrentBSP ||
+        !name || !*name)
+        return -1;
+    const size_t requested_length = strnlen(name, 65U);
+    if (requested_length == 65U)
+        return -1;
+    const GBSP_BSPData &bsp = runtime->world->CurrentBSP->BSPData;
+    for (int32 index = 0; index < bsp.NumGFXTextures; ++index) {
+        const GFX_Texture &material = bsp.GFXTextures[index];
+        const size_t length = strnlen(material.Name, sizeof(material.Name));
+        if (requested_length == length &&
+            strncasecmp(material.Name, name, length) == 0)
+            return index;
+    }
+    return -1;
+}
+
 geLinuxRender_Camera export_camera(const PlayerCamera &camera) {
     return {{camera.position.x, camera.position.y, camera.position.z},
             camera.yaw, camera.pitch, camera.move_speed};
@@ -1021,6 +1052,105 @@ extern "C" int geLinuxRender_SubmitBillboard(
     runtime_billboard.remaining = billboard->LifetimeSeconds;
     runtime->billboards.push_back(runtime_billboard);
     return 1;
+}
+
+extern "C" size_t geLinuxRender_GetMaterialCount(
+    const geLinuxRender_Runtime *runtime) {
+    if (!runtime || !runtime->world || !runtime->world->CurrentBSP)
+        return 0U;
+    const int32 count = runtime->world->CurrentBSP->BSPData.NumGFXTextures;
+    return count > 0 ? static_cast<size_t>(count) : 0U;
+}
+
+extern "C" size_t geLinuxRender_GetMaterialName(
+    const geLinuxRender_Runtime *runtime, size_t material_index_value,
+    char *buffer, size_t buffer_size) {
+    if (!runtime || !runtime->world || !runtime->world->CurrentBSP)
+        return 0U;
+    const GBSP_BSPData &bsp = runtime->world->CurrentBSP->BSPData;
+    const size_t count = bsp.NumGFXTextures > 0
+        ? static_cast<size_t>(bsp.NumGFXTextures) : 0U;
+    if (material_index_value >= count)
+        return 0U;
+    const GFX_Texture &material = bsp.GFXTextures[material_index_value];
+    const size_t length = strnlen(material.Name, sizeof(material.Name));
+    return copy_api_span(material.Name, length, buffer, buffer_size);
+}
+
+extern "C" int geLinuxRender_GetMaterialInfo(
+    const geLinuxRender_Runtime *runtime, size_t material_index_value,
+    geLinuxRender_MaterialInfo *info) {
+    if (!runtime || !runtime->world || !runtime->world->CurrentBSP || !info)
+        return 0;
+    const GBSP_BSPData &bsp = runtime->world->CurrentBSP->BSPData;
+    const size_t count = bsp.NumGFXTextures > 0
+        ? static_cast<size_t>(bsp.NumGFXTextures) : 0U;
+    if (material_index_value >= count)
+        return 0;
+    const GFX_Texture &material = bsp.GFXTextures[material_index_value];
+    if (material.Width <= 0 || material.Height <= 0)
+        return 0;
+    *info = {material.Width, material.Height};
+    return 1;
+}
+
+extern "C" int geLinuxRender_UpdateMaterialRGBA(
+    geLinuxRender_Runtime *runtime, const char *material_name,
+    int width, int height, const uint8_t *pixels, size_t byte_count,
+    size_t row_stride) {
+    if (!runtime || !pixels || width <= 0 || height <= 0)
+        return 0;
+    const int index = material_index(runtime, material_name);
+    if (index < 0)
+        return 0;
+    const GFX_Texture &material =
+        runtime->world->CurrentBSP->BSPData.GFXTextures[index];
+    if (width != material.Width || height != material.Height ||
+        static_cast<size_t>(width) > SIZE_MAX / 4U)
+        return 0;
+    const size_t row_bytes = static_cast<size_t>(width) * 4U;
+    if (row_stride < row_bytes ||
+        static_cast<size_t>(height - 1) >
+            (SIZE_MAX - row_bytes) / row_stride ||
+        static_cast<size_t>(height - 1) * row_stride + row_bytes > byte_count)
+        return 0;
+    if (runtime->headless)
+        return 1;
+    if (!runtime->context || !runtime->window ||
+        static_cast<size_t>(index) >= runtime->world_textures.materials.size() ||
+        runtime->world_textures.materials[static_cast<size_t>(index)] == 0U ||
+        SDL_GL_MakeCurrent(runtime->window, runtime->context) != 0)
+        return 0;
+
+    const uint8_t *upload = pixels;
+    std::vector<uint8_t> packed;
+    if (row_stride != row_bytes) {
+        packed.resize(row_bytes * static_cast<size_t>(height));
+        for (int row = 0; row < height; ++row) {
+            std::memcpy(packed.data() + static_cast<size_t>(row) * row_bytes,
+                        pixels + static_cast<size_t>(row) * row_stride,
+                        row_bytes);
+        }
+        upload = packed.data();
+    }
+    GLint previous_active_texture = 0;
+    GLint previous_binding = 0;
+    GLint previous_unpack_alignment = 0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &previous_active_texture);
+    glActiveTexture(GL_TEXTURE0);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous_binding);
+    glGetIntegerv(GL_UNPACK_ALIGNMENT, &previous_unpack_alignment);
+    while (glGetError() != GL_NO_ERROR) {}
+    glBindTexture(GL_TEXTURE_2D,
+                  runtime->world_textures.materials[static_cast<size_t>(index)]);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA,
+                    GL_UNSIGNED_BYTE, upload);
+    const GLenum upload_error = glGetError();
+    glPixelStorei(GL_UNPACK_ALIGNMENT, previous_unpack_alignment);
+    glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previous_binding));
+    glActiveTexture(static_cast<GLenum>(previous_active_texture));
+    return upload_error == GL_NO_ERROR ? 1 : 0;
 }
 
 extern "C" int geLinuxRender_GetEntityOrigin(
