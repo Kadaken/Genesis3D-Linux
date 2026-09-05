@@ -30,6 +30,11 @@ struct RuntimeLight {
     geLight *native = nullptr;
 };
 
+struct RuntimeBillboard {
+    geLinuxRender_Billboard billboard{};
+    double remaining = 0.0;
+};
+
 struct geLinuxRender_Runtime {
     geWorld *world = nullptr;
     SDL_Window *window = nullptr;
@@ -45,6 +50,7 @@ struct geLinuxRender_Runtime {
     std::vector<std::unique_ptr<RuntimeActor>> actors;
     std::vector<RuntimeBeam> beams;
     std::vector<RuntimeLight> dynamic_lights;
+    std::vector<RuntimeBillboard> billboards;
     std::vector<uint8_t> model_visibility;
     NativeLightingState lighting_state;
     RenderDiagnostics diagnostics;
@@ -193,6 +199,24 @@ bool valid_light(const geLinuxRender_Vec3 &position,
            std::isfinite(radius) && radius > 0.0 && radius <= 65536.0;
 }
 
+bool valid_billboard(const geLinuxRender_Billboard &billboard) {
+    return valid_vector(billboard.Position) &&
+           std::isfinite(billboard.Red) &&
+           std::isfinite(billboard.Green) &&
+           std::isfinite(billboard.Blue) &&
+           std::isfinite(billboard.Alpha) &&
+           std::isfinite(billboard.Size) &&
+           std::isfinite(billboard.LifetimeSeconds) &&
+           billboard.Red >= 0.0f && billboard.Red <= 1.0f &&
+           billboard.Green >= 0.0f && billboard.Green <= 1.0f &&
+           billboard.Blue >= 0.0f && billboard.Blue <= 1.0f &&
+           billboard.Alpha >= 0.0f && billboard.Alpha <= 1.0f &&
+           billboard.Size > 0.0f && billboard.Size <= 4096.0f &&
+           billboard.LifetimeSeconds > 0.0 &&
+           billboard.LifetimeSeconds <= 60.0 &&
+           (billboard.Additive == 0 || billboard.Additive == 1);
+}
+
 int set_runtime_light(geLinuxRender_Runtime *runtime, RuntimeLight &light,
                       const geLinuxRender_Vec3 &position,
                       const geLinuxRender_Color3 &color, double radius) {
@@ -239,6 +263,52 @@ void render_runtime_beams(const geLinuxRender_Runtime *runtime,
         glVertex3d(beam.End.X - rx, beam.End.Y - ry, beam.End.Z - rz);
     }
     glEnd();
+    glPopAttrib();
+}
+
+void render_runtime_billboards(const geLinuxRender_Runtime *runtime,
+                               const CameraBasis &basis) {
+    if (!runtime || runtime->billboards.empty())
+        return;
+    glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
+                 GL_TEXTURE_BIT | GL_CURRENT_BIT);
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glDepthMask(GL_FALSE);
+    for (int additive = 0; additive <= 1; ++additive) {
+        glBlendFunc(GL_SRC_ALPHA,
+                    additive ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA);
+        glBegin(GL_QUADS);
+        for (const RuntimeBillboard &runtime_billboard :
+             runtime->billboards) {
+            const geLinuxRender_Billboard &billboard =
+                runtime_billboard.billboard;
+            if (billboard.Additive != additive)
+                continue;
+            const double half = static_cast<double>(billboard.Size) * 0.5;
+            const double rx = basis.right.x * half;
+            const double ry = basis.right.y * half;
+            const double rz = basis.right.z * half;
+            const double ux = basis.up.x * half;
+            const double uy = basis.up.y * half;
+            const double uz = basis.up.z * half;
+            glColor4f(billboard.Red, billboard.Green, billboard.Blue,
+                      billboard.Alpha);
+            glVertex3d(billboard.Position.X - rx - ux,
+                       billboard.Position.Y - ry - uy,
+                       billboard.Position.Z - rz - uz);
+            glVertex3d(billboard.Position.X + rx - ux,
+                       billboard.Position.Y + ry - uy,
+                       billboard.Position.Z + rz - uz);
+            glVertex3d(billboard.Position.X + rx + ux,
+                       billboard.Position.Y + ry + uy,
+                       billboard.Position.Z + rz + uz);
+            glVertex3d(billboard.Position.X - rx + ux,
+                       billboard.Position.Y - ry + uy,
+                       billboard.Position.Z - rz + uz);
+        }
+        glEnd();
+    }
     glPopAttrib();
 }
 
@@ -496,6 +566,7 @@ extern "C" int geLinuxRender_LoadMap(geLinuxRender_Runtime *runtime,
     runtime->lighting_state = NativeLightingState{};
     runtime->diagnostics = RenderDiagnostics{};
     runtime->beams.clear();
+    runtime->billboards.clear();
     runtime->player_physics = PlayerPhysics{};
     runtime->movement_input = HeldMovementInput{};
     runtime->fire_button = false;
@@ -665,6 +736,15 @@ extern "C" int geLinuxRender_AdvanceSimulation(
                            return beam.remaining <= 0.0;
                        }),
         runtime->beams.end());
+    for (RuntimeBillboard &billboard : runtime->billboards)
+        billboard.remaining -= fixed_delta_seconds;
+    runtime->billboards.erase(
+        std::remove_if(runtime->billboards.begin(),
+                       runtime->billboards.end(),
+                       [](const RuntimeBillboard &billboard) {
+                           return billboard.remaining <= 0.0;
+                       }),
+        runtime->billboards.end());
     if (!runtime->headless) {
         for (auto &actor : runtime->actors) {
             if (actor)
@@ -720,6 +800,7 @@ extern "C" int geLinuxRender_RenderFrame(geLinuxRender_Runtime *runtime) {
             render_native_actor(&actor->native, &runtime->diagnostics);
     }
     render_runtime_beams(runtime, basis);
+    render_runtime_billboards(runtime, basis);
     if (runtime->overlay_callback)
         runtime->overlay_callback(runtime->overlay_context,
                                   runtime->framebuffer_width,
@@ -814,7 +895,8 @@ extern "C" int geLinuxRender_GetFrameStats(
     stats->VisibleFaces = runtime->diagnostics.visible_faces;
     stats->SubmodelFaces = runtime->diagnostics.submodel_faces;
     stats->ActorPrimitives = runtime->diagnostics.actor_submissions;
-    stats->EffectPrimitives = static_cast<uint64_t>(runtime->beams.size());
+    stats->EffectPrimitives = static_cast<uint64_t>(
+        runtime->beams.size() + runtime->billboards.size());
     stats->DynamicLights = runtime->diagnostics.dynamic_lights;
     stats->RegeneratedLightmaps = runtime->diagnostics.regenerated_lightmaps;
     return 1;
@@ -833,7 +915,7 @@ extern "C" int geLinuxRender_SubmitBeam(
 
 extern "C" size_t geLinuxRender_GetTransientEffectCount(
     const geLinuxRender_Runtime *runtime) {
-    return runtime ? runtime->beams.size() : 0U;
+    return runtime ? runtime->beams.size() + runtime->billboards.size() : 0U;
 }
 
 extern "C" int geLinuxRender_CreateDynamicLight(
@@ -878,6 +960,18 @@ extern "C" int geLinuxRender_RemoveDynamicLight(
     if (!runtime->headless)
         mark_dynamic_lightmaps(runtime->world, &runtime->world_textures,
                                &runtime->lighting_state);
+    return 1;
+}
+
+extern "C" int geLinuxRender_SubmitBillboard(
+    geLinuxRender_Runtime *runtime,
+    const geLinuxRender_Billboard *billboard) {
+    if (!runtime || !billboard || !valid_billboard(*billboard))
+        return 0;
+    RuntimeBillboard runtime_billboard;
+    runtime_billboard.billboard = *billboard;
+    runtime_billboard.remaining = billboard->LifetimeSeconds;
+    runtime->billboards.push_back(runtime_billboard);
     return 1;
 }
 

@@ -63,6 +63,7 @@ struct CameraBasis {
     Vec3 forward;
     Vec3 planar_forward;
     Vec3 right;
+    Vec3 up;
 };
 
 struct HeldMovementInput {
@@ -843,7 +844,9 @@ CameraBasis camera_basis(const PlayerCamera &camera) {
     return {{pitch_cosine * yaw_cosine, std::sin(camera.pitch),
              pitch_cosine * yaw_sine},
             {yaw_cosine, 0.0, yaw_sine},
-            {-yaw_sine, 0.0, yaw_cosine}};
+            {-yaw_sine, 0.0, yaw_cosine},
+            {-yaw_cosine * std::sin(camera.pitch), pitch_cosine,
+             -yaw_sine * std::sin(camera.pitch)}};
 }
 
 PlayerCamera initial_camera(geWorld *world) {
