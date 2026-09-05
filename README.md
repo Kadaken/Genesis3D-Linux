@@ -28,7 +28,7 @@ Verified on one Fedora KDE system with AMD/Mesa:
 - swept-hull BSP collision, gravity, jumping, stairs, slopes, wall sliding, and
   ceiling rejection in deterministic real-map fixtures;
 - 60 and 120 FPS presentation targets on the tested machine; and
-- normal SIGINT/SIGTERM teardown under the documented sanitizer checks.
+- normal SIGINT/SIGTERM teardown under the documented sanitizer checks; and
 - a versioned in-process C renderer API exposed by `libgenesis3d_render.so`.
 
 Known limitations and the exact evidence boundary are documented in

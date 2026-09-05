@@ -22,12 +22,12 @@ harness, not a feature-complete game.
 | SDL window and OpenGL ownership | Native XWayland hardware runs | PASS |
 | Shared renderer ABI | Directly linked game-layer integration and symbol/link audit | PASS for API v1 on the tested system |
 | Application camera ownership | Fixed-step position/yaw submission followed by in-process frame rendering | PASS |
-| Mouse look and planar WASD | User physical test after SDL migration | PASS, confirmed by Kadaken |
+| Mouse look and planar WASD | Maintainer physical test after SDL migration | PASS, confirmed by the maintainer |
 | Actor BODY/ACT parsing | Four purified real actor files | PASS |
 | Skeletal animation | Pose-time advancement and measured posed-vertex changes on all four actors | PASS |
 | Runtime dynamic lightmaps | Real lightmap byte changes through controlled add/remove fixture | PASS; removal restores baked bytes exactly |
 | BSP collision and movement physics | Deterministic tests against real `rfedit1.bsp` | PASS |
-| Stairs, slopes, gravity, jumping and ceilings | Real-map automated collision regressions | PASS structurally; physical gameplay feel has not yet been confirmed by Kadaken |
+| Stairs, slopes, gravity, jumping and ceilings | Real-map automated collision regressions | PASS structurally; physical gameplay feel has not yet been confirmed by the maintainer |
 | Fixed simulation pacing | 60/120 Hz and forced one-second stall tests | PASS; catch-up clamps to 250 ms |
 | Hardware cadence | Long AMD/Mesa runs | PASS at 60.00 and 120.00 FPS, with small compositor/scheduler deadline jitter documented |
 | Signal teardown | SIGINT/SIGTERM and sanitizer runs | PASS for engine-owned resources |
