@@ -29,4 +29,3 @@ The engine contains no ammo, damage, weapon, enemy, or other game rules.
 - Private game-layer left-button edge, ammo decrement, impact logging: PASS.
 - Clang ASan/UBSan trace lifecycle: PASS.
 - Graphical window and input capture during automated tests: disabled.
-
