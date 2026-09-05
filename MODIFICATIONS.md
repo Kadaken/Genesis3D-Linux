@@ -86,3 +86,6 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
   and standalone harness, with a non-MSAA window-format fallback.
 - Added trilinear mipmaps and bounded anisotropic filtering to world materials;
   dynamic material replacements now refresh all mip levels.
+- Extended the version-21 input ABI with bounded mouse-wheel edge counts. The
+  renderer preserves SDL's high-resolution wheel motion and exposes neutral
+  next/previous actions while leaving inventory policy to applications.
