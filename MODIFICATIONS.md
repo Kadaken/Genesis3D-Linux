@@ -62,3 +62,5 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
   submissions, and actor primitives.
 - Added application-controlled submodel render visibility so private gameplay
   code can suppress logical brush volumes without removing their query data.
+- Added bounded actor motion enumeration/selection and per-instance scale
+  controls for application-owned animation state machines.

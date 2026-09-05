@@ -16,6 +16,7 @@ Verification covered 19 authored actor instances on the first private BSP and
 OpenGL frame across a map transition. No physical display or input capture was
 used.
 
-The current ABI is version 7; subsequent versions add BSP submodel/motion and
-per-model render-visibility access without changing these entity/actor
-contracts.
+The current ABI is version 8. It adds bounded actor-motion enumeration,
+name-based motion selection with portable filename matching, and per-instance
+scale submission. Subsequent BSP submodel/motion and render-visibility additions
+do not change the original entity copy-out contract.
