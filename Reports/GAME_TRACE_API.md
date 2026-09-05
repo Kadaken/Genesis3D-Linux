@@ -21,6 +21,11 @@ The input snapshot also exposes the held state of SDL's left mouse button as
 `Fire`. Focus loss clears the held state, preventing a stuck-fire condition.
 The engine contains no ammo, damage, weapon, enemy, or other game rules.
 
+The same opaque boundary now supplies a validated swept-AABB query and indexed
+actor transform, dynamic-bounds, and visibility controls. Headless runtimes load
+actor geometry without issuing OpenGL texture calls, which lets collision and
+game-state tests use the real ACT parser safely without creating a window.
+
 ## Verification
 
 - Engine and standalone runtime build: PASS.
@@ -28,4 +33,6 @@ The engine contains no ammo, damage, weapon, enemy, or other game rules.
 - Real BSP forward trace from the authored player start: PASS.
 - Private game-layer left-button edge, ammo decrement, impact logging: PASS.
 - Clang ASan/UBSan trace lifecycle: PASS.
+- Actor load, transform, dynamic bounds, and death visibility submission: PASS.
+- Swept enemy hull movement against the real BSP: PASS.
 - Graphical window and input capture during automated tests: disabled.
