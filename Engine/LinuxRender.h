@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 19u
+#define GE_LINUX_RENDER_API_VERSION 20u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -144,6 +144,11 @@ typedef struct geLinuxRender_Config {
 typedef void (*geLinuxRender_OverlayCallback)(void *Context,
                                               int FramebufferWidth,
                                               int FramebufferHeight);
+/* Called after BSP geometry while the world camera matrices are active. The
+ * renderer restores OpenGL attributes and matrices after the callback. */
+typedef void (*geLinuxRender_WorldCallback)(void *Context,
+                                            int FramebufferWidth,
+                                            int FramebufferHeight);
 
 geLinuxRender_Runtime *geLinuxRender_Create(const geLinuxRender_Config *Config);
 void geLinuxRender_Destroy(geLinuxRender_Runtime *Runtime);
@@ -342,6 +347,9 @@ int geLinuxRender_SetActorScale(geLinuxRender_Runtime *Runtime,
 int geLinuxRender_SetOverlayCallback(geLinuxRender_Runtime *Runtime,
                                      geLinuxRender_OverlayCallback Callback,
                                      void *Context);
+int geLinuxRender_SetWorldCallback(geLinuxRender_Runtime *Runtime,
+                                   geLinuxRender_WorldCallback Callback,
+                                   void *Context);
 
 const char *geLinuxRender_GetLastError(void);
 

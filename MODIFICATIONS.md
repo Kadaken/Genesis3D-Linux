@@ -79,3 +79,6 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
   view projection.
 - Made framebuffer capture redraw into the owned back buffer before readback,
   avoiding driver-dependent post-swap buffer retention.
+- Added the version-20 protected world-space callback. Applications can draw
+  transient world presentation after BSP geometry while the renderer brackets
+  the callback with complete OpenGL attribute and matrix restoration.

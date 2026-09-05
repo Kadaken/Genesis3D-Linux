@@ -71,6 +71,8 @@ struct geLinuxRender_Runtime {
     bool menu_right_requested = false;
     geLinuxRender_OverlayCallback overlay_callback = nullptr;
     void *overlay_context = nullptr;
+    geLinuxRender_WorldCallback world_callback = nullptr;
+    void *world_context = nullptr;
 };
 
 namespace {
@@ -918,6 +920,23 @@ static int render_runtime_scene(geLinuxRender_Runtime *runtime) {
         set_api_error("world has no renderable BSP geometry");
         return 0;
     }
+    if (runtime->world_callback) {
+        GLint previous_matrix_mode = GL_MODELVIEW;
+        glGetIntegerv(GL_MATRIX_MODE, &previous_matrix_mode);
+        glPushAttrib(GL_ALL_ATTRIB_BITS);
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        runtime->world_callback(runtime->world_context,
+                                runtime->framebuffer_width,
+                                runtime->framebuffer_height);
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(static_cast<GLenum>(previous_matrix_mode));
+        glPopAttrib();
+    }
     const size_t first_world_actor = primary_native ? 1U : 0U;
     for (size_t index = first_world_actor;
          index < runtime->actors.size(); ++index) {
@@ -1754,6 +1773,16 @@ extern "C" int geLinuxRender_SetOverlayCallback(
         return 0;
     runtime->overlay_callback = callback;
     runtime->overlay_context = callback ? context : nullptr;
+    return 1;
+}
+
+extern "C" int geLinuxRender_SetWorldCallback(
+    geLinuxRender_Runtime *runtime, geLinuxRender_WorldCallback callback,
+    void *context) {
+    if (!runtime)
+        return 0;
+    runtime->world_callback = callback;
+    runtime->world_context = callback ? context : nullptr;
     return 1;
 }
 
