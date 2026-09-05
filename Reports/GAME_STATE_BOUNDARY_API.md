@@ -2,7 +2,7 @@
 
 ## Result
 
-The renderer API is version 15. It exposes bounded input edges, one lifecycle
+The renderer API is version 16. It exposes bounded input edges, one lifecycle
 operation needed by an external game layer while retaining all save data and
 serialization outside the public engine.
 
@@ -19,6 +19,9 @@ serialization outside the public engine.
 - F12 is delivered as a one-poll `Screenshot` edge. The caller can use
   `geLinuxRender_SaveScreenshot` to save the displayed framebuffer as a 24-bit
   BMP at a caller-owned path.
+- F2 and directional menu actions are delivered as bounded application-facing
+  input edges. Menu ownership, selection, volume values, and persistence remain
+  outside the renderer.
 - Opaque dynamic-light handles let a game layer create, update, and remove
   bounded point lights while the renderer owns lightmap invalidation and
   regeneration.

@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 15u
+#define GE_LINUX_RENDER_API_VERSION 16u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -49,6 +49,11 @@ typedef struct geLinuxRender_Input {
     int QuickSave;
     int QuickLoad;
     int WeaponSlot;
+    int MenuToggle;
+    int MenuUp;
+    int MenuDown;
+    int MenuLeft;
+    int MenuRight;
     int QuitRequested;
 } geLinuxRender_Input;
 

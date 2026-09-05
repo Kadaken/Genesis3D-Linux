@@ -63,6 +63,11 @@ struct geLinuxRender_Runtime {
     bool quick_save_requested = false;
     bool quick_load_requested = false;
     int weapon_slot_requested = -1;
+    bool menu_toggle_requested = false;
+    bool menu_up_requested = false;
+    bool menu_down_requested = false;
+    bool menu_left_requested = false;
+    bool menu_right_requested = false;
     geLinuxRender_OverlayCallback overlay_callback = nullptr;
     void *overlay_context = nullptr;
 };
@@ -575,6 +580,11 @@ extern "C" int geLinuxRender_LoadMap(geLinuxRender_Runtime *runtime,
     runtime->quick_save_requested = false;
     runtime->quick_load_requested = false;
     runtime->weapon_slot_requested = -1;
+    runtime->menu_toggle_requested = false;
+    runtime->menu_up_requested = false;
+    runtime->menu_down_requested = false;
+    runtime->menu_left_requested = false;
+    runtime->menu_right_requested = false;
     runtime->camera = initial_camera(runtime->world);
     runtime->model_visibility.assign(
         geLinuxRender_GetWorldModelCount(runtime), 1U);
@@ -629,6 +639,17 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
                 event.key.keysym.scancode == SDL_SCANCODE_F10)
                 runtime->quick_load_requested = true;
             if (event.key.repeat == 0 &&
+                event.key.keysym.scancode == SDL_SCANCODE_F2)
+                runtime->menu_toggle_requested = true;
+            if (event.key.keysym.scancode == SDL_SCANCODE_UP)
+                runtime->menu_up_requested = true;
+            if (event.key.keysym.scancode == SDL_SCANCODE_DOWN)
+                runtime->menu_down_requested = true;
+            if (event.key.keysym.scancode == SDL_SCANCODE_LEFT)
+                runtime->menu_left_requested = true;
+            if (event.key.keysym.scancode == SDL_SCANCODE_RIGHT)
+                runtime->menu_right_requested = true;
+            if (event.key.repeat == 0 &&
                 event.key.keysym.scancode >= SDL_SCANCODE_1 &&
                 event.key.keysym.scancode <= SDL_SCANCODE_9) {
                 runtime->weapon_slot_requested =
@@ -673,11 +694,21 @@ extern "C" int geLinuxRender_PollInput(geLinuxRender_Runtime *runtime,
     input->QuickSave = runtime->quick_save_requested ? 1 : 0;
     input->QuickLoad = runtime->quick_load_requested ? 1 : 0;
     input->WeaponSlot = runtime->weapon_slot_requested;
+    input->MenuToggle = runtime->menu_toggle_requested ? 1 : 0;
+    input->MenuUp = runtime->menu_up_requested ? 1 : 0;
+    input->MenuDown = runtime->menu_down_requested ? 1 : 0;
+    input->MenuLeft = runtime->menu_left_requested ? 1 : 0;
+    input->MenuRight = runtime->menu_right_requested ? 1 : 0;
     runtime->use_requested = false;
     runtime->screenshot_requested = false;
     runtime->quick_save_requested = false;
     runtime->quick_load_requested = false;
     runtime->weapon_slot_requested = -1;
+    runtime->menu_toggle_requested = false;
+    runtime->menu_up_requested = false;
+    runtime->menu_down_requested = false;
+    runtime->menu_left_requested = false;
+    runtime->menu_right_requested = false;
     input->QuitRequested = runtime->close_requested;
     return 1;
 }
