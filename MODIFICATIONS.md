@@ -84,3 +84,5 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
   the callback with complete OpenGL attribute and matrix restoration.
 - Enabled negotiated 4x multisample anti-aliasing in both the reusable runtime
   and standalone harness, with a non-MSAA window-format fallback.
+- Added trilinear mipmaps and bounded anisotropic filtering to world materials;
+  dynamic material replacements now refresh all mip levels.
