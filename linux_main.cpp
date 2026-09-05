@@ -1332,6 +1332,8 @@ bool render_native_actor(NativeActor *native_actor,
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
+    glEnable(GL_ALPHA_TEST);
+    glAlphaFunc(GL_GREATER, 0.01f);
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
     const geBodyInst_Index *cursor = geometry->FaceList;
@@ -1378,6 +1380,7 @@ bool render_native_actor(NativeActor *native_actor,
         ++diagnostics->actor_submissions;
     }
     glBindTexture(GL_TEXTURE_2D, 0);
+    glDisable(GL_ALPHA_TEST);
     return true;
 }
 
