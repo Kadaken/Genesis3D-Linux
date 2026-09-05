@@ -67,3 +67,5 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
 - Added bounded material name/dimension inspection and stride-aware RGBA texture
   replacement so application layers can implement animated surfaces without
   importing game-specific decoders or assets into the engine.
+- Added bounded player gravity, jump-speed, and step-height configuration so an
+  application can apply authored map movement without renderer coupling.

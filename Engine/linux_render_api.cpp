@@ -802,6 +802,22 @@ extern "C" int geLinuxRender_SetPlayerMedium(
     return 1;
 }
 
+extern "C" int geLinuxRender_SetPlayerMovement(
+    geLinuxRender_Runtime *runtime,
+    const geLinuxRender_PlayerMovement *movement) {
+    if (!runtime || !movement || !std::isfinite(movement->Gravity) ||
+        !std::isfinite(movement->JumpSpeed) ||
+        !std::isfinite(movement->StepHeight) ||
+        movement->Gravity < 1.0 || movement->Gravity > 10000.0 ||
+        movement->JumpSpeed < 1.0 || movement->JumpSpeed > 5000.0 ||
+        movement->StepHeight < 0.1 || movement->StepHeight > 256.0)
+        return 0;
+    runtime->player_physics.gravity = movement->Gravity;
+    runtime->player_physics.jump_speed = movement->JumpSpeed;
+    runtime->player_physics.step_height = movement->StepHeight;
+    return 1;
+}
+
 extern "C" int geLinuxRender_AdvanceSimulation(
     geLinuxRender_Runtime *runtime, double fixed_delta_seconds) {
     if (!runtime || !std::isfinite(fixed_delta_seconds) ||
@@ -843,7 +859,14 @@ extern "C" int geLinuxRender_ResetPlayerPhysics(
     geLinuxRender_Runtime *runtime) {
     if (!runtime)
         return 0;
+    const PlayerPhysics configured = runtime->player_physics;
     runtime->player_physics = PlayerPhysics{};
+    runtime->player_physics.speed_scale = configured.speed_scale;
+    runtime->player_physics.gravity_scale = configured.gravity_scale;
+    runtime->player_physics.swim_acceleration = configured.swim_acceleration;
+    runtime->player_physics.gravity = configured.gravity;
+    runtime->player_physics.jump_speed = configured.jump_speed;
+    runtime->player_physics.step_height = configured.step_height;
     runtime->movement_input = HeldMovementInput{};
     runtime->fire_button = false;
     return 1;
