@@ -8,11 +8,15 @@ Date: 2026-09-05
 submits the non-root BSP models used for doors and moving platforms instead of
 drawing only the static root world.
 
-API version 6 adds bounded world-model count, lookup, bounds, entity-to-model,
+API version 6 added bounded world-model count, lookup, bounds, entity-to-model,
 motion-extents, motion-sampling, and frame-statistics calls. The engine samples
 the original Genesis3D motion path and applies it with
 `geWorld_SetModelXForm`, keeping transformed rendering and BSP collision on the
 same engine-owned model state.
+
+API version 7 adds per-model render visibility. This lets an application keep
+logical trigger and level-exit brushes in BSP collision/query data without
+submitting those invisible volumes to OpenGL.
 
 ## Verification
 

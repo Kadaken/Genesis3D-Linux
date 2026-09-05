@@ -1443,7 +1443,8 @@ bool render_world_geometry(const geWorld *world,
                            NativeActor *native_actor,
                            const NativeLightingState &lighting_state,
                            RenderDiagnostics *diagnostics,
-                           int width, int height) {
+                           int width, int height,
+                           const std::vector<uint8_t> *model_visibility = nullptr) {
     if (!world || !world->CurrentBSP || !diagnostics)
         return false;
 
@@ -1602,6 +1603,10 @@ bool render_world_geometry(const geWorld *world,
     }
     for (int32 model_index = 1; model_index < bsp.NumGFXModels;
          ++model_index) {
+        if (model_visibility &&
+            static_cast<size_t>(model_index) < model_visibility->size() &&
+            (*model_visibility)[static_cast<size_t>(model_index)] == 0)
+            continue;
         const GFX_Model &bsp_model = bsp.GFXModels[model_index];
         const int32 model_first = (std::max)(0, bsp_model.FirstFace);
         const int32 model_final = (std::min)(

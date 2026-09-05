@@ -104,7 +104,8 @@ executable and `libgenesis3d_render.so.1`. Applications should include
 
 The versioned C ABI provides opaque runtime ownership, exact-map loading,
 generic entity queries, multi-actor ownership, BSP submodel lookup and authored
-motion sampling, SDL input polling, fixed-step BSP player collision, explicit
+motion sampling, per-model render visibility, SDL input polling, fixed-step BSP
+player collision, explicit
 camera submission, simulation advancement, and single-frame rendering. Game
 code remains outside the engine target.
 

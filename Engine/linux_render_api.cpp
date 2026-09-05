@@ -32,6 +32,7 @@ struct geLinuxRender_Runtime {
     NativeTextureSet world_textures;
     NativeFaceCache face_cache;
     std::vector<std::unique_ptr<RuntimeActor>> actors;
+    std::vector<uint8_t> model_visibility;
     NativeLightingState lighting_state;
     RenderDiagnostics diagnostics;
     PlayerCamera camera{{0.0, 0.0, 0.0}, 0.0, 0.0, 400.0};
@@ -228,6 +229,8 @@ geLinuxRender_Create(const geLinuxRender_Config *config) {
         return nullptr;
     }
     runtime->camera = initial_camera(runtime->world);
+    runtime->model_visibility.assign(
+        geLinuxRender_GetWorldModelCount(runtime), 1U);
     if (runtime->headless) {
         load_runtime_actor(runtime, config->ActorDirectory, false);
         place_runtime_actor_at_default(runtime);
@@ -374,6 +377,8 @@ extern "C" int geLinuxRender_LoadMap(geLinuxRender_Runtime *runtime,
     runtime->movement_input = HeldMovementInput{};
     runtime->fire_button = false;
     runtime->camera = initial_camera(runtime->world);
+    runtime->model_visibility.assign(
+        geLinuxRender_GetWorldModelCount(runtime), 1U);
     place_runtime_actor_at_default(runtime);
     if (!runtime->headless) {
         advance_light_styles(runtime->world, &runtime->world_textures,
@@ -528,7 +533,8 @@ extern "C" int geLinuxRender_RenderFrame(geLinuxRender_Runtime *runtime) {
                                runtime->lighting_state,
                                &runtime->diagnostics,
                                runtime->framebuffer_width,
-                               runtime->framebuffer_height)) {
+                               runtime->framebuffer_height,
+                               &runtime->model_visibility)) {
         set_api_error("world has no renderable BSP geometry");
         return 0;
     }
@@ -714,6 +720,15 @@ extern "C" int geLinuxRender_SetWorldModelMotionTime(
         return 0;
     gePath_Sample(path, static_cast<geFloat>(time_seconds), &transform);
     return geWorld_SetModelXForm(runtime->world, model, &transform) == GE_TRUE;
+}
+
+extern "C" int geLinuxRender_SetWorldModelVisible(
+    geLinuxRender_Runtime *runtime, size_t model_index, int visible) {
+    if (!runtime || model_index == 0 ||
+        model_index >= runtime->model_visibility.size())
+        return 0;
+    runtime->model_visibility[model_index] = visible ? 1U : 0U;
+    return 1;
 }
 
 extern "C" size_t geLinuxRender_GetEntityClassCount(

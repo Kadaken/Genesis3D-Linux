@@ -16,5 +16,6 @@ Verification covered 19 authored actor instances on the first private BSP and
 OpenGL frame across a map transition. No physical display or input capture was
 used.
 
-The current ABI is version 6; the subsequent version adds BSP submodel and
-authored motion access without changing these entity/actor contracts.
+The current ABI is version 7; subsequent versions add BSP submodel/motion and
+per-model render-visibility access without changing these entity/actor
+contracts.
