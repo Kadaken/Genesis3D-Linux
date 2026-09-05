@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 3u
+#define GE_LINUX_RENDER_API_VERSION 5u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
@@ -113,6 +113,31 @@ int geLinuxRender_GetEntityModelBounds(const geLinuxRender_Runtime *Runtime,
                                        size_t EntityIndex,
                                        geLinuxRender_Aabb *Bounds);
 
+/* Generic entity inspection. String functions return the required byte count
+ * including the terminating NUL, or zero when the item does not exist. */
+size_t geLinuxRender_GetEntityClassCount(const geLinuxRender_Runtime *Runtime);
+size_t geLinuxRender_GetEntityClassName(const geLinuxRender_Runtime *Runtime,
+                                        size_t ClassIndex,
+                                        char *Buffer,
+                                        size_t BufferSize);
+size_t geLinuxRender_GetEntityCount(const geLinuxRender_Runtime *Runtime,
+                                    const char *ClassName);
+size_t geLinuxRender_GetEntityKeyCount(const geLinuxRender_Runtime *Runtime,
+                                       const char *ClassName,
+                                       size_t EntityIndex);
+size_t geLinuxRender_GetEntityKeyName(const geLinuxRender_Runtime *Runtime,
+                                      const char *ClassName,
+                                      size_t EntityIndex,
+                                      size_t KeyIndex,
+                                      char *Buffer,
+                                      size_t BufferSize);
+size_t geLinuxRender_GetEntityValue(const geLinuxRender_Runtime *Runtime,
+                                    const char *ClassName,
+                                    size_t EntityIndex,
+                                    const char *Key,
+                                    char *Buffer,
+                                    size_t BufferSize);
+
 /* Returns API success separately from Result->Hit so a clean miss is valid. */
 int geLinuxRender_TraceWorld(const geLinuxRender_Runtime *Runtime,
                              const geLinuxRender_Vec3 *Start,
@@ -125,6 +150,14 @@ int geLinuxRender_SweepWorld(const geLinuxRender_Runtime *Runtime,
                              geLinuxRender_TraceResult *Result);
 
 size_t geLinuxRender_GetActorCount(const geLinuxRender_Runtime *Runtime);
+int geLinuxRender_CreateActor(geLinuxRender_Runtime *Runtime,
+                              const char *ActorPath,
+                              const geLinuxRender_Vec3 *Position,
+                              double YawRadians,
+                              size_t *ActorIndex);
+int geLinuxRender_RemoveActor(geLinuxRender_Runtime *Runtime,
+                              size_t ActorIndex);
+int geLinuxRender_ClearActors(geLinuxRender_Runtime *Runtime);
 int geLinuxRender_SetActorTransform(geLinuxRender_Runtime *Runtime,
                                     size_t ActorIndex,
                                     const geLinuxRender_Vec3 *Position,
