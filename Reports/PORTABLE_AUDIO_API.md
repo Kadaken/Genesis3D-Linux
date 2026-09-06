@@ -25,6 +25,9 @@ streaming API before that path is enabled.
 - GCC release build: complete, including `libgenesis3d_render.so.1`, the
   standalone validator, and the sound test.
 - Null-output test: `genesis3d_sound_null_backend` passed.
+- The fixture passes a null legacy window argument to
+  `geSound_CreateSoundSystem(NULL)` and asserts successful initialization; the
+  window handle and null output-device conditions are independently covered.
 - Clang ASan/UBSan build and null-output test: passed with leak detection on.
 - No visible window, physical input capture, or physical audio device was used.
 
