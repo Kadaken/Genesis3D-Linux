@@ -31,7 +31,6 @@
 #endif
 #endif
 
-#ifndef NDEBUG
 GENESISAPI geFloat GENESISCC   geVec3d_GetElement(geVec3d *V, int Index)
 {
 	assert( V != NULL );
@@ -39,7 +38,22 @@ GENESISAPI geFloat GENESISCC   geVec3d_GetElement(geVec3d *V, int Index)
 	assert( Index <  3 );
 	return (* ((&((V)->X)) +  (Index) ));
 }
-#endif
+
+GENESISAPI geFloat GENESISCC geVec3d_GetMaxElement(const geVec3d *V)
+{
+	geFloat Max;
+	assert(V != NULL);
+	Max = V->X;
+	if (V->Y > Max) Max = V->Y;
+	if (V->Z > Max) Max = V->Z;
+	return Max;
+}
+
+GENESISAPI geBoolean GENESISCC geVec3d_IsZero(const geVec3d *V)
+{
+	assert(V != NULL);
+	return (V->X == 0.0f && V->Y == 0.0f && V->Z == 0.0f) ? GE_TRUE : GE_FALSE;
+}
 
 GENESISAPI geBoolean GENESISCC geVec3d_IsValid(const geVec3d *V)
 {

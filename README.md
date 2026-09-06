@@ -77,14 +77,14 @@ Fedora dependencies:
 
 ```bash
 sudo dnf install gcc gcc-c++ cmake make pkgconf-pkg-config \
-  mesa-libGL-devel libX11-devel SDL2-devel
+  mesa-libGL-devel libX11-devel SDL2-devel openal-soft-devel
 ```
 
 Ubuntu/Debian dependencies:
 
 ```bash
 sudo apt install build-essential cmake pkg-config libgl1-mesa-dev \
-  libx11-dev libsdl2-dev
+  libx11-dev libsdl2-dev libopenal-dev
 ```
 
 Configure and compile out of tree:
@@ -115,6 +115,12 @@ callbacks, and single-frame rendering. The world callback executes after BSP
 geometry with camera matrices active; the renderer restores its OpenGL state and
 matrices before continuing. Dynamic
 surface decoding and all other game policy remain outside the engine target.
+
+The historical `geSound_*` API uses an OpenAL backend on Linux. It supports
+looping, pitch, per-source gain/pan, master gain, deterministic source cleanup,
+and headless tests through OpenAL Soft's null output driver. The legacy
+`geSound_GetDSound` escape hatch returns null because DirectSound objects do not
+exist on Linux; clients must treat that optional platform handle accordingly.
 
 Visible runtimes request a four-sample multisampled framebuffer and enable
 OpenGL multisampling when the driver grants it. Window creation automatically

@@ -34,10 +34,7 @@ typedef struct geSound_Def		geSound_Def;
 typedef struct geSound			geSound;
 
 
-#ifdef _INC_WINDOWS
-	// Windows.h must be previously included for this api to be exposed.
 GENESISAPI	geSound_System *geSound_CreateSoundSystem(HWND hWnd);
-#endif
 
 GENESISAPI	void			geSound_DestroySoundSystem(geSound_System *Sound);
 
@@ -73,4 +70,3 @@ GENESISAPI void *geSound_GetDSound(void);
 #endif
 
 #endif
-

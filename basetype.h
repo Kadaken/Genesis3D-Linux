@@ -43,6 +43,11 @@ typedef double   geDouble;
 typedef int32_t  geBoolean;
 typedef geBoolean BOOL;
 
+#ifndef _WIN32
+/* Opaque compatibility handle used only to preserve the historical public ABI. */
+typedef void *HWND;
+#endif
+
 typedef struct geSystemTime {
     uint16_t wYear, wMonth, wDayOfWeek, wDay;
     uint16_t wHour, wMinute, wSecond, wMilliseconds;
