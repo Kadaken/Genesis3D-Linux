@@ -6,6 +6,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 project(Genesis3D_Linux LANGUAGES C CXX)
+include(CTest)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +16,7 @@ find_package(OpenGL REQUIRED)
 find_package(X11 REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+pkg_check_modules(OPENAL REQUIRED IMPORTED_TARGET openal)
 
 # Discover the native-port implementation graph. CONFIGURE_DEPENDS makes CMake
 # regenerate when a source module is added or removed.
@@ -53,7 +55,7 @@ list(APPEND ENGINE_SOURCES ${ROOT_ENGINE_SOURCES})
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/Engine/Drivers/")
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/Engine/Logo/")
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/VFile/fsdos\\.c$")
-list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/(CSNetMgr|Netplay|Sound|Sound3d)\\.c$")
+list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/(CSNetMgr|Netplay|Sound)\\.c$")
 list(REMOVE_DUPLICATES ENGINE_SOURCES)
 list(SORT ENGINE_SOURCES)
 
@@ -117,6 +119,7 @@ target_include_directories(genesis3d_render PUBLIC
 target_link_libraries(genesis3d_render PUBLIC
     OpenGL::GL
     PkgConfig::SDL2
+    PkgConfig::OPENAL
     ${X11_LIBRARIES}
     ${CMAKE_DL_LIBS}
     pthread
@@ -137,8 +140,20 @@ target_include_directories(genesis3d_linux PRIVATE
 target_link_libraries(genesis3d_linux PRIVATE genesis3d_render)
 set_target_properties(genesis3d_linux PROPERTIES BUILD_RPATH "$ORIGIN")
 
+if(BUILD_TESTING)
+    add_executable(genesis3d_sound_test tests/sound_openal_test.c)
+    target_include_directories(genesis3d_sound_test PRIVATE ${ENGINE_INCLUDE_DIRS})
+    target_link_libraries(genesis3d_sound_test PRIVATE genesis3d_render)
+    set_target_properties(genesis3d_sound_test PROPERTIES BUILD_RPATH "$ORIGIN")
+    add_test(NAME genesis3d_sound_null_backend COMMAND genesis3d_sound_test)
+    set_tests_properties(genesis3d_sound_null_backend PROPERTIES
+        ENVIRONMENT "ALSOFT_DRIVERS=null"
+    )
+endif()
+
 message(STATUS "Genesis3D native canvas: 1920x1080")
 message(STATUS "Genesis3D fixed-step rates: 60 FPS and 120 FPS")
 list(LENGTH ENGINE_SOURCES ENGINE_SOURCE_COUNT)
 message(STATUS "Genesis3D native implementation modules: ${ENGINE_SOURCE_COUNT}")
 message(STATUS "Legacy Win32 driver and optional subsystem sources are excluded")
+message(STATUS "Genesis3D audio backend: OpenAL (pitch, looping, spatial pan, and per-source/master gain)")

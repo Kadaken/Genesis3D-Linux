@@ -234,16 +234,10 @@ typedef struct
 //================================================================================
 
 
-#ifdef _INC_WINDOWS	
-	// Windows.h must be included before genesis.h for this api to be exposed.
-	
-
 GENESISAPI	geEngine	*geEngine_CreateWithVersion(HWND hWnd, const char *AppName, const char *DriverDirectory, uint32 Version);
 							// use geEngine_Create, rather than calling this directly.
 
 #define geEngine_Create( hWnd, AppName, DriverDirectory)   geEngine_CreateWithVersion(hWnd,AppName,DriverDirectory,GE_VERSION)
-
-#endif
 
 GENESISAPI void			geEngine_Free(geEngine *Engine);
 
@@ -335,10 +329,7 @@ GENESISAPI geBoolean	geDriver_ModeGetWidthHeight(geDriver_Mode *Mode, int32 *Wid
 //================================================================================
 //	Sound Management functions
 //================================================================================
-#ifdef _INC_WINDOWS
-	// Windows.h must be included before genesis.h for this api to be exposed.
 GENESISAPI 	geSound_System *geSound_CreateSoundSystem(HWND hWnd);
-#endif
 
 
 GENESISAPI void			geSound_DestroySoundSystem(geSound_System *Sound);

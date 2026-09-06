@@ -3,6 +3,18 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-05 — portable sound API and ABI v22
+
+- Implemented the historical `geSound_*` interface over OpenAL, including WAV
+  ingestion through `geVFile`, looping, pitch, source pan/gain, master gain, and
+  deterministic definition/source teardown.
+- Restored the portable `Sound3d.c` calculations to the native shared library.
+- Defined the unavailable DirectSound escape hatch to return null on Linux.
+- Exposed the existing engine constructor and vector element helper on Linux,
+  and added the small vector maximum/zero helpers.
+- Added a neutral in-memory WAV lifecycle test using OpenAL Soft's null backend.
+- Advanced the native renderer ABI from 21 to 22.
+
 **Prominent derivation statement:** This work is derived directly and
 indirectly from Genesis3D Original Code provided by Eclipse Entertainment,
 later Genesis3D 1.1 material carrying WildTangent notices, and subsequent

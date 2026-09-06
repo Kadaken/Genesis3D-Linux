@@ -33,11 +33,9 @@ typedef struct
 	geFloat X, Y, Z;
 } geVec3d;
 
-#ifndef NDEBUG
 GENESISAPI	geFloat GENESISCC   geVec3d_GetElement(geVec3d *V, int Index);
-#else
-	#define geVec3d_GetElement(Vector,Index)  (* ((&((Vector)->X)) +  (Index) ))
-#endif
+GENESISAPI geFloat GENESISCC geVec3d_GetMaxElement(const geVec3d *V);
+GENESISAPI geBoolean GENESISCC geVec3d_IsZero(const geVec3d *V);
 
 GENESISAPI void GENESISCC		geVec3d_Set(geVec3d *V, geFloat X, geFloat Y, geFloat Z);
 GENESISAPI void GENESISCC		geVec3d_Get(const geVec3d *V, geFloat *X, geFloat *Y, geFloat *Z);
@@ -67,4 +65,3 @@ GENESISAPI geBoolean GENESISCC	geVec3d_IsValid(const geVec3d *V);
 #endif
 
 #endif
-

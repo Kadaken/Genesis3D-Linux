@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GE_LINUX_RENDER_API_VERSION 21u
+#define GE_LINUX_RENDER_API_VERSION 22u
 
 typedef struct geLinuxRender_Runtime geLinuxRender_Runtime;
 
