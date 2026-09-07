@@ -181,7 +181,7 @@ static	void	GENESISCC FSMemory_Close(void *Handle)
 
 static int GENESISCC ClampOperationSize(const MemoryFile *File, int Size)
 {
-	return min(File->Size - File->Position, Size);
+	return GE_MIN(File->Size - File->Position, Size);
 }
 
 static char * GENESISCC DataPtr(const MemoryFile *File)

@@ -958,8 +958,8 @@ GENESISAPI geBoolean GENESISCC gePath_GetTimeExtents(const gePath *P, gePath_Tim
 							TransEnd = TransStart;
 						}
 
-					*StartTime = min(TransStart,RotStart);
-					*EndTime   = max(TransEnd,RotEnd);
+					*StartTime = GE_MIN(TransStart,RotStart);
+					*EndTime   = GE_MAX(TransEnd,RotEnd);
 				}
 			else
 				{	// No Translation Keys

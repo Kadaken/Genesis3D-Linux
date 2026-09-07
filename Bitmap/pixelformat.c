@@ -255,7 +255,7 @@ void	PutPixel_32bit(uint8 **ppData,uint32 Pixel)
 /*}{****************************************************************************************/
 
 //#define RGB_to_Gray(R,G,B)	((R + G + B)/3)
-#define RGB_to_Gray(R,G,B)	max(max(R,G),B)
+#define RGB_to_Gray(R,G,B)	GE_MAX(GE_MAX(R,G),B)
 
 uint32	Compose_8bitGray   (int R,int G,int B,int A)
 {
@@ -944,4 +944,3 @@ void	Put_(uint8 **ppData,int  R,int  G,int  B,int  A)
 */
 
 /*}{****************************************************************************************/
-

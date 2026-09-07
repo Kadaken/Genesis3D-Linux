@@ -3,6 +3,14 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-06 — public header macro hygiene
+
+- Removed the generic `min` and `max` function-like macros from the public
+  `basetype.h` compatibility header because they corrupt C++ standard-library
+  declarations in downstream consumers.
+- Added engine-prefixed `GE_MIN` and `GE_MAX` equivalents and migrated active
+  engine call sites to those names.
+
 ## 2026-09-05 — portable sound API and ABI v22
 
 - Implemented the historical `geSound_*` interface over OpenAL, including WAV

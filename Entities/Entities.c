@@ -525,7 +525,7 @@ GENESISAPI void geEntity_GetName(const geEntity *Entity, char *Buff, int MaxLen)
 	EntName = geEntity_GetStringForKey(Entity, "%Name%");
 	assert(EntName);
 	Length = strlen(EntName) + 1;
-	memcpy(Buff, EntName, min(Length, MaxLen));
+	memcpy(Buff, EntName, GE_MIN(Length, MaxLen));
 }
 
 //====================================================================================

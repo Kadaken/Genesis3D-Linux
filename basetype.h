@@ -20,12 +20,6 @@
 #define _inline inline
 #define strnicmp strncasecmp
 #define stricmp strcasecmp
-#ifndef min
-#define min(a,b) (((a) < (b)) ? (a) : (b))
-#endif
-#ifndef max
-#define max(a,b) (((a) > (b)) ? (a) : (b))
-#endif
 #endif
 
 #ifdef __cplusplus
@@ -74,6 +68,8 @@ typedef struct geSystemTime {
 #endif
 
 #define GE_ABS(x)        ((x) < 0 ? -(x) : (x))
+#define GE_MIN(a,b)      (((a) < (b)) ? (a) : (b))
+#define GE_MAX(a,b)      (((a) > (b)) ? (a) : (b))
 #define GE_CLAMP(x,lo,hi) ((x) < (lo) ? (lo) : ((x) > (hi) ? (hi) : (x)))
 #define GE_CLAMP8(x)     GE_CLAMP((x), 0, 255)
 #define GE_CLAMP16(x)    GE_CLAMP((x), 0, 65535)

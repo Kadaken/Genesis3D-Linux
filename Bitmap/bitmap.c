@@ -2625,7 +2625,7 @@ geBoolean	BITMAP_GENESIS_INTERNAL geBitmap_AttachToDriver(geBitmap *Bmp,
 //		if ( Bmp->DriverFlags & RDRIVER_PF_COMBINE_LIGHTMAP )
 //			Bmp->SeekMipCount = max(Bmp->SeekMipCount,4);
 
-		NumMipLevels = max(Bmp->SeekMipCount,(Bmp->Info.MaximumMip + 1));
+		NumMipLevels = GE_MAX(Bmp->SeekMipCount,(Bmp->Info.MaximumMip + 1));
 		if ( NumMipLevels > 4 ) NumMipLevels = 4; // {} kind of a hack, our drivers ignore mips > 4
 
 		// make sizes power-of-two and square
@@ -3433,7 +3433,7 @@ geBoolean geBitmap_UpdateMips_System(geBitmap *Bmp,int fm,int to)
 	Ret = geBitmap_UpdateMips_Data(	&FmInfo, Bmp->Data[fm],
 									&ToInfo, Bmp->Data[to]);
 
-	Bmp->Info.MaximumMip = max(Bmp->Info.MaximumMip,to);
+	Bmp->Info.MaximumMip = GE_MAX(Bmp->Info.MaximumMip,to);
 
 	return Ret;
 }
@@ -3843,8 +3843,8 @@ geBoolean geBitmap_MakeSystemMips(geBitmap *Bmp,int low,int high)
 		}
 	}
 
-	Bmp->Info.MinimumMip = min(Bmp->Info.MinimumMip,low);
-	Bmp->Info.MaximumMip = max(Bmp->Info.MaximumMip,high);
+	Bmp->Info.MinimumMip = GE_MIN(Bmp->Info.MinimumMip,low);
+	Bmp->Info.MaximumMip = GE_MAX(Bmp->Info.MaximumMip,high);
 
 	return GE_TRUE;
 }
@@ -4049,9 +4049,9 @@ geBoolean geBitmap_BlitMipRect(const geBitmap * Src, int SrcMip, int SrcX,int Sr
 	}
 
 	if ( SizeX < 0 )
-		SizeX = min(SrcLockInfo->Width,DstLockInfo->Width);
+		SizeX = GE_MIN(SrcLockInfo->Width,DstLockInfo->Width);
 	if ( SizeY < 0 )
-		SizeY = min(SrcLockInfo->Height,DstLockInfo->Height);
+		SizeY = GE_MIN(SrcLockInfo->Height,DstLockInfo->Height);
 
 	if (( (SrcX + SizeX) > SrcLockInfo->Width ) ||
 		( (SrcY + SizeY) > SrcLockInfo->Height) ||
@@ -4244,7 +4244,7 @@ GENESISAPI geBoolean GENESISCC geBitmap_SetFormat(geBitmap *Bmp,
 		Bmp->Info.ColorKey = ColorKey;
 
 		// {} this is not very polite; we do restore them later, though...
-		OldMaxMips = max(Bmp->Info.MaximumMip,Bmp->DriverInfo.MaximumMip);
+		OldMaxMips = GE_MAX(Bmp->Info.MaximumMip,Bmp->DriverInfo.MaximumMip);
 		geBitmap_ClearMips(Bmp);		
 
 		if ( Bmp->Data[Bmp->Info.MinimumMip] == NULL && 

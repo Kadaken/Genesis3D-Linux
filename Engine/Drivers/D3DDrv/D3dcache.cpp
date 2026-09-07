@@ -774,8 +774,7 @@ int32 SnapToPower2(int32 Width)
 //=====================================================================================
 int32 GetLog(int32 Width, int32 Height)
 {
-	int32	LWidth = SnapToPower2(max(Width, Height));
+	int32	LWidth = SnapToPower2(GE_MAX(Width, Height));
 	
 	return Log2(LWidth);
 }
-

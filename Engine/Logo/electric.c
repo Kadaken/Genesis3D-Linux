@@ -216,7 +216,7 @@ void _Electric_BoltEffectAnimate(
 		int	Spike;
 
 		DecayRate = rand() % (int)(Effect->beBaseColors[dominant] - Effect->beBaseColors[nonDominant1]);
-		DecayRate = max(DecayRate, 5);
+		DecayRate = GE_MAX(DecayRate, 5);
 		Effect->beDecayRate = DecayRate;
 		if	(Effect->beBaseColors[nonDominant1] >= 1.0f)
 			Spike = rand() % (int)(Effect->beBaseColors[nonDominant1]);

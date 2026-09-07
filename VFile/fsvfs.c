@@ -506,7 +506,7 @@ static	int			ClampOperationSize(const VFSFile *File, int Size)
 {
 	assert(!File->Directory);
 	assert(File->CurrentRelPos >= 0);
-	return min(File->Length - File->CurrentRelPos, Size);
+	return GE_MIN(File->Length - File->CurrentRelPos, Size);
 }
 
 static	void		GENESISCC UpdateFilePos(VFSFile *File)
