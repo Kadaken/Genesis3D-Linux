@@ -17,7 +17,7 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#include <windows.h>
+#include <string.h>
 #include <GL/gl.h>
 
 #include "Render.h"
@@ -144,7 +144,7 @@ void Render_WorldPolyMultitexture(DRV_TLVertex *Pnts, int32 NumPoints, geRDriver
 
 	if(LInfo != NULL)
 	{
-		glActiveTextureARB(GL_TEXTURE1_ARB);
+		DriverActiveTexture(GL_TEXTURE1_ARB);
 		glEnable(GL_TEXTURE_2D);
 
 		if(boundTexture2 != LInfo->THandle->TextureID)
@@ -175,7 +175,7 @@ void Render_WorldPolyMultitexture(DRV_TLVertex *Pnts, int32 NumPoints, geRDriver
 
 		glColor4ub((GLubyte)pPnt->r, (GLubyte)pPnt->g, (GLubyte)pPnt->b, alpha);
 
-		glMultiTexCoord4fARB(GL_TEXTURE0_ARB, tu * THandle->InvScale * zRecip, 
+		DriverMultiTexCoord4f(GL_TEXTURE0_ARB, tu * THandle->InvScale * zRecip,
 			tv * THandle->InvScale * zRecip, 0.0f, zRecip);
 
 		if(LInfo)
@@ -183,7 +183,7 @@ void Render_WorldPolyMultitexture(DRV_TLVertex *Pnts, int32 NumPoints, geRDriver
 			lu = pPnt->u - shiftU2;
 			lv = pPnt->v - shiftV2;
 
-			glMultiTexCoord4fARB(GL_TEXTURE1_ARB, lu * LInfo->THandle->InvScale * zRecip, 
+			DriverMultiTexCoord4f(GL_TEXTURE1_ARB, lu * LInfo->THandle->InvScale * zRecip,
 				lv * LInfo->THandle->InvScale * zRecip, 0.0f, zRecip);
 		}
 
@@ -197,7 +197,7 @@ void Render_WorldPolyMultitexture(DRV_TLVertex *Pnts, int32 NumPoints, geRDriver
 	if(LInfo != NULL)
 	{
 		glDisable(GL_TEXTURE_2D);
-		glActiveTextureARB(GL_TEXTURE0_ARB);
+		DriverActiveTexture(GL_TEXTURE0_ARB);
 	}
 } 
 

@@ -33,6 +33,10 @@ struct
 
 
 void WindowSetup(DRV_DriverHook *Hook);
+#ifndef _WIN32
+/* Caller owns the SDL_Window; this driver owns only its GL context. */
+geBoolean WindowInitialize(DRV_DriverHook *Hook);
+#endif
 void SetGLPixelFormat(DRV_DriverHook *Hook);
 void WindowCleanup();
 void FlipGLBuffers();

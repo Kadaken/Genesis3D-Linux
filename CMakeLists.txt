@@ -51,7 +51,8 @@ list(APPEND ENGINE_SOURCES ${ROOT_ENGINE_SOURCES})
 
 # The Linux bootstrap owns the active OpenGL/X11 context. The repository's
 # OpenGl directory is an older Win32-hosted driver, so all historical driver
-# backends are excluded together with optional Win32-only subsystems.
+# backends are excluded from this core graph. The inherited OpenGL driver is
+# built separately below with an SDL host.
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/Engine/Drivers/")
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/Engine/Logo/")
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX "/VFile/fsdos\\.c$")
@@ -86,7 +87,8 @@ foreach(ENGINE_HEADER IN LISTS ENGINE_HEADERS)
     list(APPEND ENGINE_INCLUDE_DIRS "${ENGINE_HEADER_DIR}")
 endforeach()
 # Core world/engine headers consume the renderer-neutral Dcommon.h ABI, but no
-# implementation source from the legacy driver directories is compiled.
+# implementation source from the legacy driver directories enters the core.
+# The inherited OpenGL driver is built as a separate module below.
 list(APPEND ENGINE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/Engine/Drivers")
 list(REMOVE_DUPLICATES ENGINE_INCLUDE_DIRS)
 list(SORT ENGINE_INCLUDE_DIRS)
@@ -129,6 +131,19 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(genesis3d_render PUBLIC m)
 endif()
 
+# Historical DRV_Driver ABI, separate from the high-level LinuxRender API.
+add_library(OglDrv SHARED
+    Engine/Drivers/OpenGl/OGLDrv.c
+    Engine/Drivers/OpenGl/OglMisc.c
+    Engine/Drivers/OpenGl/Render.c
+    Engine/Drivers/OpenGl/THandle.c
+    Engine/Drivers/OpenGl/SDLWindow.c
+)
+target_include_directories(OglDrv PRIVATE ${ENGINE_INCLUDE_DIRS}
+    Engine/Drivers/OpenGl)
+target_link_libraries(OglDrv PRIVATE OpenGL::GL OpenGL::GLU PkgConfig::SDL2 m)
+set_target_properties(OglDrv PROPERTIES C_VISIBILITY_PRESET hidden)
+
 # Preserve the original standalone validation executable. It now resolves the
 # engine implementation through the same shared object consumed by clients.
 add_executable(genesis3d_linux linux_main.cpp)
@@ -155,11 +170,30 @@ if(BUILD_TESTING)
     target_link_libraries(genesis3d_texture_name_test PRIVATE genesis3d_render)
     set_target_properties(genesis3d_texture_name_test PROPERTIES BUILD_RPATH "$ORIGIN")
     add_test(NAME genesis3d_texture_name_fixture COMMAND genesis3d_texture_name_test)
+
+    add_executable(genesis3d_legacy_frame_test tests/legacy_frame_test.c)
+    target_link_libraries(genesis3d_legacy_frame_test PRIVATE genesis3d_render)
+    add_dependencies(genesis3d_legacy_frame_test OglDrv)
+    find_program(XVFB_RUN_EXECUTABLE xvfb-run)
+    if(XVFB_RUN_EXECUTABLE)
+        add_test(NAME genesis3d_legacy_frame_fixture
+            COMMAND "${XVFB_RUN_EXECUTABLE}" -a -s "-screen 0 640x480x24"
+            $<TARGET_FILE:genesis3d_legacy_frame_test> $<TARGET_FILE_DIR:OglDrv>)
+        set_tests_properties(genesis3d_legacy_frame_fixture PROPERTIES
+            TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=x11;LIBGL_ALWAYS_SOFTWARE=1")
+        add_test(NAME genesis3d_legacy_bsp_fixture
+            COMMAND "${XVFB_RUN_EXECUTABLE}" -a -s "-screen 0 640x480x24"
+            $<TARGET_FILE:genesis3d_legacy_frame_test> $<TARGET_FILE_DIR:OglDrv> --bsp)
+        set_tests_properties(genesis3d_legacy_bsp_fixture PROPERTIES
+            TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=x11;LIBGL_ALWAYS_SOFTWARE=1")
+    else()
+        message(WARNING "xvfb-run unavailable: legacy graphics fixtures are not registered; install Xvfb and xauth to validate the driver")
+    endif()
 endif()
 
 message(STATUS "Genesis3D native canvas: 1920x1080")
 message(STATUS "Genesis3D fixed-step rates: 60 FPS and 120 FPS")
 list(LENGTH ENGINE_SOURCES ENGINE_SOURCE_COUNT)
 message(STATUS "Genesis3D native implementation modules: ${ENGINE_SOURCE_COUNT}")
-message(STATUS "Legacy Win32 driver and optional subsystem sources are excluded")
+message(STATUS "Legacy OpenGL driver: libOglDrv.so with SDL host; other Win32 drivers excluded")
 message(STATUS "Genesis3D audio backend: OpenAL (pitch, looping, spatial pan, and per-source/master gain)")

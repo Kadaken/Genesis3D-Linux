@@ -2,6 +2,11 @@
 
 Date: 2026-09-03
 
+Addendum: 2026-09-07 — the separate inherited `DRV_Driver` path now passes
+asset-free legacy frame tests. See [LEGACY_OPENGL_DRIVER.md](LEGACY_OPENGL_DRIVER.md)
+for the precise scope; earlier hardware claims below concern the native bridge,
+not this newly enabled driver.
+
 ## Short answer
 
 The native port's implemented core systems have been exercised and pass their
@@ -15,6 +20,7 @@ harness, not a feature-complete game.
 | Capability | Evidence level | Result |
 |---|---|---|
 | Native x86-64 C/C++ build | Production CMake builds | PASS |
+| Historical `geEngine` frame pipeline | Two neutral Xvfb/llvmpipe fixtures; Release and ASan/UBSan with unsuppressed leak detection | PASS for textured world polygon, generated BSP with baked lightmap, and context teardown; hardware and full application coverage pending |
 | Memory/type safety | Clang ASan and UBSan runs | PASS for engine-owned paths; one documented external 128-byte driver/global record remains |
 | BSP loading | Real purified `rfedit1.bsp` | PASS |
 | Textures and baked lightmaps | Hardware-rendered compositor capture | PASS visually; exact pixel equivalence lacks an original-renderer reference image |

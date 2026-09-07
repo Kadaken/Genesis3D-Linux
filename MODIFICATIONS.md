@@ -3,6 +3,23 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-07 — inherited OpenGL driver on SDL
+
+- Added the separate `libOglDrv.so` target for the historical `DRV_Driver`
+  interface; the existing native renderer and standalone executable remain.
+- Added an SDL host replacing the Win32 host in the Linux build. The caller
+  owns the SDL window; the driver owns and releases only its OpenGL context.
+- Guarded Windows-only initialization, used system GL extension declarations
+  and SDL procedure lookup, corrected conflicting declarations, and exported
+  the driver entry point without exporting implementation globals.
+- Preserved the inherited polygon and texture submission algorithms; release
+  texture handles before deleting the context and bound error-string copying.
+- Added asset-free legacy frame fixtures, including a generated BSP with a
+  measured half-intensity lightmap and window/context ownership checks.
+- Verified all four CTests in Release and with Clang ASan/UBSan and leak
+  detection under Xvfb/Mesa llvmpipe. No sanitizer suppressions were used for
+  this gate. This is not hardware or full application verification.
+
 ## 2026-09-06 — texture-name query completion
 
 - Completed the inherited `geWorld_GetTextureName` path, which previously

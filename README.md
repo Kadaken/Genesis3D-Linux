@@ -77,14 +77,14 @@ Fedora dependencies:
 
 ```bash
 sudo dnf install gcc gcc-c++ cmake make pkgconf-pkg-config \
-  mesa-libGL-devel libX11-devel SDL2-devel openal-soft-devel
+  mesa-libGL-devel mesa-libGLU-devel libX11-devel SDL2-devel openal-soft-devel
 ```
 
 Ubuntu/Debian dependencies:
 
 ```bash
 sudo apt install build-essential cmake pkg-config libgl1-mesa-dev \
-  libx11-dev libsdl2-dev libopenal-dev
+  libglu1-mesa-dev libx11-dev libsdl2-dev libopenal-dev
 ```
 
 Configure and compile out of tree:
@@ -94,8 +94,38 @@ cmake -S . -B build
 cmake --build build --parallel
 ```
 
-Compilation alone does not require proprietary game assets. Runtime validation
-does.
+Compilation and the synthetic CTest fixtures require no proprietary assets.
+The standalone map/actor harness requires compatible runtime assets.
+
+## Historical engine API driver
+
+The build also produces `libOglDrv.so`, the inherited OpenGL `DRV_Driver`
+backend with an SDL host. An application initializes SDL video, sets its GL
+framebuffer attributes, creates one `SDL_WINDOW_OPENGL` window, and passes that
+`SDL_Window *` as the opaque window argument to `geEngine_Create`. Pass the
+directory containing `libOglDrv.so` as `DriverDirectory`. Select an enumerated
+driver mode before calling the historical frame API.
+
+The application owns the window and event pump. The driver owns the OpenGL
+context and releases it on driver shutdown without destroying the window. It
+supports one active legacy driver context per process; concurrent legacy
+engine instances and mixing it with the high-level renderer are unverified.
+The `WindowMode` entry uses the caller's current drawable dimensions.
+
+Asset-free tests run `geEngine_Create`, driver selection, world/texture
+creation, `BeginFrame`/`RenderWorld`/`EndFrame`, pixel readback, and teardown.
+One test uses a public empty world plus a textured polygon; another generates
+a GBSP with a root face and a half-intensity lightmap. Both pass under Xvfb
+with Mesa llvmpipe and ASan/UBSan. This establishes the tested legacy frame
+paths, not hardware performance or completion of all historical renderer
+features. See [the legacy driver report](Reports/LEGACY_OPENGL_DRIVER.md).
+
+Install `xorg-x11-server-Xvfb` and `xorg-x11-xauth` on Fedora (or `xvfb` and
+`xauth` on Debian/Ubuntu) to register and run the isolated graphics tests:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
 
 ## Native render library
 

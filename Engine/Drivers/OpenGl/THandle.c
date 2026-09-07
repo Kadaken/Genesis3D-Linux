@@ -24,8 +24,8 @@
 #include "OGLDrv.h"
 #include "Render.h"
 
-extern boundTexture;
-extern boundTexture2;
+extern GLint boundTexture;
+extern GLint boundTexture2;
 
 geRDriver_THandle	TextureHandles[MAX_TEXTURE_HANDLES];
 

@@ -1,0 +1,159 @@
+/* Genesis3D Public License v1.01; see ../g3dlicense.txt.
+ * Contributor: Kadaken, 2026. Asset-free legacy engine pipeline gate.
+ */
+#include "Genesis.h"
+#include "Errorlog.h"
+#include <SDL2/SDL.h>
+#include <GL/gl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "neutral_bsp_fixture.h"
+
+static const char *Stage = "SDL initialization";
+
+static void errors(void)
+{
+    int i;
+    geErrorLog_ErrorClassType code;
+    const char *message;
+    fprintf(stderr, "legacy fixture failed at %s: %s\n", Stage, SDL_GetError());
+    for (i = 0; geErrorLog_Report(i, &code, &message); ++i)
+        fprintf(stderr, "engine error %d: %s\n", (int)code, message ? message : "");
+}
+
+int main(int argc, char **argv)
+{
+    SDL_Window *window = NULL;
+    geEngine *engine = NULL;
+    geWorld *world = NULL;
+    geCamera *camera = NULL;
+    geBitmap *bitmap = NULL, *lock = NULL;
+    gePoly *poly = NULL;
+    geDriver *driver;
+    geDriver_Mode *mode;
+    geRect rect = {0, 319, 0, 239};
+    geXForm3d transform;
+    GE_LVertex vertices[4];
+    int i, width, height, world_added = 0, bitmap_added = 0, result = 1;
+    unsigned char pixel[3];
+
+    setvbuf(stdout, NULL, _IONBF, 0);
+    if (argc != 2 && argc != 3) {
+        fprintf(stderr, "usage: legacy_frame_test <driver-directory> [--bsp]\n");
+        return 2;
+    }
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) goto cleanup;
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+    Stage = "caller window creation";
+    window = SDL_CreateWindow("Neutral legacy pipeline fixture", 0, 0, 320, 240,
+                              SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+    if (!window) goto cleanup;
+
+    Stage = "geEngine_Create";
+    puts(Stage);
+    engine = geEngine_Create(window, "Neutral fixture", argv[1]);
+    if (!engine) goto cleanup;
+    geEngine_EnableFrameRateCounter(engine, GE_FALSE);
+    Stage = "driver enumeration";
+    driver = geDriver_SystemGetNextDriver(geEngine_GetDriverSystem(engine), NULL);
+    if (!driver) goto cleanup;
+    for (mode = geDriver_GetNextMode(driver, NULL); mode;
+         mode = geDriver_GetNextMode(driver, mode)) {
+        if (geDriver_ModeGetWidthHeight(mode, &width, &height) &&
+            width == -1 && height == -1) break;
+    }
+    if (!mode) goto cleanup;
+    Stage = "geEngine_SetDriverAndModeNoSplash";
+    puts(Stage);
+    if (!geEngine_SetDriverAndModeNoSplash(engine, driver, mode)) goto cleanup;
+    printf("GL renderer: %s\n", glGetString(GL_RENDERER));
+
+    Stage = argc == 3 ? "geWorld_Create(synthetic BSP)" : "geWorld_Create(NULL)";
+    puts(Stage);
+    world = argc == 3 ? neutral_bsp_world() : geWorld_Create(NULL);
+    if (!world) goto cleanup;
+    Stage = "geEngine_AddWorld";
+    if (!geEngine_AddWorld(engine, world)) goto cleanup;
+    world_added = 1;
+    /* The neutral world uses the engine's public empty-world constructor and
+     * a textured world polygon, ensuring a frame cannot pass by just clearing. */
+    if (argc == 2) {
+    bitmap = geBitmap_Create(16, 16, 1, GE_PIXELFORMAT_24BIT_RGB);
+    Stage = "neutral texture creation";
+    if (!bitmap || !geBitmap_LockForWrite(bitmap, &lock, 0, 0)) goto cleanup;
+    {
+        geBitmap_Info info;
+        unsigned char *bits = geBitmap_GetBits(lock);
+        if (!bits || !geBitmap_GetInfo(lock, &info, NULL)) goto cleanup;
+        for (i = 0; i < info.Stride * info.Height; ++i) {
+            bits[i * 3] = 24; bits[i * 3 + 1] = 220; bits[i * 3 + 2] = 48;
+        }
+    }
+    if (!geBitmap_UnLock(lock)) goto cleanup;
+    lock = NULL;
+    if (!geWorld_AddBitmap(world, bitmap)) goto cleanup;
+    bitmap_added = 1;
+    memset(vertices, 0, sizeof(vertices));
+    for (i = 0; i < 4; ++i) {
+        vertices[i].X = (i == 0 || i == 3) ? -50 : 50;
+        vertices[i].Y = i < 2 ? 50 : -50;
+        vertices[i].Z = -100;
+        vertices[i].u = (i == 0 || i == 3) ? 0 : 1;
+        vertices[i].v = i < 2 ? 0 : 1;
+        vertices[i].r = vertices[i].g = vertices[i].b = vertices[i].a = 255;
+    }
+    poly = geWorld_AddPoly(world, vertices, 4, bitmap, GE_TEXTURED_POLY, 0, 1);
+    if (!poly) goto cleanup;
+    }
+    camera = geCamera_Create(2.0f, &rect);
+    if (!camera) goto cleanup;
+    geXForm3d_SetIdentity(&transform);
+    if (!geCamera_SetWorldSpaceXForm(camera, &transform)) goto cleanup;
+    Stage = "geEngine_BeginFrame";
+    puts(Stage);
+    if (!geEngine_BeginFrame(engine, camera, GE_TRUE)) goto cleanup;
+    Stage = "geEngine_RenderWorld";
+    puts(Stage);
+    if (!geEngine_RenderWorld(engine, world, camera, 0)) goto cleanup;
+    glReadBuffer(GL_BACK);
+    glReadPixels(160, 120, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel);
+    Stage = "geEngine_EndFrame";
+    puts(Stage);
+    if (!geEngine_EndFrame(engine)) goto cleanup;
+    printf("neutral center pixel: %u %u %u\n", pixel[0], pixel[1], pixel[2]);
+    Stage = "pixel and GL error check";
+    /* Half-intensity BSP lightmap must attenuate the same green texture;
+     * the empty-world polygon exercises the unlightmapped texture path. */
+    if (glGetError() != GL_NO_ERROR ||
+        abs((int)pixel[0] - (argc == 3 ? 12 : 24)) > 2 ||
+        abs((int)pixel[1] - (argc == 3 ? 110 : 220)) > 2 ||
+        abs((int)pixel[2] - (argc == 3 ? 24 : 48)) > 2) goto cleanup;
+    result = 0;
+
+cleanup:
+    if (result) errors();
+    if (lock) geBitmap_UnLock(lock);
+    if (poly) geWorld_RemovePoly(world, poly);
+    if (bitmap_added) geWorld_RemoveBitmap(world, bitmap);
+    if (bitmap) geBitmap_Destroy(&bitmap);
+    if (camera) geCamera_Destroy(&camera);
+    if (world_added) geEngine_RemoveWorld(engine, world);
+    if (world) geWorld_Free(world);
+    if (engine) {
+        puts("geEngine_Free");
+        geEngine_Free(engine);
+        if (SDL_GL_GetCurrentContext() != NULL || SDL_GetWindowID(window) == 0) {
+            fprintf(stderr, "legacy fixture: context/window ownership teardown failed\n");
+            result = 1;
+        }
+    }
+    if (window) SDL_DestroyWindow(window);
+    SDL_Quit();
+    if (!result) puts("legacy frame fixture: PASS");
+    return result;
+}

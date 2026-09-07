@@ -17,7 +17,13 @@
 /*                                                                                      */
 /****************************************************************************************/
 
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <SDL2/SDL.h>
+#endif
+#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <GL/gl.h>
@@ -30,11 +36,13 @@
 
 
 int32 LastError;
+unsigned int COLOR_DEPTH;
+unsigned int ZBUFFER_DEPTH;
 char LastErrorStr[255];		
 
 GLfloat	CurrentGamma = 1.0f;
 DRV_Window	ClientWindow;
-static DRV_CacheInfo	CacheInfo;
+DRV_CacheInfo CacheInfo;
 
 GLint maxTextureSize = 0;
 geBoolean FogEnabled = GE_TRUE;
@@ -43,8 +51,8 @@ GLfloat ClearColor[3];
 
 // Toggle and function pointers for OpenGL multitexture extention
 GLboolean multitexture = GE_FALSE;
-PFNGLACTIVETEXTUREARBPROC glActiveTextureARB;
-PFNGLMULTITEXCOORD4FARBPROC glMultiTexCoord4fARB;
+PFNGLACTIVETEXTUREARBPROC DriverActiveTexture;
+PFNGLMULTITEXCOORD4FARBPROC DriverMultiTexCoord4f;
 
 
 
@@ -176,6 +184,7 @@ geBoolean DRIVERCC SetClearColor(float r, float g, float b)
 
 geBoolean DRIVERCC DrvInit(DRV_DriverHook *Hook)
 {
+#ifdef _WIN32
 	RECT		WRect;
 	FILE *stream;
 
@@ -216,6 +225,10 @@ geBoolean DRIVERCC DrvInit(DRV_DriverHook *Hook)
 	} 
 
 	SetGLPixelFormat(Hook);
+#else
+	if (!WindowInitialize(Hook))
+		return GE_FALSE;
+#endif
 
 	ClientWindow.Width = Hook->Width;
 	ClientWindow.Height = Hook->Height;
@@ -224,10 +237,15 @@ geBoolean DRIVERCC DrvInit(DRV_DriverHook *Hook)
 #ifdef USE_LIGHTMAPS
 	if(ExtensionExists("GL_ARB_multitexture"))
 	{
-		glActiveTextureARB = (PFNGLACTIVETEXTUREARBPROC)wglGetProcAddress("glActiveTextureARB");
-		glMultiTexCoord4fARB = (PFNGLMULTITEXCOORD4FARBPROC)wglGetProcAddress("glMultiTexCoord4fARB");
+#ifdef _WIN32
+		DriverActiveTexture = (PFNGLACTIVETEXTUREARBPROC)wglGetProcAddress("glActiveTextureARB");
+		DriverMultiTexCoord4f = (PFNGLMULTITEXCOORD4FARBPROC)wglGetProcAddress("glMultiTexCoord4fARB");
+#else
+		DriverActiveTexture = (PFNGLACTIVETEXTUREARBPROC)SDL_GL_GetProcAddress("glActiveTextureARB");
+		DriverMultiTexCoord4f = (PFNGLMULTITEXCOORD4FARBPROC)SDL_GL_GetProcAddress("glMultiTexCoord4fARB");
+#endif
 
-		if(glActiveTextureARB != NULL && glMultiTexCoord4fARB != NULL)
+		if(DriverActiveTexture != NULL && DriverMultiTexCoord4f != NULL)
 		{
 			multitexture = GL_TRUE;
 		}
@@ -253,12 +271,12 @@ geBoolean DRIVERCC DrvInit(DRV_DriverHook *Hook)
 
 	if(multitexture)
 	{
-		glActiveTextureARB(GL_TEXTURE1_ARB);
+		DriverActiveTexture(GL_TEXTURE1_ARB);
 
 		glDisable(GL_TEXTURE_1D);
 		glDisable(GL_TEXTURE_2D);		
 
-		glActiveTextureARB(GL_TEXTURE0_ARB);
+		DriverActiveTexture(GL_TEXTURE0_ARB);
 	} 
 
 	SetFogEnable(GE_FALSE, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
@@ -285,6 +303,7 @@ geBoolean DRIVERCC DrvShutdown(void)
 {
 	// Tell OpenGL to finish whatever is in the pipe, because we're closing up shop.
 	glFinish();
+	FreeAllTextureHandles();
 
 	WindowCleanup();
 
@@ -297,7 +316,11 @@ geBoolean DRIVERCC DrvShutdown(void)
 // Should handle a resize and re-InitMatrices here...
 geBoolean DRIVERCC DrvUpdateWindow(void)
 {
-
+#ifndef _WIN32
+	SDL_GL_GetDrawableSize((SDL_Window *)ClientWindow.hWnd,
+		&ClientWindow.Width, &ClientWindow.Height);
+	InitMatrices(ClientWindow.Width, ClientWindow.Height);
+#endif
 	return	GE_TRUE;
 }
 
@@ -340,7 +363,11 @@ geBoolean DRIVERCC GetGamma(float *Gamma)
 
 DRV_EngineSettings EngineSettings;
 
+#ifdef _WIN32
 DllExport BOOL DriverHook(DRV_Driver **Driver)
+#else
+__attribute__((visibility("default"))) geBoolean DriverHook(DRV_Driver **Driver)
+#endif
 {
 
 	EngineSettings.CanSupportFlags = (DRV_SUPPORT_ALPHA | DRV_SUPPORT_COLORKEY);
@@ -419,7 +446,7 @@ void SetLastDrvError(int32 Error, char *ErrorStr)
 	
 	if(ErrorStr)
 	{
-		strcpy(LastErrorStr, ErrorStr);
+		snprintf(LastErrorStr, sizeof(LastErrorStr), "%s", ErrorStr);
 	}
 	else
 	{
@@ -488,4 +515,3 @@ geBoolean DRIVERCC ScreenShot(const char *Name)
 	
 	return GE_TRUE;
 }
-

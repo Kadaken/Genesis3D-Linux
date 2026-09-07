@@ -17,7 +17,7 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#include <windows.h>
+#include <string.h>
 #include <GL/gl.h>
 
 #include "Dcommon.h"
