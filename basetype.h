@@ -79,6 +79,12 @@ typedef struct geSystemTime {
 #define GE_PI            ((geFloat)3.14159265358979323846f)
 #define GE_2PI           ((geFloat)6.28318530717958647693f)
 #define GE_PIOVER2       ((geFloat)1.57079632679489661923f)
+#define GE_1OVERPI       ((geFloat)0.31830988618379067154f)
+#define GE_1OVER2PI      ((geFloat)0.15915494309189533577f)
+#define GE_180OVERPI     ((geFloat)57.2957795130823208768f)
+#define GE_360OVER2PI    GE_180OVERPI
+#define GE_PIOVER180     ((geFloat)0.01745329251994329577f)
+#define GE_2PIOVER360    GE_PIOVER180
 
 #ifdef __cplusplus
 }

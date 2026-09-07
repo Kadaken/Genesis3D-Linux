@@ -3,6 +3,17 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-06 — public math-constant exposure
+
+- Exposed the complete reciprocal and degree/radian conversion constants from
+  the historical support header through the canonical root `basetype.h` so
+  external engine consumers receive the same public math vocabulary.
+- Kept the two historical same-named headers structurally separate for now;
+  their Windows calling/export convention differences belong to the planned
+  cross-platform Windows target rather than this narrow Linux consumer fix.
+- Exposed the already-portable `geEngine_UpdateWindow` declaration to native
+  consumers instead of hiding it behind the Windows-header include guard.
+
 ## 2026-09-06 — public header macro hygiene
 
 - Removed the generic `min` and `max` function-like macros from the public

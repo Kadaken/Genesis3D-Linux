@@ -314,10 +314,7 @@ GENESISAPI void			geEngine_EnableFrameRateCounter(geEngine *Engine, geBoolean En
 
 GENESISAPI geBoolean	geEngine_Activate(geEngine *Engine, geBoolean bActive);
 
-#ifdef _INC_WINDOWS
-	// Windows.h must be included before genesis.h for this api to be exposed.
 GENESISAPI geBoolean	geEngine_UpdateWindow(geEngine *Engine);
-#endif
 
 // geDriver
 GENESISAPI geDriver		*geDriver_SystemGetNextDriver(geDriver_System *DriverSystem, geDriver *Start);
