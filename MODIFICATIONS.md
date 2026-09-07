@@ -8,7 +8,11 @@ Genesis3D Public License v1.01.
 - Completed the inherited `geWorld_GetTextureName` path, which previously
   reported a hit without ever writing a texture name.
 - Added bounds validation, null-extents support, nearest leaf-face selection,
-  and a synthetic neutral-world regression fixture.
+  bounded-polygon rejection, and a two-surface neutral-world regression
+  fixture.
+- Added an exact collision-result query that restricts lookup to the collided
+  model, hit-plane orientation, and bounded face; documented the required
+  32-byte output capacity in the public header.
 
 ## 2026-09-06 — public math-constant exposure
 

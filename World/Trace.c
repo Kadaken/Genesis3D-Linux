@@ -2299,6 +2299,49 @@ geBoolean Trace_CollideBeam(int32 Node, geVec3d *s, geVec3d *e, geFloat Radius)
 
 // changed texture name
 
+//=====================================================================================
+//	Trace_PointInsideFace
+//	Checks the bounded convex polygon, not merely its infinite supporting plane.
+//=====================================================================================
+static geBoolean Trace_PointInsideFace(const geVec3d *Pos, const GFX_Face *Face)
+{
+	const GFX_Plane *Plane;
+	geBoolean HasPositive = GE_FALSE;
+	geBoolean HasNegative = GE_FALSE;
+	int32 i;
+
+	if (Face->NumVerts < 3 || Face->FirstVert < 0 ||
+		Face->FirstVert + Face->NumVerts > BSPData->NumGFXVertIndexList ||
+		Face->PlaneNum < 0 || Face->PlaneNum >= BSPData->NumGFXPlanes)
+		return GE_FALSE;
+	Plane = &BSPData->GFXPlanes[Face->PlaneNum];
+
+	for (i = 0; i < Face->NumVerts; ++i)
+	{
+		const int32 Index0 = BSPData->GFXVertIndexList[Face->FirstVert + i];
+		const int32 Index1 = BSPData->GFXVertIndexList[
+			Face->FirstVert + ((i + 1) % Face->NumVerts)];
+		geVec3d Edge, ToPoint, Cross;
+		geFloat Side;
+
+		if (Index0 < 0 || Index0 >= BSPData->NumGFXVerts ||
+			Index1 < 0 || Index1 >= BSPData->NumGFXVerts)
+			return GE_FALSE;
+		geVec3d_Subtract(&BSPData->GFXVerts[Index1],
+			&BSPData->GFXVerts[Index0], &Edge);
+		geVec3d_Subtract(Pos, &BSPData->GFXVerts[Index0], &ToPoint);
+		geVec3d_CrossProduct(&Edge, &ToPoint, &Cross);
+		Side = geVec3d_DotProduct(&Cross, &Plane->Normal);
+		if (Side > ON_EPSILON)
+			HasPositive = GE_TRUE;
+		else if (Side < -ON_EPSILON)
+			HasNegative = GE_TRUE;
+		if (HasPositive && HasNegative)
+			return GE_FALSE;
+	}
+	return GE_TRUE;
+}
+
 
 //=====================================================================================
 //	FillContents_tr
@@ -2330,6 +2373,8 @@ static void FillContents_tr(geWorld *World, int32 Node, const geVec3d *Pos, char
 				if (FaceIndex < 0 || FaceIndex >= BSPData->NumGFXFaces)
 					continue;
 				Face = &BSPData->GFXFaces[FaceIndex];
+				if (!Trace_PointInsideFace(Pos, Face))
+					continue;
 				if (Face->PlaneNum < 0 || Face->PlaneNum >= BSPData->NumGFXPlanes ||
 					Face->TexInfo < 0 || Face->TexInfo >= BSPData->NumGFXTexInfo)
 					continue;
@@ -2437,6 +2482,70 @@ geBoolean Trace_GetTexureName(geWorld *World, const geVec3d *Pos, const geVec3d 
 	}
 
 	return TextureFound;
+}
+
+geBoolean Trace_GetTextureNameFromCollision(geWorld *World,
+	const GE_Collision *Collision, char *TexName)
+{
+	const geWorld_Model *Model;
+	const GFX_Model *GfxModel;
+	geVec3d LocalImpact;
+	int32 FaceOffset;
+
+	if (TexName == NULL)
+		return GE_FALSE;
+	TexName[0] = '\0';
+	if (World == NULL || World->CurrentBSP == NULL || Collision == NULL ||
+		Collision->Model == NULL)
+		return GE_FALSE;
+
+	BSPData = &World->CurrentBSP->BSPData;
+	Model = Collision->Model;
+	if (Model->GFXModelNum < 0 || Model->GFXModelNum >= BSPData->NumGFXModels)
+		return GE_FALSE;
+	GfxModel = &BSPData->GFXModels[Model->GFXModelNum];
+
+	geVec3d_Subtract(&Collision->Impact, &Model->Pivot, &LocalImpact);
+	geXForm3d_TransposeTransform(&Model->XForm, &LocalImpact, &LocalImpact);
+	geVec3d_Add(&LocalImpact, &Model->Pivot, &LocalImpact);
+
+	for (FaceOffset = 0; FaceOffset < GfxModel->NumFaces; ++FaceOffset)
+	{
+		const int32 FaceIndex = GfxModel->FirstFace + FaceOffset;
+		const GFX_Face *Face;
+		const GFX_Plane *Plane;
+		const GFX_TexInfo *TexInfo;
+		const GFX_Texture *Texture;
+		geVec3d WorldNormal;
+		geFloat Alignment;
+		geFloat PlaneDistance;
+
+		if (FaceIndex < 0 || FaceIndex >= BSPData->NumGFXFaces)
+			continue;
+		Face = &BSPData->GFXFaces[FaceIndex];
+		if (Face->PlaneNum < 0 || Face->PlaneNum >= BSPData->NumGFXPlanes ||
+			Face->TexInfo < 0 || Face->TexInfo >= BSPData->NumGFXTexInfo ||
+			!Trace_PointInsideFace(&LocalImpact, Face))
+			continue;
+
+		Plane = &BSPData->GFXPlanes[Face->PlaneNum];
+		geXForm3d_Rotate(&Model->XForm, &Plane->Normal, &WorldNormal);
+		Alignment = (geFloat)fabs(geVec3d_DotProduct(&WorldNormal,
+			&Collision->Plane.Normal));
+		PlaneDistance = (geFloat)fabs(geVec3d_DotProduct(&LocalImpact,
+			&Plane->Normal) - Plane->Dist);
+		if (Alignment < 0.999f || PlaneDistance > ON_EPSILON * 2.0f)
+			continue;
+
+		TexInfo = &BSPData->GFXTexInfo[Face->TexInfo];
+		if (TexInfo->Texture < 0 || TexInfo->Texture >= BSPData->NumGFXTextures)
+			continue;
+		Texture = &BSPData->GFXTextures[TexInfo->Texture];
+		memcpy(TexName, Texture->Name, sizeof(Texture->Name));
+		TexName[sizeof(Texture->Name) - 1] = '\0';
+		return GE_TRUE;
+	}
+	return GE_FALSE;
 }
 
 // end change texture name

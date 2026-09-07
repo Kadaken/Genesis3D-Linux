@@ -382,9 +382,13 @@ GENESISAPI geBoolean geWorld_GetTextureName(geWorld *World, const geVec3d *Pos, 
 {
 	return Trace_GetTexureName(World, Pos, Mins, Maxs, TexName);
 }
+
+GENESISAPI geBoolean geWorld_GetTextureNameFromCollision(geWorld *World, const GE_Collision *Collision, char *TexName)
+{
+	return Trace_GetTextureNameFromCollision(World, Collision, TexName);
+}
 // end change texture name
 
 //========================================================================================
 //	NetPlay
 //========================================================================================
-

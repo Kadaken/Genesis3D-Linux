@@ -505,7 +505,9 @@ GENESISAPI geBoolean geWorld_Collision(	geWorld *World,				// World to collide w
 
 GENESISAPI geBoolean geWorld_GetContents(geWorld *World, const geVec3d *Pos, const geVec3d *Mins, const geVec3d *Maxs, uint32 Flags, uint32 UserFlags, GE_CollisionCB *CollisionCB, void *Context, GE_Contents *Contents);
 // changed texture name
+// TexName must point to storage for at least 32 bytes (the on-disk texture-name width).
 GENESISAPI geBoolean geWorld_GetTextureName(geWorld *World, const geVec3d *Pos, const geVec3d *Mins, const geVec3d *Maxs, char *TexName);
+GENESISAPI geBoolean geWorld_GetTextureNameFromCollision(geWorld *World, const GE_Collision *Collision, char *TexName);
 // end change texture name
 
 // World Polys
