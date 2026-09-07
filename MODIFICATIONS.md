@@ -3,6 +3,13 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-06 — texture-name query completion
+
+- Completed the inherited `geWorld_GetTextureName` path, which previously
+  reported a hit without ever writing a texture name.
+- Added bounds validation, null-extents support, nearest leaf-face selection,
+  and a synthetic neutral-world regression fixture.
+
 ## 2026-09-06 — public math-constant exposure
 
 - Exposed the complete reciprocal and degree/radian conversion constants from

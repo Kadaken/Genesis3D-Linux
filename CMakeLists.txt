@@ -149,6 +149,12 @@ if(BUILD_TESTING)
     set_tests_properties(genesis3d_sound_null_backend PROPERTIES
         ENVIRONMENT "ALSOFT_DRIVERS=null"
     )
+
+    add_executable(genesis3d_texture_name_test tests/world_texture_name_test.c)
+    target_include_directories(genesis3d_texture_name_test PRIVATE ${ENGINE_INCLUDE_DIRS})
+    target_link_libraries(genesis3d_texture_name_test PRIVATE genesis3d_render)
+    set_target_properties(genesis3d_texture_name_test PROPERTIES BUILD_RPATH "$ORIGIN")
+    add_test(NAME genesis3d_texture_name_fixture COMMAND genesis3d_texture_name_test)
 endif()
 
 message(STATUS "Genesis3D native canvas: 1920x1080")

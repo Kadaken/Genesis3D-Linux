@@ -20,6 +20,8 @@
 /*                                                                                      */
 /****************************************************************************************/
 #include <assert.h>
+#include <float.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
  
@@ -58,6 +60,8 @@ static	BOOL			UseMinsMaxs;		// If MiscCollision should use mins maxs...
 
 static	BOOL			HitSet;
 static  int32			GlobalNNode[2]={0x696C6345,0x21657370};
+static	geFloat			TextureBestDistance;
+static	geBoolean		TextureFound;
 
 int32	NumExactCast;
 int32	NumBBoxCast;
@@ -2311,19 +2315,38 @@ static void FillContents_tr(geWorld *World, int32 Node, const geVec3d *Pos, char
 		Leaf = -(Node+1);
 		if (PointInLeafSides(Pos, &MiscLeafs[Leaf]))
 		{
-			//gePoly *Poly = World->CurrentBSP->LeafData[Leaf].PolyList;
-			//if(Poly)
+			const GFX_Leaf *LeafData = &MiscLeafs[Leaf];
+			int32 FaceOffset;
+
+			for (FaceOffset = 0; FaceOffset < LeafData->NumFaces; ++FaceOffset)
 			{
-				//const geBitmap *Bitmap = Poly->Bitmap;
-				//char *name = geWBitmap_Pool_GetWNameByBitmap(World->CurrentBSP->WBitmapPool, Bitmap);
-				char str[100];
-				sprintf(str,"Leaf : %d\n",Leaf);
-				fputs(str, stderr);
-				//if(name)
-				//{
-				//	strcpy(str, name);
-				//	OutputDebugString(str); OutputDebugString("\n");
-				//}
+				const int32 FaceIndex = BSPData->GFXLeafFaces[LeafData->FirstFace + FaceOffset];
+				const GFX_Face *Face;
+				const GFX_Plane *Plane;
+				const GFX_TexInfo *TexInfo;
+				const GFX_Texture *Texture;
+				geFloat Distance;
+
+				if (FaceIndex < 0 || FaceIndex >= BSPData->NumGFXFaces)
+					continue;
+				Face = &BSPData->GFXFaces[FaceIndex];
+				if (Face->PlaneNum < 0 || Face->PlaneNum >= BSPData->NumGFXPlanes ||
+					Face->TexInfo < 0 || Face->TexInfo >= BSPData->NumGFXTexInfo)
+					continue;
+
+				Plane = &BSPData->GFXPlanes[Face->PlaneNum];
+				Distance = (geFloat)fabs(geVec3d_DotProduct(Pos, &Plane->Normal) - Plane->Dist);
+				if (Distance >= TextureBestDistance)
+					continue;
+
+				TexInfo = &BSPData->GFXTexInfo[Face->TexInfo];
+				if (TexInfo->Texture < 0 || TexInfo->Texture >= BSPData->NumGFXTextures)
+					continue;
+				Texture = &BSPData->GFXTextures[TexInfo->Texture];
+				memcpy(texname, Texture->Name, sizeof(Texture->Name));
+				texname[sizeof(Texture->Name) - 1] = '\0';
+				TextureBestDistance = Distance;
+				TextureFound = GE_TRUE;
 			}
 		}
 		return;
@@ -2347,15 +2370,21 @@ static void FillContents_tr(geWorld *World, int32 Node, const geVec3d *Pos, char
 geBoolean Trace_GetTexureName(geWorld *World, const geVec3d *Pos, const geVec3d *Mins, const geVec3d *Maxs, char *TexName)
 {
 	geVec3d						TMins, TMaxs;
-	geBoolean					Hit;
+	geVec3d						ZeroExtents;
 	int32						i, k;
-	geWorld_Model				*Models, *ModelHit;
+	geWorld_Model				*Models;
 	GFX_Model					*GFXModels;
 
-	assert(World);
-	
-	ModelHit = NULL;
-	Hit = GE_FALSE;
+	if (World == NULL || World->CurrentBSP == NULL || Pos == NULL || TexName == NULL)
+		return GE_FALSE;
+	TexName[0] = '\0';
+	geVec3d_Clear(&ZeroExtents);
+	if (Mins == NULL)
+		Mins = &ZeroExtents;
+	if (Maxs == NULL)
+		Maxs = &ZeroExtents;
+	TextureBestDistance = FLT_MAX;
+	TextureFound = GE_FALSE;
 
 	BSPData = &World->CurrentBSP->BSPData;
 
@@ -2405,20 +2434,9 @@ geBoolean Trace_GetTexureName(geWorld *World, const geVec3d *Pos, const geVec3d 
 		geVec3d_Add(&TPos, &Models->RealCenter, &TPos);
 
 		FillContents_tr(World, GFXModels->RootNode[0], &TPos, TexName);
-
-		if (!ModelHit)
-		{
-			ModelHit = Models;						// First model hit for any arbritrary contents
-			Hit = GE_TRUE;
-		}
 	}
 
-	if (Hit)
-	{
-		return GE_TRUE;
-	}
-
-	return GE_FALSE;
+	return TextureFound;
 }
 
 // end change texture name
