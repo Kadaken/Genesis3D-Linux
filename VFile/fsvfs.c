@@ -529,9 +529,10 @@ static	geBoolean	GENESISCC FSVFS_GetS(void *Handle, void *Buff, int MaxLen)
 {
 	VFSFile *	File;
 	geBoolean	Res;
+	long Remaining, SavedLength;
 
 	assert(Buff);
-	assert(MaxLen != 0);
+	if (MaxLen <= 1) return GE_FALSE;
 
 	File = Handle;
 
@@ -542,15 +543,21 @@ static	geBoolean	GENESISCC FSVFS_GetS(void *Handle, void *Buff, int MaxLen)
 
 	assert(File->CurrentRelPos >= 0);
 	assert(File->CurrentRelPos <= File->Length);
+	SavedLength = File->Length;
+	Remaining = SavedLength - File->CurrentRelPos;
+	if (Remaining <= 0) return GE_FALSE;
 
 	if	(!ForceFilePos(File))
 		return GE_FALSE;
 
-	MaxLen = ClampOperationSize(File, MaxLen);
+	/* Capacity includes NUL; source byte budget does not. This comparison
+	   avoids overflowing Remaining + 1 when the member length is INT_MAX. */
+	if (Remaining < MaxLen - 1) MaxLen = (int)Remaining + 1;
 
 	Res = geVFile_GetS(File->RWOps, Buff, MaxLen);
 
 	UpdateFilePos(File);
+	assert(File->CurrentRelPos <= SavedLength);
 
 	return Res;
 }
@@ -608,9 +615,7 @@ static	geBoolean	GENESISCC FSVFS_Write(void *Handle, const void *Buff, int Count
 {
 	VFSFile *	File;
 	geBoolean	Res;
-	int i;
-	char Bbyte;
-	char *TBuffer;
+	int Offset;
 
 #ifndef	NDEBUG
 	int			CurRelPos;
@@ -638,17 +643,29 @@ static	geBoolean	GENESISCC FSVFS_Write(void *Handle, const void *Buff, int Count
 #ifndef	NDEBUG
 	CurRelPos = File->CurrentRelPos;
 #endif
-	TBuffer = (char *)Buff;
-	for(i=0;i<Count;i++)
+	if (File->Mask == 0)
+		Res = geVFile_Write(File->RWOps, Buff, Count);
+	else
 	{
-		memcpy(&Bbyte, (TBuffer+i),1);
-		Bbyte ^=File->Mask;
-		memcpy((TBuffer+i),&Bbyte,1);
+		unsigned char Scratch[4096];
+		const unsigned char *Input = (const unsigned char *)Buff;
+		Res = GE_TRUE;
+		for (Offset = 0; Offset < Count; )
+		{
+			int i, Chunk = GE_MIN(Count - Offset, (int)sizeof(Scratch));
+			for (i = 0; i < Chunk; ++i)
+				Scratch[i] = Input[Offset + i] ^ (unsigned char)File->Mask;
+			if (!geVFile_Write(File->RWOps, Scratch, Chunk))
+			{
+				Res = GE_FALSE;
+				break;
+			}
+			Offset += Chunk;
+		}
 	}
-	Res = geVFile_Write(File->RWOps, Buff, Count);
 
 	UpdateFilePos(File);
-	assert(File->CurrentRelPos - CurRelPos == Count);
+	assert(!Res || File->CurrentRelPos - CurRelPos == Count);
 
 	return Res;
 }

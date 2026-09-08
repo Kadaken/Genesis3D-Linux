@@ -3,6 +3,23 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-08 — bounded VFile lines and const-safe archive writes
+
+- Replaced the POSIX fgets pass-through with a bounded raw-read/scan routine
+  folding CRLF, CR and LF to LF followed by NUL, seeking back unread bytes.
+- Intentionally differ from the legacy Windows reader: final unterminated
+  lines and buffer-filling fragments return TRUE with NUL-terminated content,
+  instead of returning FALSE after consuming and losing those bytes.
+- Archive line capacity now reserves room for NUL without excluding the final
+  member byte. Invalid capacities and actual member EOF return FALSE without
+  reading. Assert against the saved member length, not a length updated by I/O.
+- Plain archive writes use the const input directly. Nonzero-mask writes XOR
+  into bounded 4 KiB stack chunks without modifying the caller's storage.
+- Added asset-free DOS/VIRTUAL line and const-write fixtures. Release and
+  matched Clang ASan/UBSan public suites pass 7/7; no suppressions added.
+
+See `Reports/VFILE_LINE_AND_WRITE_CONTRACT.md` for exact coverage and limits.
+
 ## 2026-09-07 — explicit SDL fullscreen policy
 
 - Defaulted the inherited SDL driver to desktop fullscreen. Exclusive mode

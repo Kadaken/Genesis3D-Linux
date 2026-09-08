@@ -124,7 +124,32 @@ static void GENESISCC Posix_Close(void *Handle)
 	geRam_Free(File);
 }
 static geBoolean GENESISCC Posix_GetS(void *H, void *B, int N)
-{ return fgets((char *)B, N, ((PosixFile *)H)->Stream) ? GE_TRUE : GE_FALSE; }
+{
+	PosixFile *File = (PosixFile *)H;
+	char *Buffer = (char *)B;
+	size_t Count, i;
+	if (!File || !Buffer || N <= 1 || !File->Stream) return GE_FALSE;
+	Buffer[0] = '\0';
+	Count = fread(Buffer, 1, (size_t)N - 1, File->Stream);
+	if (!Count) return GE_FALSE;
+	for (i = 0; i < Count; ++i)
+	{
+		if (Buffer[i] == '\r' || Buffer[i] == '\n')
+		{
+			size_t Consumed = i + 1;
+			if (Buffer[i] == '\r' && Consumed < Count && Buffer[Consumed] == '\n')
+				++Consumed;
+			Buffer[i] = '\n';
+			Buffer[i + 1] = '\0';
+			if (Consumed < Count && fseek(File->Stream, -(long)(Count - Consumed), SEEK_CUR))
+				return GE_FALSE;
+			return GE_TRUE;
+		}
+	}
+	/* Intentional extension: preserve final and buffer-filling partial lines. */
+	Buffer[Count] = '\0';
+	return GE_TRUE;
+}
 static geBoolean GENESISCC Posix_Read(void *H, void *B, int N)
 { return fread(B, 1, (size_t)N, ((PosixFile *)H)->Stream) == (size_t)N ? GE_TRUE : GE_FALSE; }
 static geBoolean GENESISCC Posix_Write(void *H, const void *B, int N)
