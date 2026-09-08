@@ -89,6 +89,61 @@ static int line_cases(void)
     return ok;
 }
 
+static int check_reads(geVFile *file, int strict, const unsigned char *expected)
+{
+    unsigned char buffer[100];
+    long position = -1;
+    int ok = 1;
+    if (!file) return 0;
+    ok = geVFile_Read(file, buffer, 13) && !memcmp(buffer, expected, 13) && ok;
+    memset(buffer, 0xa5, sizeof(buffer));
+    ok = (geVFile_Read(file, buffer, 88) == (strict ? GE_FALSE : GE_TRUE)) && ok;
+    ok = geVFile_Tell(file, &position) && position == (strict ? 13 : 100) && ok;
+    if (strict) {
+        int i;
+        for (i=0; i<100; ++i) ok = buffer[i] == 0xa5 && ok;
+    } else {
+        ok = !memcmp(buffer, expected+13, 87) && buffer[87] == 0xa5 && ok;
+        ok = !geVFile_Read(file, buffer, 1) && ok;
+        ok = geVFile_Tell(file, &position) && position == 100 && ok;
+    }
+    ok = geVFile_Seek(file, 13, GE_VFILE_SEEKSET) && ok;
+    ok = geVFile_Read(file, buffer, 87) && !memcmp(buffer, expected+13, 87) && ok;
+    ok = geVFile_Tell(file, &position) && position == 100 && ok;
+    ok = !geVFile_Read(file, buffer, 1) && ok;
+    if (!ok) fprintf(stderr, "VFile read contract failed: strict=%d position=%ld\n", strict, position);
+    return geVFile_Close(file) && ok;
+}
+
+static int read_cases(void)
+{
+    unsigned char data[100];
+    geVFile *archive, *file;
+    FILE *raw;
+    int i, ok;
+    for (i=0; i<100; ++i) data[i] = (unsigned char)i;
+    raw = fopen("loose.bin", "wb");
+    if (!raw) return 0;
+    ok = fwrite(data, 1, sizeof(data), raw) == sizeof(data);
+    ok = fclose(raw) == 0 && ok;
+    file = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_DOS, "loose.bin", NULL, GE_VFILE_OPEN_READONLY);
+    ok = check_reads(file, 0, data) && ok;
+    archive = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_VIRTUAL, "reads.vfs", NULL,
+        GE_VFILE_OPEN_CREATE | GE_VFILE_OPEN_DIRECTORY);
+    if (!archive) return 0;
+    ok = write_member(archive, "member", data, sizeof(data)) && ok;
+    ok = write_member(archive, "sentinel", "DO-NOT-READ", 11) && ok;
+    ok = geVFile_Close(archive) && ok;
+    archive = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_VIRTUAL, "reads.vfs", NULL,
+        GE_VFILE_OPEN_READONLY | GE_VFILE_OPEN_DIRECTORY);
+    if (!archive) return 0;
+    file = geVFile_Open(archive, "member", GE_VFILE_OPEN_READONLY);
+    ok = check_reads(file, 1, data) && ok;
+    ok = geVFile_Close(archive) && ok;
+    fprintf(stderr, "VFile reads: DOS short success, VIRTUAL over-length rejection, exact reads and EOF\n");
+    return ok;
+}
+
 static int write_cases(void)
 {
     unsigned char input[9001], original[9001], output[9001];
@@ -128,9 +183,12 @@ int main(int argc, char **argv)
     char directory[] = "/tmp/genesis-vfile-XXXXXX";
     int ok;
     if (argc != 2 || !mkdtemp(directory) || chdir(directory)) return 2;
-    ok = !strcmp(argv[1], "lines") ? line_cases() : write_cases();
+    ok = !strcmp(argv[1], "lines") ? line_cases() :
+         !strcmp(argv[1], "reads") ? read_cases() :
+         !strcmp(argv[1], "writes") ? write_cases() : 0;
     geVFile_CloseAPI();
     unlink("loose.txt"); unlink("lines.vfs"); unlink("write.vfs");
+    unlink("loose.bin"); unlink("reads.vfs");
     chdir("/"); rmdir(directory);
     return ok ? 0 : 1;
 }

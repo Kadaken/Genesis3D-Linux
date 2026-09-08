@@ -3,6 +3,18 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-08 — DOS binary short-read parity
+
+- Posix_Read now matches the inherited FSDos_Read contract: DOS short reads
+  at EOF succeed when at least one byte is read; zero bytes fail.
+- FSVFS_Read remains unchanged: an over-length member read fails without
+  advancing the member position. These are intentionally different contracts.
+- Added generated 100-byte DOS/VIRTUAL read tests covering an 88-byte request
+  after consuming 13 bytes, exact 87-byte reads, Tell and true EOF. The DOS
+  regression fails against the previous implementation.
+
+See `Reports/VFILE_LINE_AND_WRITE_CONTRACT.md` for results and limits.
+
 ## 2026-09-08 — bounded VFile lines and const-safe archive writes
 
 - Replaced the POSIX fgets pass-through with a bounded raw-read/scan routine

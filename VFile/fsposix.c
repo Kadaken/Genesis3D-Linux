@@ -151,7 +151,12 @@ static geBoolean GENESISCC Posix_GetS(void *H, void *B, int N)
 	return GE_TRUE;
 }
 static geBoolean GENESISCC Posix_Read(void *H, void *B, int N)
-{ return fread(B, 1, (size_t)N, ((PosixFile *)H)->Stream) == (size_t)N ? GE_TRUE : GE_FALSE; }
+{
+	/* Match FSDos_Read: positive short reads succeed; zero bytes fail.
+	   Archive members retain the separate strict FSVFS_Read contract. */
+	if (N <= 0) return GE_FALSE;
+	return fread(B, 1, (size_t)N, ((PosixFile *)H)->Stream) > 0 ? GE_TRUE : GE_FALSE;
+}
 static geBoolean GENESISCC Posix_Write(void *H, const void *B, int N)
 { return fwrite(B, 1, (size_t)N, ((PosixFile *)H)->Stream) == (size_t)N ? GE_TRUE : GE_FALSE; }
 static geBoolean GENESISCC Posix_Seek(void *H, int Where, geVFile_Whence Whence)
