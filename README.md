@@ -120,6 +120,12 @@ with Mesa llvmpipe and ASan/UBSan. This establishes the tested legacy frame
 paths, not hardware performance or completion of all historical renderer
 features. See [the legacy driver report](Reports/LEGACY_OPENGL_DRIVER.md).
 
+Driver ABI **100.4** requires rebuilding engine and driver together. Fullscreen
+defaults to SDL desktop fullscreen; exclusive display mode switching is only
+available to driver-hook callers setting `DRV_HOOK_EXCLUSIVE_FULLSCREEN`.
+The standard engine initializer leaves that flag clear. See
+[the SDL window policy tests](Reports/LEGACY_SDL_WINDOW_POLICY.md).
+
 Install `xorg-x11-server-Xvfb` and `xorg-x11-xauth` on Fedora (or `xvfb` and
 `xauth` on Debian/Ubuntu) to register and run the isolated graphics tests:
 

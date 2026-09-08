@@ -108,9 +108,9 @@ typedef struct tagRECT
 #endif
 
 #define DRV_VERSION_MAJOR		100			// Genesis 1.0
-#define DRV_VERSION_MINOR		3			// >= 3.0 added fog
+#define DRV_VERSION_MINOR		4			// Hook flags; rebuild engine and drivers together
 #define DRV_VMAJS				"100"
-#define DRV_VMINS				"3"
+#define DRV_VMINS				"4"
 
 #ifndef US_TYPEDEFS
 #define US_TYPEDEFS
@@ -349,7 +349,10 @@ typedef struct
 	S32					Width;
 	S32					Height;
 	HWND				hWnd;
+	uint32              Flags;          // Zero by default; see DRV_HOOK_* below
 } DRV_DriverHook;
+
+#define DRV_HOOK_EXCLUSIVE_FULLSCREEN (1u << 0)
 
 #ifdef GLOBALINFO
 typedef struct

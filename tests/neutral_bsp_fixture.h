@@ -14,7 +14,7 @@ static int fixture_chunk(geVFile *file, int type, int size, int count, const voi
            (!count || geVFile_Write(file, data, size * count));
 }
 
-static geWorld *neutral_bsp_world(void)
+static int neutral_bsp_write(geVFile *file)
 {
     GBSP_Header header = {{'G','B','S','P',0}, GBSP_VERSION, {0}};
     GFX_Model model = {0};
@@ -35,9 +35,7 @@ static geWorld *neutral_bsp_world(void)
     geVec3d rgb[4] = {{255,255,255},{255,255,255},
                       {255,255,255},{255,255,255}};
     unsigned char pixels[1+16*16*3], light[1+7*7*3];
-    geVFile_MemoryContext context = {0};
-    geVFile *file;
-    geWorld *world = NULL;
+    int result = 0;
     int i;
     model.RootNode[0] = 0;
     model.RootNode[1] = -1;
@@ -66,9 +64,7 @@ static geWorld *neutral_bsp_world(void)
         pixels[1+i*3] = 24; pixels[2+i*3] = 220; pixels[3+i*3] = 48;
     }
     memset(light, 128, sizeof(light)); light[0] = 1;
-    file = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_MEMORY, NULL,
-                                &context, GE_VFILE_OPEN_CREATE);
-    if (!file) return NULL;
+    if (!file) return 0;
 #define CHUNK(type, data, count) \
     if (!fixture_chunk(file, type, sizeof(*(data)), count, data)) goto done
     CHUNK(GBSP_CHUNK_HEADER, &header, 1);
@@ -90,10 +86,20 @@ static geWorld *neutral_bsp_world(void)
     CHUNK(GBSP_CHUNK_LIGHTDATA, light, sizeof(light));
     CHUNK(GBSP_CHUNK_SKYDATA, &sky, 1);
 #undef CHUNK
-    if (!fixture_chunk(file, GBSP_CHUNK_END, 0, 0, NULL) ||
-        !geVFile_Seek(file, 0, GE_VFILE_SEEKSET)) goto done;
-    world = geWorld_Create(file);
+    result = fixture_chunk(file, GBSP_CHUNK_END, 0, 0, NULL);
 done:
+    return result;
+}
+
+static geWorld *neutral_bsp_world(void)
+{
+    geVFile_MemoryContext context = {0};
+    geVFile *file = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_MEMORY, NULL,
+                                         &context, GE_VFILE_OPEN_CREATE);
+    geWorld *world = NULL;
+    if (!file) return NULL;
+    if (neutral_bsp_write(file) && geVFile_Seek(file, 0, GE_VFILE_SEEKSET))
+        world = geWorld_Create(file);
     geVFile_Close(file);
     return world;
 }

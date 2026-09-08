@@ -36,6 +36,8 @@ extern unsigned int ZBUFFER_DEPTH;	// Depth of the ZBuffer to use in OpenGL.
 
 
 extern		DRV_Driver	OGLDRV;
+// DriverHook returns process-global state: single-context, non-reentrant.
+// A caller-owned SDL window must outlive the driver-owned GL context.
 extern		DRV_Window	ClientWindow;
 
 extern		PFNGLACTIVETEXTUREARBPROC DriverActiveTexture;

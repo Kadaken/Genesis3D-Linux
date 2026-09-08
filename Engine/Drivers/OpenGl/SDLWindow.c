@@ -11,11 +11,19 @@
 static SDL_Window *DriverWindow;
 static SDL_GLContext DriverContext;
 static geBoolean ChangedFullscreen;
+static Uint32 OriginalFullscreen;
+static SDL_DisplayMode OriginalMode;
+static geBoolean ChangedMode;
 
 geBoolean WindowInitialize(DRV_DriverHook *Hook)
 {
     if (!Hook || !Hook->hWnd || DriverContext) {
         SetLastDrvError(DRV_ERROR_GENERIC, "SDL driver requires one caller-owned OpenGL window");
+        return GE_FALSE;
+    }
+    if ((Hook->Width == -1) != (Hook->Height == -1) ||
+        (Hook->Width != -1 && (Hook->Width <= 0 || Hook->Height <= 0))) {
+        SetLastDrvError(DRV_ERROR_GENERIC, "Use (-1,-1) window mode or two positive dimensions");
         return GE_FALSE;
     }
     DriverWindow = (SDL_Window *)Hook->hWnd;
@@ -24,14 +32,25 @@ geBoolean WindowInitialize(DRV_DriverHook *Hook)
         DriverWindow = NULL;
         return GE_FALSE;
     }
-    if (Hook->Width != -1 && Hook->Height != -1) {
+    OriginalFullscreen = SDL_GetWindowFlags(DriverWindow) & SDL_WINDOW_FULLSCREEN_DESKTOP;
+    if (Hook->Width != -1) {
         SDL_DisplayMode requested = {0};
+        Uint32 fullscreen = SDL_WINDOW_FULLSCREEN_DESKTOP;
         requested.w = Hook->Width;
         requested.h = Hook->Height;
-        if (SDL_SetWindowDisplayMode(DriverWindow, &requested) != 0 ||
-            SDL_SetWindowFullscreen(DriverWindow, SDL_WINDOW_FULLSCREEN) != 0) {
+        if (Hook->Flags & DRV_HOOK_EXCLUSIVE_FULLSCREEN) {
+            if (SDL_GetWindowDisplayMode(DriverWindow, &OriginalMode) != 0 ||
+                SDL_SetWindowDisplayMode(DriverWindow, &requested) != 0) {
+                SetLastDrvError(DRV_ERROR_GENERIC, (char *)SDL_GetError());
+                WindowCleanup();
+                return GE_FALSE;
+            }
+            ChangedMode = GE_TRUE;
+            fullscreen = SDL_WINDOW_FULLSCREEN;
+        }
+        if (SDL_SetWindowFullscreen(DriverWindow, fullscreen) != 0) {
             SetLastDrvError(DRV_ERROR_GENERIC, (char *)SDL_GetError());
-            DriverWindow = NULL;
+            WindowCleanup();
             return GE_FALSE;
         }
         ChangedFullscreen = GE_TRUE;
@@ -55,8 +74,13 @@ void WindowCleanup(void)
         DriverContext = NULL;
     }
     if (DriverWindow && ChangedFullscreen)
-        SDL_SetWindowFullscreen(DriverWindow, 0);
+        if (SDL_SetWindowFullscreen(DriverWindow, OriginalFullscreen) != 0)
+            fprintf(stderr, "OpenGL driver: restoring fullscreen state: %s\n", SDL_GetError());
+    if (DriverWindow && ChangedMode)
+        if (SDL_SetWindowDisplayMode(DriverWindow, &OriginalMode) != 0)
+            fprintf(stderr, "OpenGL driver: restoring display mode: %s\n", SDL_GetError());
     ChangedFullscreen = GE_FALSE;
+    ChangedMode = GE_FALSE;
     DriverWindow = NULL;
 }
 

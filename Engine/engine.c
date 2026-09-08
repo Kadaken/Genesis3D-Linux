@@ -1799,6 +1799,7 @@ static geBoolean Engine_InitDriver(	geEngine *Engine,
 	DLLDriverHook.Width = DriverMode->Width;
 	DLLDriverHook.Height = DriverMode->Height;
 	DLLDriverHook.hWnd = Engine->hWnd;
+	DLLDriverHook.Flags = 0; // Borderless desktop fullscreen; no implicit mode switch
 	strcpy(DLLDriverHook.ModeName, DriverMode->Name);
 	
 	if (!RDriver->Init(&DLLDriverHook))

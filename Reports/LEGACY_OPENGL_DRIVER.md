@@ -2,6 +2,10 @@
 
 Date: 2026-09-07. Contributor: Kadaken.
 
+Later same-day update: [SDL window policy](LEGACY_SDL_WINDOW_POLICY.md) adds
+driver ABI 100.4, safe-default fullscreen flags and a fifth test. The results
+below describe the earlier initial driver gate.
+
 ## Result
 
 The historical engine frame pipeline now executes on Linux through the

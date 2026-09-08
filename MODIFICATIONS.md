@@ -3,6 +3,19 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-07 — explicit SDL fullscreen policy
+
+- Defaulted the inherited SDL driver to desktop fullscreen. Exclusive mode
+  switching requires `DRV_HOOK_EXCLUSIVE_FULLSCREEN` in the new hook flags.
+- Advanced the driver ABI to 100.4 and initialized engine-supplied flags to
+  zero. Engine and driver must be rebuilt together; older modules are rejected.
+- Reject mixed windowed/fullscreen dimension sentinels and invalid dimensions;
+  restore the caller's prior fullscreen/display-mode state on cleanup.
+- Documented single-context, non-reentrant driver ownership and added an Xvfb
+  contract fixture for mode policy and teardown. Rendering/texture algorithms
+  were not changed.
+- Extracted the neutral fixture writer for reuse by consumer-side boot tests.
+
 ## 2026-09-07 — inherited OpenGL driver on SDL
 
 - Added the separate `libOglDrv.so` target for the historical `DRV_Driver`

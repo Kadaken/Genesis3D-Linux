@@ -175,7 +175,17 @@ if(BUILD_TESTING)
     target_link_libraries(genesis3d_legacy_frame_test PRIVATE genesis3d_render)
     add_dependencies(genesis3d_legacy_frame_test OglDrv)
     find_program(XVFB_RUN_EXECUTABLE xvfb-run)
+    add_executable(genesis3d_sdl_window_test tests/sdl_window_contract.c
+        Engine/Drivers/OpenGl/SDLWindow.c)
+    target_include_directories(genesis3d_sdl_window_test PRIVATE ${ENGINE_INCLUDE_DIRS}
+        "${CMAKE_CURRENT_SOURCE_DIR}/Engine/Drivers/OpenGl")
+    target_link_libraries(genesis3d_sdl_window_test PRIVATE PkgConfig::SDL2)
     if(XVFB_RUN_EXECUTABLE)
+        add_test(NAME genesis3d_sdl_window_contract
+            COMMAND "${XVFB_RUN_EXECUTABLE}" -a -s "-screen 0 640x480x24"
+            $<TARGET_FILE:genesis3d_sdl_window_test>)
+        set_tests_properties(genesis3d_sdl_window_contract PROPERTIES
+            TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=x11;LIBGL_ALWAYS_SOFTWARE=1")
         add_test(NAME genesis3d_legacy_frame_fixture
             COMMAND "${XVFB_RUN_EXECUTABLE}" -a -s "-screen 0 640x480x24"
             $<TARGET_FILE:genesis3d_legacy_frame_test> $<TARGET_FILE_DIR:OglDrv>)
