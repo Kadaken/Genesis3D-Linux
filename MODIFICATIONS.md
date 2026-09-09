@@ -3,6 +3,23 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-08 — application-declared entity layouts and borrowed names
+
+- Added copied class/field declarations and an explicit schema-aware world
+  constructor. Original world construction remains available without overrides.
+- Native-aligned field layout replaces the authored layout before allocation;
+  text values resolve by field name. Added scalar-to-Y-vector and integer-to-float
+  conversion, zero initialization, removal/invalid-value diagnostics, and retained
+  name-based entity links when declared as opaque pointers.
+- Added borrowed immutable entity names with world/entity lifetime.
+- Added synthetic world fixtures for conversion, inserted fields, native offsets,
+  retained links, copied declarations, failed construction cleanup, legacy-constructor
+  isolation and name lifetime. No application schemas or assets are included.
+- Changed `Entities/Entities.c`, `Entities/ENTITIES.H`, `Genesis.h`, `World/World.c`;
+  added `Entities/EntitySchema.c` and test/build support.
+
+See `Reports/ENTITY_SCHEMA_CONTRACT.md` for the API contract and test limits.
+
 ## 2026-09-08 — generic entity userdata reservation
 
 - Added public class field-size query and zero-tail userdata reservation APIs.

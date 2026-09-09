@@ -14,7 +14,7 @@ static int fixture_chunk(geVFile *file, int type, int size, int count, const voi
            (!count || geVFile_Write(file, data, size * count));
 }
 
-static int neutral_bsp_write(geVFile *file)
+static int neutral_bsp_write_with_entities(geVFile *file, const void *entities, int entity_bytes)
 {
     GBSP_Header header = {{'G','B','S','P',0}, GBSP_VERSION, {0}};
     GFX_Model model = {0};
@@ -86,9 +86,15 @@ static int neutral_bsp_write(geVFile *file)
     CHUNK(GBSP_CHUNK_LIGHTDATA, light, sizeof(light));
     CHUNK(GBSP_CHUNK_SKYDATA, &sky, 1);
 #undef CHUNK
+    if (entity_bytes && !fixture_chunk(file, GBSP_CHUNK_ENTDATA, 1, entity_bytes, entities)) goto done;
     result = fixture_chunk(file, GBSP_CHUNK_END, 0, 0, NULL);
 done:
     return result;
+}
+
+static int neutral_bsp_write(geVFile *file)
+{
+    return neutral_bsp_write_with_entities(file, NULL, 0);
 }
 
 static geWorld *neutral_bsp_world(void)

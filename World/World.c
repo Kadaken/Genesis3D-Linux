@@ -847,6 +847,12 @@ World_BSP *World_CreateBSPFromBox(const geVec3d *Mins, const geVec3d *Maxs)
 //=====================================================================================
 GENESISAPI geWorld *geWorld_Create(geVFile *File)
 {
+	return geWorld_CreateWithEntitySchema(File, NULL);
+}
+
+GENESISAPI geWorld *geWorld_CreateWithEntitySchema(geVFile *File,
+    const geEntity_EntitySet *Schema)
+{
 	geWorld			*NewWorld;
 	int32			i;
 	geWorld_Model	*Models;
@@ -900,7 +906,7 @@ GENESISAPI geWorld *geWorld_Create(geVFile *File)
 	if (!Light_WorldInit(NewWorld))
 		goto Error;
 
-	if (!Ent_WorldInit(NewWorld))
+	if (!Ent_WorldInitWithSchema(NewWorld, Schema))
 		goto Error;
 
 	if (!Vis_WorldInit(NewWorld))

@@ -477,6 +477,28 @@ GENESISAPI geEntity *geWorld_AddEntity(geWorld *World, const char *ClassName, co
 GENESISAPI geEntity_EntitySet *geWorld_GetEntitySet(geWorld *World, const char *ClassName);
 GENESISAPI geEntity		*geEntity_EntitySetGetNextEntity(geEntity_EntitySet *EntitySet, geEntity *Entity);
 GENESISAPI void			*geEntity_GetUserData(geEntity *Entity);
+/* Borrowed immutable name; valid until entity/world destruction. NULL if absent. */
+GENESISAPI const char *geEntity_GetNameString(const geEntity *Entity);
+
+typedef struct geEntity_FieldDecl {
+    const char *Name;
+    const char *TypeName;
+} geEntity_FieldDecl;
+/* Empty declaration set -> DeclareClass -> explicit world constructor.
+ * Strings are copied. Destroy the declaration set after construction.
+ * No global registration; the world retains no borrowed schema pointer.
+ * Fields replace the authored layout by name in native aligned order.
+ * Missing declared fields are zero; removed authored fields are ignored.
+ * Scalar -> point is (0,value,0); integer -> float is numeric conversion.
+ * Unsupported/invalid values stay zero with a once-per-field diagnostic.
+ * FieldSize excludes trailing C struct padding: reserve sizeof(struct) if needed.
+ * Construction retains the engine's existing single-threaded world contract. */
+GENESISAPI geEntity_EntitySet *geEntity_EntitySetCreate(void);
+GENESISAPI void geEntity_EntitySetDestroy(geEntity_EntitySet *Set);
+GENESISAPI geBoolean geEntity_EntitySetDeclareClass(geEntity_EntitySet *Set,
+    const char *ClassName, const geEntity_FieldDecl *Fields, int Count);
+GENESISAPI geWorld *geWorld_CreateWithEntitySchema(geVFile *File,
+    const geEntity_EntitySet *Schema);
 
 /* Use the complete owning set returned by geWorld_GetEntitySet(World, NULL),
  * not a class-specific view. Unknown classes/invalid arguments return FALSE.

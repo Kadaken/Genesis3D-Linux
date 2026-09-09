@@ -95,6 +95,11 @@ static geBoolean InsertEntityInClassList(geWorld *World, geEntity *Entity)
 //====================================================================================
 geBoolean Ent_WorldInit(geWorld *World)
 {
+	return Ent_WorldInitWithSchema(World, NULL);
+}
+
+geBoolean Ent_WorldInitWithSchema(geWorld *World, const geEntity_EntitySet *Schema)
+{
 	GBSP_BSPData		*BSP;
 	geEntity_EntitySet	*EntitySet;
 	geEntity			*Entity;
@@ -113,7 +118,7 @@ geBoolean Ent_WorldInit(geWorld *World)
 	if (BSP->NumGFXEntData == 0)
 		return GE_TRUE;				// Nothing to do...
 
-	EntitySet = LoadEntitySet(BSP->GFXEntData, BSP->NumGFXEntData);
+	EntitySet = LoadEntitySetWithSchema(BSP->GFXEntData, BSP->NumGFXEntData, Schema);
 
 	if (!EntitySet)
 		return GE_FALSE;
@@ -554,6 +559,7 @@ void geEntity_EntitySetDestroy(geEntity_EntitySet *EntitySet)
 {
 	geEntity_EntitySet	*Set, *Next;
 	geEntity_Class		*Class, *NextClass;
+	Ent_FreeDeclarations(EntitySet);
 	
 	assert(EntitySet);
 
@@ -613,6 +619,11 @@ GENESISAPI void geEntity_GetName(const geEntity *Entity, char *Buff, int MaxLen)
 	assert(EntName);
 	Length = strlen(EntName) + 1;
 	memcpy(Buff, EntName, GE_MIN(Length, MaxLen));
+}
+
+GENESISAPI const char *geEntity_GetNameString(const geEntity *Entity)
+{
+	return Entity ? geEntity_GetStringForKey(Entity, "%Name%") : NULL;
 }
 
 //====================================================================================
@@ -910,9 +921,16 @@ static geBoolean ParseClassUserData(geEntity_EntitySet *EntitySet, geEntity *Ent
 		// Find the field in this class
 		Field = geEntity_ClassFindFieldByName(Entity->Class, Epair->Key);
 		
-		if	(!Field)		
+		if (!Field) {
+			if (Entity->Class->AppDeclared) continue;
 			return GE_FALSE;
+		}
 			//continue;
+		if (Entity->Class->AppDeclared) {
+			if (!Ent_ParseDeclaredField(EntitySet, Entity, Field, Epair->Value, GWorld))
+				return GE_FALSE;
+			continue;
+		}
 
 		UData = Entity->UserData;
 
@@ -1168,6 +1186,12 @@ geBoolean geEntity_EntitySetLoadEntities(geEntity_EntitySet *EntitySet, geVFile 
 //====================================================================================
 geEntity_EntitySet *LoadEntitySet(const char *EntityData, int32 EntityDataSize)
 {
+	return LoadEntitySetWithSchema(EntityData, EntityDataSize, NULL);
+}
+
+geEntity_EntitySet *LoadEntitySetWithSchema(const char *EntityData, int32 EntityDataSize,
+    const geEntity_EntitySet *Schema)
+{
 	geEntity_EntitySet		*EntitySet;
 	geVFile_MemoryContext	Context;
 	geVFile					*MemFile;
@@ -1199,7 +1223,8 @@ geEntity_EntitySet *LoadEntitySet(const char *EntityData, int32 EntityDataSize)
 	geVFile_Close(MemFile);
 	MemFile = NULL;
 		
-	if (!geEntity_EntitySetBuildClasses(EntitySet))
+	if (!BuildClassTypes(EntitySet) || !Ent_ApplySchema(EntitySet, Schema) ||
+		!ParseClassData(EntitySet))
 		goto ExitWithError;
 
 	return EntitySet;

@@ -60,6 +60,9 @@ typedef struct geEntity_Field
 	geEntity_Class			*TypeClass;				// Atomic class the defines field
 	int32					Offset;					// Offset in Entity's UserData
 
+	geEntity_ClassType SourceType;
+	geBoolean HasSource;
+	unsigned Diagnostics;
 	struct geEntity_Field	*Next;					// Next Field list
 
 } geEntity_Field;
@@ -73,6 +76,7 @@ typedef	struct geEntity_Class
 	geEntity_Field			*Fields;				// Fields in this Class
 	int32					FieldSize;				// Size of all fields
 
+	geBoolean AppDeclared;
 	struct geEntity_Class	*Next;
 
 } geEntity_Class; 
@@ -104,6 +108,7 @@ typedef struct geEntity_EntitySet
 	geEntity					*Entity;			// The entity
 	geEntity_Class				*Classes;			// List of classes for set
 
+    struct geEntity_Declaration *Declarations;
 } geEntity_EntitySet;
 
 
@@ -111,6 +116,13 @@ typedef struct geEntity_EntitySet
 //	Function prototypes
 //=====================================================================================
 geBoolean	Ent_WorldInit(geWorld *World);
+geBoolean Ent_WorldInitWithSchema(geWorld *World, const geEntity_EntitySet *Schema);
+geBoolean Ent_ApplySchema(geEntity_EntitySet *Set, const geEntity_EntitySet *Schema);
+void Ent_FreeDeclarations(geEntity_EntitySet *Set);
+geBoolean Ent_ParseDeclaredField(geEntity_EntitySet *Set, geEntity *Entity,
+    geEntity_Field *Field, const char *Value, geWorld *World);
+geEntity_EntitySet *LoadEntitySetWithSchema(const char *Data, int32 Size,
+    const geEntity_EntitySet *Schema);
 void		Ent_WorldShutdown(geWorld *World);
 
 geEntity				*geEntity_Create(void);
