@@ -219,6 +219,93 @@ GENESISAPI void *geEntity_GetUserData(geEntity *Entity)
 	return Entity->UserData;
 }
 
+GENESISAPI geBoolean geEntity_EntitySetGetClassFieldSize(
+    geEntity_EntitySet *Set, const char *ClassName, int *FieldSize)
+{
+    geEntity_Class *Class;
+    if (!Set || !Set->OwnsEntities || !ClassName || !FieldSize)
+        return GE_FALSE;
+    Class = geEntity_EntitySetFindClassByName(Set, ClassName);
+    if (!Class || Class->Type != TYPE_STRUCT) return GE_FALSE;
+    *FieldSize = Class->FieldSize;
+    return GE_TRUE;
+}
+
+/* All allocations precede publication, so allocation failure is atomic. */
+GENESISAPI geBoolean geEntity_EntitySetReserveUserData(
+    geEntity_EntitySet *Set, const char *ClassName, int MinBytes)
+{
+    typedef struct Relocation {
+        struct Relocation *Next;
+        geEntity *Entity;
+        void *OldData, *NewData;
+    } Relocation;
+    Relocation *Moves = NULL, *Move, *Next;
+    geEntity_EntitySet *Node;
+    geEntity_Class *Class;
+    int FieldSize;
+    if (MinBytes < 0 || !geEntity_EntitySetGetClassFieldSize(Set, ClassName, &FieldSize))
+        return GE_FALSE;
+    if (MinBytes <= FieldSize) return GE_TRUE;
+    Class = geEntity_EntitySetFindClassByName(Set, ClassName);
+    for (Node = Set; Node; Node = Node->Next) {
+        geEntity *Entity = Node->Entity;
+        if (!Entity || Entity->Class != Class || Entity->UserDataCapacity >= MinBytes)
+            continue;
+        if (Entity->UserDataCapacity < FieldSize ||
+            (Entity->UserDataCapacity && !Entity->UserData)) goto Failed;
+        Move = geRam_Allocate(sizeof(*Move));
+        if (!Move) goto Failed;
+        Move->NewData = geRam_Allocate((uint32)MinBytes);
+        if (!Move->NewData) { geRam_Free(Move); goto Failed; }
+        Move->Entity = Entity;
+        Move->OldData = Entity->UserData;
+        memset(Move->NewData, 0, (size_t)MinBytes);
+        if (Entity->UserDataCapacity)
+            memcpy(Move->NewData, Move->OldData, (size_t)Entity->UserDataCapacity);
+        Move->Next = Moves;
+        Moves = Move;
+    }
+    for (Move = Moves; Move; Move = Move->Next) {
+        Move->Entity->UserData = Move->NewData;
+        Move->Entity->UserDataCapacity = MinBytes;
+    }
+    /* Scan the complete set, including moved/self-referencing entities.
+       Do not reparse epairs: that would discard runtime changes. */
+    for (Node = Set; Node; Node = Node->Next) {
+        geEntity *Entity = Node->Entity;
+        geEntity_Field *Field;
+        if (!Entity || !Entity->Class || !Entity->UserData) continue;
+        for (Field = Entity->Class->Fields; Field; Field = Field->Next) {
+            void *Reference;
+            char *Slot;
+            if (Field->TypeClass->Type != TYPE_STRUCT && Field->TypeClass->Type != TYPE_PTR)
+                continue;
+            Slot = (char *)Entity->UserData + Field->Offset;
+            memcpy(&Reference, Slot, sizeof(Reference));
+            for (Move = Moves; Move; Move = Move->Next) {
+                if (Move->OldData && Reference == Move->OldData) {
+                    memcpy(Slot, &Move->NewData, sizeof(Move->NewData));
+                    break;
+                }
+            }
+        }
+    }
+    for (Move = Moves; Move; Move = Next) {
+        Next = Move->Next;
+        if (Move->OldData) geRam_Free(Move->OldData);
+        geRam_Free(Move);
+    }
+    return GE_TRUE;
+Failed:
+    for (Move = Moves; Move; Move = Next) {
+        Next = Move->Next;
+        geRam_Free(Move->NewData);
+        geRam_Free(Move);
+    }
+    return GE_FALSE;
+}
+
 //====================================================================================
 //	geEntity_GetModelNumForKey
 //====================================================================================
@@ -953,6 +1040,7 @@ static geBoolean ParseClassData(geEntity_EntitySet *EntitySet)
 		Entity->Class = Class;
 		// Make user data big enough to hold all possible data from class type
 		Entity->UserData = GE_RAM_ALLOCATE_ARRAY(char, Class->FieldSize);
+		Entity->UserDataCapacity = Class->FieldSize;
 		
 		if	(!Entity->UserData)
 		{

@@ -477,6 +477,21 @@ GENESISAPI geEntity *geWorld_AddEntity(geWorld *World, const char *ClassName, co
 GENESISAPI geEntity_EntitySet *geWorld_GetEntitySet(geWorld *World, const char *ClassName);
 GENESISAPI geEntity		*geEntity_EntitySetGetNextEntity(geEntity_EntitySet *EntitySet, geEntity *Entity);
 GENESISAPI void			*geEntity_GetUserData(geEntity *Entity);
+
+/* Use the complete owning set returned by geWorld_GetEntitySet(World, NULL),
+ * not a class-specific view. Unknown classes/invalid arguments return FALSE.
+ * Query reports the declared field extent, never the reserved capacity.
+ * Reserve preserves existing bytes, zero-fills growth, and repairs declared
+ * TYPE_STRUCT/TYPE_PTR references within this set. No shrink; repeat calls
+ * preserve tail edits. Allocation failure leaves the set unchanged.
+ * Call before exposing userdata to application code: external pointers and
+ * undeclared tail fields cannot be repaired. No concurrent access is allowed.
+ * This is storage reservation, not schema reordering or default-value parsing.
+ * Alignment matches the engine's built-in entity types. */
+GENESISAPI geBoolean geEntity_EntitySetGetClassFieldSize(geEntity_EntitySet *Set,
+    const char *ClassName, int *FieldSize);
+GENESISAPI geBoolean geEntity_EntitySetReserveUserData(geEntity_EntitySet *Set,
+    const char *ClassName, int MinBytes);
 GENESISAPI void			geEntity_GetName(const geEntity *Entity, char *Buff, int MaxLen);
 
 // World collision

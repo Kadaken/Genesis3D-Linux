@@ -91,6 +91,7 @@ typedef struct geEntity
 	geEntity_Epair			*Epairs;				// Parsed epair list from entity string list
 
 	void					*UserData;				// User structure parsed from entity
+	int32                   UserDataCapacity;       // Allocation extent, separate from schema size
 } geEntity;
 
 typedef struct geEntity_EntitySet

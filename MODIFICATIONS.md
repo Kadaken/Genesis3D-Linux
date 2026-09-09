@@ -3,6 +3,20 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-08 — generic entity userdata reservation
+
+- Added public class field-size query and zero-tail userdata reservation APIs.
+- Kept schema FieldSize immutable; internal per-entity capacity tracks growth.
+- Repair declared struct/raw pointer references across the complete owning
+  set after relocation, including self references, before freeing old blocks.
+- Preserve values and prior tail edits; stage all allocations before changes
+  so failure leaves original storage intact. Views cannot request reservation.
+- Added an in-memory generated entity fixture with a discriminating stale-
+  reference negative control. Public Release and matched sanitized suites 9/9.
+- This reserves storage only: it does not migrate reordered/type-changed fields.
+
+See `Reports/ENTITY_USERDATA_RESERVE.md` for contract and limits.
+
 ## 2026-09-08 — DOS binary short-read parity
 
 - Posix_Read now matches the inherited FSDos_Read contract: DOS short reads
