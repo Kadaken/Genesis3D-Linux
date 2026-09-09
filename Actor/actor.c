@@ -833,6 +833,7 @@ GENESISAPI geActor_Def *GENESISCC geActor_DefCreateFromFile(geVFile *pFile)
 	if (Ad == NULL)
 		{	geErrorLog_Add( ERR_ACTOR_FILE_READ , NULL);	goto CreateError;}
 	geVFile_Close(SubFile);
+	SubFile = NULL;
 
 
 	if (HasBody != GE_FALSE)
@@ -847,12 +848,13 @@ GENESISAPI geActor_Def *GENESISCC geActor_DefCreateFromFile(geVFile *pFile)
 			if (geActor_SetBody(Ad,Body)==GE_FALSE)
 				{	geErrorLog_Add( ERR_ACTOR_ENOMEM , NULL);	goto CreateError; }
 			geVFile_Close(SubFile);
+			SubFile = NULL;
 		}
 
 	MotionDirectory = geVFile_Open(VFile,GE_MOTION_DIRECTORY_NAME, 
 									GE_VFILE_OPEN_DIRECTORY | GE_VFILE_OPEN_READONLY);
 	if (MotionDirectory == NULL)
-		{	geErrorLog_Add( ERR_ACTOR_FILE_READ , NULL);	return NULL;}
+		{	geErrorLog_Add( ERR_ACTOR_FILE_READ , NULL);	goto CreateError;}
 
 	if (Ad->MotionCount>0)
 		{

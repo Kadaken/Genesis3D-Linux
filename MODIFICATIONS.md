@@ -3,6 +3,16 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-09 — rejected actor cleanup
+
+- Actor/actor.c: clear closed Header/Body subfile handles and route missing
+  Motions through existing failure cleanup. Preserve NULL and the file-read
+  diagnostic; no archive acceptance rules change.
+- Added a generated public-VFS actor rejection fixture: valid empty-body
+  control, missing Motions, missing required Body, and header-only rejection.
+  Error-code interception forwards to the real logger; runtime logging is
+  unchanged. This is not a malformed-actor parser or nonempty writer audit.
+
 ## 2026-09-08 — application-declared entity layouts and borrowed names
 
 - Added copied class/field declarations and an explicit schema-aware world
