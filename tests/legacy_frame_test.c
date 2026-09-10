@@ -12,6 +12,83 @@
 
 static const char *Stage = "SDL initialization";
 
+static int flat_color_cases(geEngine *engine)
+{
+    static const unsigned char colors[][3] = {
+        {255,0,0}, {0,255,0}, {0,0,255}, {128,128,128}
+    };
+    geRect rect = {0,319,0,239};
+    geCamera *camera = NULL;
+    geWorld *world = NULL;
+    geBitmap *bitmap = NULL, *lock = NULL;
+    gePoly *poly = NULL;
+    geXForm3d transform;
+    GE_LVertex vertices[4];
+    unsigned char pixel[3];
+    int world_added = 0, bitmap_added = 0, ok = 0;
+    int color, i;
+#define COLOR_CHECK(expr) do { if (!(expr)) { \
+    fprintf(stderr, "flat color fixture: line %d: %s\n", __LINE__, #expr); goto done; \
+} } while (0)
+    world = geWorld_Create(NULL);
+    COLOR_CHECK(world);
+    COLOR_CHECK(geEngine_AddWorld(engine, world)); world_added = 1;
+    camera = geCamera_Create(2.0f, &rect);
+    COLOR_CHECK(camera);
+    geXForm3d_SetIdentity(&transform);
+    COLOR_CHECK(geCamera_SetWorldSpaceXForm(camera, &transform));
+    memset(vertices, 0, sizeof(vertices));
+    for (i = 0; i < 4; ++i) {
+        vertices[i].X = (i == 0 || i == 3) ? -50 : 50;
+        vertices[i].Y = i < 2 ? 50 : -50;
+        vertices[i].Z = -100;
+        vertices[i].u = (i == 0 || i == 3) ? 0 : 1;
+        vertices[i].v = i < 2 ? 0 : 1;
+        vertices[i].r = vertices[i].g = vertices[i].b = vertices[i].a = 255;
+    }
+    for (color = 0; color < 4; ++color) {
+        geBitmap_Info info;
+        unsigned char *bits;
+        bitmap = geBitmap_Create(16, 16, 1, GE_PIXELFORMAT_24BIT_RGB);
+        COLOR_CHECK(bitmap && geBitmap_LockForWrite(bitmap, &lock, 0, 0));
+        bits = geBitmap_GetBits(lock);
+        COLOR_CHECK(bits && geBitmap_GetInfo(lock, &info, NULL));
+        for (i = 0; i < info.Stride * info.Height; ++i) {
+            bits[i*3] = colors[color][0];
+            bits[i*3+1] = colors[color][1];
+            bits[i*3+2] = colors[color][2];
+        }
+        COLOR_CHECK(geBitmap_UnLock(lock)); lock = NULL;
+        COLOR_CHECK(geWorld_AddBitmap(world, bitmap)); bitmap_added = 1;
+        poly = geWorld_AddPoly(world, vertices, 4, bitmap, GE_TEXTURED_POLY, 0, 1);
+        COLOR_CHECK(poly);
+        COLOR_CHECK(geEngine_BeginFrame(engine, camera, GE_TRUE));
+        COLOR_CHECK(geEngine_RenderWorld(engine, world, camera, 0));
+        glReadBuffer(GL_BACK);
+        glReadPixels(160, 120, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel);
+        COLOR_CHECK(geEngine_EndFrame(engine));
+        COLOR_CHECK(glGetError() == GL_NO_ERROR);
+        fprintf(stderr, "flat color: source=%u/%u/%u read=%u/%u/%u\n",
+            colors[color][0], colors[color][1], colors[color][2],
+            pixel[0], pixel[1], pixel[2]);
+        COLOR_CHECK(!memcmp(pixel, colors[color], 3));
+        geWorld_RemovePoly(world, poly); poly = NULL;
+        COLOR_CHECK(geWorld_RemoveBitmap(world, bitmap)); bitmap_added = 0;
+        geBitmap_Destroy(&bitmap);
+    }
+    ok = 1;
+done:
+    if (lock) geBitmap_UnLock(lock);
+    if (poly) geWorld_RemovePoly(world, poly);
+    if (bitmap_added) geWorld_RemoveBitmap(world, bitmap);
+    if (bitmap) geBitmap_Destroy(&bitmap);
+    if (camera) geCamera_Destroy(&camera);
+    if (world_added) geEngine_RemoveWorld(engine, world);
+    if (world) geWorld_Free(world);
+#undef COLOR_CHECK
+    return ok;
+}
+
 static int capacity_cases(geEngine *engine)
 {
     const int counts[] = {63,64,75,130,123,124,75};
@@ -96,7 +173,7 @@ int main(int argc, char **argv)
 
     setvbuf(stdout, NULL, _IONBF, 0);
     if (argc != 2 && argc != 3) {
-        fprintf(stderr, "usage: legacy_frame_test <driver-directory> [--bsp|--face-capacity]\n");
+        fprintf(stderr, "usage: legacy_frame_test <driver-directory> [--bsp|--face-capacity|--flat-colors]\n");
         return 2;
     }
     if (SDL_Init(SDL_INIT_VIDEO) != 0) goto cleanup;
@@ -132,6 +209,11 @@ int main(int argc, char **argv)
     if (argc == 3 && !strcmp(argv[2], "--face-capacity")) {
         Stage = "face capacity cases";
         result = capacity_cases(engine) ? 0 : 1;
+        goto cleanup;
+    }
+    if (argc == 3 && !strcmp(argv[2], "--flat-colors")) {
+        Stage = "flat color cases";
+        result = flat_color_cases(engine) ? 0 : 1;
         goto cleanup;
     }
 

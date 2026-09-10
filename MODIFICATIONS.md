@@ -288,3 +288,11 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
   accepts `True` and `False` in addition to numeric values.
 - Expanded the synthetic schema fixture across declaration-only, level-wins,
   explicit-zero, invalid-default, and caller-lifetime cases.
+
+## 2026-09-10 — Legacy-driver flat-colour gate
+
+- Added a lighting-free legacy engine/driver fixture that submits independent
+  24-bit RGB textures at 255/0/0, 0/255/0, 0/0/255, and 128/128/128.
+- The test asserts exact framebuffer readback for every channel, separating
+  pixel-format and palette handling from BSP lighting, gamma, and content.
+- No renderer behavior changed.
