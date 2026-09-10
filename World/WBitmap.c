@@ -267,7 +267,8 @@ geBoolean geWBitmap_Pool_CreateAllWBitmaps(geWBitmap_Pool *Pool, GBSP_BSPData *B
 	for (i=0; i< BSPData->NumGFXTextures; i++, pGFXTexture++, pWBitmap++)
 	{
 		geBitmap	*Mips[MAX_MIPS_ALLOWED];
-		int32		NumMips, m, Width, Height, Stride;
+		int32		NumMips, m, Width, Height, Stride, BytesPerPixel;
+		int32		PayloadBytes, FullMipTexels, MipWidth, MipHeight;
 		uint8		*pSrc;
 		uint8		depth;
 
@@ -306,19 +307,90 @@ geBoolean geWBitmap_Pool_CreateAllWBitmaps(geWBitmap_Pool *Pool, GBSP_BSPData *B
 
 		assert(NumMips <= MAX_MIPS_ALLOWED);
 
-		// Get the src from the .bsp texture data
+		// Get the source and identify its historical on-disk layout from the
+		// validated texture span. Genesis3D 1.1 stores raw palette indices;
+		// later tools stored raw RGB mip chains; a subsequent format also added
+		// a one-byte pixel-format tag. The first texel is not a reliable tag.
+		if (pGFXTexture->Offset < 0 || pGFXTexture->Offset >= BSPData->NumGFXTexData)
+		{
+			geErrorLog_AddString(-1, "geWBitmap_Pool_CreateAllWBitmaps: invalid BSP texture offset.", NULL);
+			goto ExitWithError;
+		}
 		pSrc = &BSPData->GFXTexData[pGFXTexture->Offset];
-
-		memcpy(&depth,pSrc,1);
-		pSrc += 1;
+		if (i+1 < BSPData->NumGFXTextures)
+			PayloadBytes = BSPData->GFXTextures[i+1].Offset - pGFXTexture->Offset;
+		else
+			PayloadBytes = BSPData->NumGFXTexData - pGFXTexture->Offset;
+		if (PayloadBytes <= 0)
+		{
+			geErrorLog_AddString(-1, "geWBitmap_Pool_CreateAllWBitmaps: invalid BSP texture span.", NULL);
+			goto ExitWithError;
+		}
+		FullMipTexels = 0;
+		MipWidth = Width;
+		MipHeight = Height;
+		for (m=0; m<MAX_MIPS_ALLOWED; ++m)
+		{
+			FullMipTexels += MipWidth*MipHeight;
+			if (MipWidth > 1) MipWidth >>= 1;
+			if (MipHeight > 1) MipHeight >>= 1;
+		}
+		if (PayloadBytes == Width*Height || PayloadBytes == FullMipTexels)
+		{
+			depth = GE_PIXELFORMAT_8BIT;
+		}
+		else if (PayloadBytes == Width*Height*3 || PayloadBytes == FullMipTexels*3)
+		{
+			depth = GE_PIXELFORMAT_24BIT_RGB;
+		}
+		else if (PayloadBytes == Width*Height*4 || PayloadBytes == FullMipTexels*4)
+		{
+			depth = GE_PIXELFORMAT_32BIT_ARGB;
+		}
+		else if ((PayloadBytes == 1+Width*Height || PayloadBytes == 1+FullMipTexels) &&
+			pSrc[0] == GE_PIXELFORMAT_8BIT)
+		{
+			depth = *pSrc++;
+		}
+		else if ((PayloadBytes == 1+Width*Height*3 || PayloadBytes == 1+FullMipTexels*3) &&
+			pSrc[0] == GE_PIXELFORMAT_24BIT_RGB)
+		{
+			depth = *pSrc++;
+		}
+		else if ((PayloadBytes == 1+Width*Height*4 || PayloadBytes == 1+FullMipTexels*4) &&
+			pSrc[0] == GE_PIXELFORMAT_32BIT_ARGB)
+		{
+			depth = *pSrc++;
+		}
+		else
+		{
+			geErrorLog_AddString(-1, "geWBitmap_Pool_CreateAllWBitmaps: unrecognized BSP texture payload layout.", NULL);
+			goto ExitWithError;
+		}
 
 		// Create the bitmap
 //Start Dec2001DCS - Changed format to 32 bit
 // added transparent textures
 	if(depth == GE_PIXELFORMAT_32BIT_ARGB)
-	   pWBitmap->Bitmap = geBitmap_Create(Width, Height, NumMips, GE_PIXELFORMAT_32BIT_ARGB);
+	{
+		BytesPerPixel = 4;
+		pWBitmap->Bitmap = geBitmap_Create(Width, Height, NumMips, GE_PIXELFORMAT_32BIT_ARGB);
+	}
+	else if(depth == GE_PIXELFORMAT_24BIT_RGB)
+	{
+		BytesPerPixel = 3;
+		pWBitmap->Bitmap = geBitmap_Create(Width, Height, NumMips, GE_PIXELFORMAT_24BIT_RGB);
+	}
+	else if(depth == GE_PIXELFORMAT_8BIT)
+	{
+		BytesPerPixel = 1;
+		pWBitmap->Bitmap = geBitmap_Create(Width, Height, NumMips, GE_PIXELFORMAT_8BIT);
+	}
 	else
-	   pWBitmap->Bitmap = geBitmap_Create(Width, Height, NumMips, GE_PIXELFORMAT_24BIT_RGB);
+	{
+		geErrorLog_AddString(-1, "geWBitmap_Pool_CreateAllWBitmaps: unsupported BSP texture format.", NULL);
+		goto ExitWithError;
+	}
 
 //End Dec2001DCS
 
@@ -370,37 +442,16 @@ geBoolean geWBitmap_Pool_CreateAllWBitmaps(geWBitmap_Pool *Pool, GBSP_BSPData *B
 
 			if ( Stride == Width )
 			{
-            //Start Dec2001DCS - Added * 4 since textures are now 32 bit
-			// added transparent textures
-			if(depth == GE_PIXELFORMAT_32BIT_ARGB)
-				memcpy(pDest,pSrc,Width*Height*4);
-			else
-			   memcpy(pDest,pSrc,Width*Height*3);
-
-            //End Dec2001DCS
+				memcpy(pDest,pSrc,Width*Height*BytesPerPixel);
 			}
 			else
 			{
 				int h;
 				for (h=Height;h--;)
 				{
-					//Start Dec2001DCS - Added * 4 since textures are now 32 bit
-					// added transparent textures
-					if(depth == GE_PIXELFORMAT_32BIT_ARGB)
-					{
-						memcpy(pDest,pSrc,Width*4);
-						//End Dec2001DCS
-						pSrc += Width*4;
-						pDest += Stride*4;
-					}
-					else
-					{
-						memcpy(pDest,pSrc,Width*3);
-						//End Dec2001DCS
-						pSrc += Width*3;
-						pDest += Stride*3;
-					}
-					
+					memcpy(pDest,pSrc,Width*BytesPerPixel);
+					pSrc += Width*BytesPerPixel;
+					pDest += Stride*BytesPerPixel;
 				}
 			}
 
@@ -467,7 +518,31 @@ geBoolean geWBitmap_Pool_CreateAllWBitmaps(geWBitmap_Pool *Pool, GBSP_BSPData *B
 			geBitmap_Palette_Destroy(&Pal);
 		} //done making the palette
 
-		if(depth == GE_PIXELFORMAT_24BIT_RGB)
+		if(depth == GE_PIXELFORMAT_8BIT && UseColorKey)
+		{
+			DRV_RGB *SourcePalette = BSPData->GFXPalettes[pGFXTexture->PaletteIndex];
+			int32 KeyIndex = -1;
+			for (m=0; m<256; ++m)
+			{
+				if (SourcePalette[m].r == 255 && SourcePalette[m].g == 0 &&
+					(SourcePalette[m].b == 254 || SourcePalette[m].b == 255))
+				{
+					KeyIndex = m;
+					break;
+				}
+			}
+			if (KeyIndex < 0)
+			{
+				geErrorLog_AddString(-1, "geWBitmap_Pool_CreateAllWBitmaps: transparent indexed texture has no key-colour palette entry.", NULL);
+				goto ExitWithError;
+			}
+			if (!geBitmap_SetColorKey(pWBitmap->Bitmap, GE_TRUE, (uint32)KeyIndex, GE_TRUE))
+			{
+				geErrorLog_AddString(-1, "geWBitmap_Pool_CreateAllWBitmaps: geBitmap_SetColorKey failed.", NULL);
+				goto ExitWithError;
+			}
+		}
+		else if(depth == GE_PIXELFORMAT_24BIT_RGB)
 		{
 			if (!geBitmap_SetColorKey(pWBitmap->Bitmap, UseColorKey, ColorKey, GE_TRUE))
 			{

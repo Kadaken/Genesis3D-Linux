@@ -107,7 +107,8 @@ static int capacity_cases(geEngine *engine)
         geVFile_MemoryContext context = {0};
         file = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_MEMORY, NULL, &context, GE_VFILE_OPEN_CREATE);
         CAP_CHECK(file);
-        CAP_CHECK(neutral_bsp_write_polygon(file, NULL, 0, counts[c], c == 6 ? 256 : 60));
+        CAP_CHECK(neutral_bsp_write_polygon(file, NULL, 0, counts[c], c == 6 ? 256 : 60,
+                                            GE_PIXELFORMAT_24BIT_RGB, 0, 0));
         CAP_CHECK(geVFile_Seek(file, 0, GE_VFILE_SEEKSET));
         world = geWorld_Create(file);
         CAP_CHECK(geVFile_Close(file)); file = NULL;
@@ -145,6 +146,66 @@ done:
     return ok;
 }
 
+static int palettized_bsp_cases(geEngine *engine)
+{
+    static const unsigned char expected[][3] = {
+        {128,0,0}, {0,0,128}, {90,45,12}, {64,64,64}, {0,0,0}, {0,0,0}
+    };
+    geRect rect = {0,319,0,239};
+    geCamera *camera = geCamera_Create(2.0f, &rect);
+    geXForm3d transform;
+    geWorld *world = NULL;
+    geVFile *file = NULL;
+    int c, added = 0, ok = 0;
+    unsigned char pixel[3];
+#define PAL_CHECK(expr) do { if (!(expr)) { \
+    fprintf(stderr, "palettized fixture: line %d: %s\n", __LINE__, #expr); goto done; \
+} } while(0)
+    PAL_CHECK(camera);
+    geXForm3d_SetIdentity(&transform);
+    PAL_CHECK(geCamera_SetWorldSpaceXForm(camera, &transform));
+    for (c=0; c<6; ++c) {
+        geVFile_MemoryContext context = {0};
+        const int palette_index = c < 5 ? c + 1 : 0;
+        const int transparent = palette_index == 5;
+        file = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_MEMORY, NULL, &context,
+                                     GE_VFILE_OPEN_CREATE);
+        PAL_CHECK(file);
+        PAL_CHECK(c < 5
+            ? neutral_bsp_write_palettized(file, palette_index, transparent)
+            : neutral_bsp_write_rgb_keyed(file));
+        PAL_CHECK(geVFile_Seek(file, 0, GE_VFILE_SEEKSET));
+        world = geWorld_Create(file);
+        PAL_CHECK(geVFile_Close(file)); file = NULL;
+        PAL_CHECK(world);
+        PAL_CHECK(geEngine_AddWorld(engine, world)); added = 1;
+        PAL_CHECK(geEngine_BeginFrame(engine, camera, GE_TRUE));
+        PAL_CHECK(geEngine_RenderWorld(engine, world, camera, 0));
+        glReadBuffer(GL_BACK);
+        glReadPixels(160,120,1,1,GL_RGB,GL_UNSIGNED_BYTE,pixel);
+        PAL_CHECK(geEngine_EndFrame(engine));
+        PAL_CHECK(glGetError() == GL_NO_ERROR);
+        fprintf(stderr,
+            "legacy BSP texture: format=%s index=%d keyed=%d expected=%u/%u/%u read=%u/%u/%u\n",
+            c < 5 ? "indexed" : "raw-rgb", palette_index, c == 5 || transparent,
+            expected[c][0], expected[c][1], expected[c][2],
+            pixel[0], pixel[1], pixel[2]);
+        PAL_CHECK(abs((int)pixel[0] - expected[c][0]) <= 2);
+        PAL_CHECK(abs((int)pixel[1] - expected[c][1]) <= 2);
+        PAL_CHECK(abs((int)pixel[2] - expected[c][2]) <= 2);
+        PAL_CHECK(geEngine_RemoveWorld(engine,world)); added = 0;
+        geWorld_Free(world); world = NULL;
+    }
+    ok = 1;
+done:
+    if (file) geVFile_Close(file);
+    if (added) geEngine_RemoveWorld(engine,world);
+    if (world) geWorld_Free(world);
+    if (camera) geCamera_Destroy(&camera);
+#undef PAL_CHECK
+    return ok;
+}
+
 static void errors(void)
 {
     int i;
@@ -173,7 +234,7 @@ int main(int argc, char **argv)
 
     setvbuf(stdout, NULL, _IONBF, 0);
     if (argc != 2 && argc != 3) {
-        fprintf(stderr, "usage: legacy_frame_test <driver-directory> [--bsp|--face-capacity|--flat-colors]\n");
+        fprintf(stderr, "usage: legacy_frame_test <driver-directory> [--bsp|--face-capacity|--flat-colors|--palette-colors]\n");
         return 2;
     }
     if (SDL_Init(SDL_INIT_VIDEO) != 0) goto cleanup;
@@ -214,6 +275,11 @@ int main(int argc, char **argv)
     if (argc == 3 && !strcmp(argv[2], "--flat-colors")) {
         Stage = "flat color cases";
         result = flat_color_cases(engine) ? 0 : 1;
+        goto cleanup;
+    }
+    if (argc == 3 && !strcmp(argv[2], "--palette-colors")) {
+        Stage = "palettized BSP cases";
+        result = palettized_bsp_cases(engine) ? 0 : 1;
         goto cleanup;
     }
 

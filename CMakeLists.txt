@@ -229,6 +229,11 @@ if(BUILD_TESTING)
             $<TARGET_FILE:genesis3d_legacy_frame_test> $<TARGET_FILE_DIR:OglDrv> --flat-colors)
         set_tests_properties(genesis3d_flat_color_fixture PROPERTIES
             TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "SDL_VIDEODRIVER=x11;LIBGL_ALWAYS_SOFTWARE=1")
+        add_test(NAME genesis3d_palettized_texture_fixture
+            COMMAND "${XVFB_RUN_EXECUTABLE}" -a -s "-screen 0 640x480x24"
+            $<TARGET_FILE:genesis3d_legacy_frame_test> $<TARGET_FILE_DIR:OglDrv> --palette-colors)
+        set_tests_properties(genesis3d_palettized_texture_fixture PROPERTIES
+            TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "SDL_VIDEODRIVER=x11;LIBGL_ALWAYS_SOFTWARE=1")
         add_test(NAME genesis3d_legacy_bsp_fixture
             COMMAND "${XVFB_RUN_EXECUTABLE}" -a -s "-screen 0 640x480x24"
             $<TARGET_FILE:genesis3d_legacy_frame_test> $<TARGET_FILE_DIR:OglDrv> --bsp)

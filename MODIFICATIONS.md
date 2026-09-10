@@ -3,6 +3,24 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-10 — legacy BSP texture layouts and transparency
+
+- Replaced the inherited one-byte format guess with bounds-checked payload-span
+  detection. Genesis3D 1.1 raw indexed mip chains, later raw RGB/ARGB chains,
+  and the subsequent format-prefixed variants are distinguished without ever
+  consuming the first texel as metadata.
+- Indexed payloads remain indexed until the bitmap conversion layer applies
+  their per-texture palette. Indexed transparent faces resolve the historical
+  key colour to its palette index before conversion to the driver's alpha
+  format. Raw RGB colour keys retain their existing path. Unknown layouts fail
+  with a diagnostic.
+- Added synthetic lightmapped GBSP coverage for asymmetric indexed palette
+  entries, a keyed indexed surface, an asymmetric raw-RGB surface, and a keyed
+  raw-RGB surface. The cases discriminate byte alignment, palette order,
+  conversion, OpenGL upload and key transparency.
+
+Affected inherited file: `World/WBitmap.c`.
+
 ## 2026-09-10 — fixed-width BODY writer and actor pose gate
 
 - `Actor/body.c` now writes vertices, normals, bones, materials, and triangles

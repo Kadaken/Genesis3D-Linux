@@ -16,7 +16,9 @@ static int fixture_chunk(geVFile *file, int type, int size, int count, const voi
 }
 
 static int neutral_bsp_write_polygon(geVFile *file, const void *entities, int entity_bytes,
-                                    int vertex_count, float radius)
+                                    int vertex_count, float radius,
+                                    gePixelFormat texture_format, int palette_index,
+                                    int transparent)
 {
     GBSP_Header header = {{'G','B','S','P',0}, GBSP_VERSION, {0}};
     GFX_Model model = {0};
@@ -36,8 +38,9 @@ static int neutral_bsp_write_polygon(geVFile *file, const void *entities, int en
                         {48,-48,-100},{-48,-48,-100}};
     geVec3d rgb[160] = {{255,255,255},{255,255,255},
                       {255,255,255},{255,255,255}};
-    unsigned char pixels[1+16*16*3], light[1+7*7*3];
-    int result = 0;
+    unsigned char pixels[16*16*4], light[1+7*7*3];
+    const int mip_texels = 16*16 + 8*8 + 4*4 + 2*2;
+    int result = 0, pixel_bytes;
     int i;
     if (vertex_count < 3 || vertex_count > 160) return 0;
     if (vertex_count != 4) {
@@ -74,11 +77,24 @@ static int neutral_bsp_write_polygon(geVFile *file, const void *entities, int en
     if (vertex_count != 4) texinfo.Vecs[0].X = texinfo.Vecs[1].Y = 48.0f / radius;
     texinfo.DrawScale[0] = texinfo.DrawScale[1] = 1;
     texinfo.Alpha = 255;
+    if (transparent) texinfo.Flags |= (1<<4); /* TEXINFO_TRANS */
     for (i = 0; i < 6; ++i) sky.Textures[i] = -1;
     sky.DrawScale = 1;
-    pixels[0] = GE_PIXELFORMAT_24BIT_RGB;
-    for (i = 0; i < 16*16; ++i) {
-        pixels[1+i*3] = 24; pixels[2+i*3] = 220; pixels[3+i*3] = 48;
+    if (texture_format == GE_PIXELFORMAT_8BIT) {
+        palette[1].r = 255; palette[1].g = 0;   palette[1].b = 0;
+        palette[2].r = 0;   palette[2].g = 0;   palette[2].b = 255;
+        palette[3].r = 180; palette[3].g = 90;  palette[3].b = 24;
+        palette[4].r = 128; palette[4].g = 128; palette[4].b = 128;
+        palette[5].r = 255; palette[5].g = 0;   palette[5].b = 254;
+        memset(pixels, palette_index, mip_texels);
+        pixel_bytes = mip_texels;
+    } else {
+        for (i = 0; i < mip_texels; ++i) {
+            pixels[i*3] = transparent ? 255 : 24;
+            pixels[i*3+1] = transparent ? 0 : 220;
+            pixels[i*3+2] = transparent ? 254 : 48;
+        }
+        pixel_bytes = mip_texels*3;
     }
     memset(light, 128, sizeof(light)); light[0] = 1;
     if (!file) return 0;
@@ -98,7 +114,7 @@ static int neutral_bsp_write_polygon(geVFile *file, const void *entities, int en
     CHUNK(GBSP_CHUNK_RGB_VERTS, rgb, vertex_count);
     CHUNK(GBSP_CHUNK_TEXINFO, &texinfo, 1);
     CHUNK(GBSP_CHUNK_TEXTURES, &texture, 1);
-    CHUNK(GBSP_CHUNK_TEXDATA, pixels, sizeof(pixels));
+    if (!fixture_chunk(file, GBSP_CHUNK_TEXDATA, 1, pixel_bytes, pixels)) goto done;
     CHUNK(GBSP_CHUNK_PALETTES, &palette, 1);
     CHUNK(GBSP_CHUNK_LIGHTDATA, light, sizeof(light));
     CHUNK(GBSP_CHUNK_SKYDATA, &sky, 1);
@@ -111,7 +127,22 @@ done:
 
 static int neutral_bsp_write_with_entities(geVFile *file, const void *entities, int entity_bytes)
 {
-    return neutral_bsp_write_polygon(file, entities, entity_bytes, 4, 48);
+    return neutral_bsp_write_polygon(file, entities, entity_bytes, 4, 48,
+                                     GE_PIXELFORMAT_24BIT_RGB, 0, 0);
+}
+
+static int neutral_bsp_write_palettized(geVFile *file, int palette_index,
+                                        int transparent)
+{
+    return neutral_bsp_write_polygon(file, NULL, 0, 4, 48,
+                                     GE_PIXELFORMAT_8BIT, palette_index,
+                                     transparent);
+}
+
+static int neutral_bsp_write_rgb_keyed(geVFile *file)
+{
+    return neutral_bsp_write_polygon(file, NULL, 0, 4, 48,
+                                     GE_PIXELFORMAT_24BIT_RGB, 0, 1);
 }
 
 static int neutral_bsp_write(geVFile *file)
