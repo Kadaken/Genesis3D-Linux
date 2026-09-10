@@ -3,6 +3,17 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-10 — fixed-width BODY writer and actor pose gate
+
+- `Actor/body.c` now writes vertices, normals, bones, materials, and triangles
+  through the same explicit fixed-width BODY 00F1 records used by the reader.
+  This restores writer/reader symmetry on LP64 hosts; notably, a native
+  eight-byte bitmap pointer is never serialized in place of the historical
+  four-byte bitmap-presence token.
+- `tests/actor_pose_chain_test.c` writes and reloads a generated three-bone ACT,
+  checks decoded keyframes and rest/animated transforms, and verifies three
+  skinned vertex positions against hand-computed results.
+
 ## 2026-09-10 — authored entity defaults in application schemas
 
 - `Entities/Entities.c` now retains each `%defaultvalue%` string from an

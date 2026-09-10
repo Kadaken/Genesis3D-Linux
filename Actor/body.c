@@ -1459,6 +1459,16 @@ static void geBody_DiskFloatsToXForm(const float Disk[12], geXForm3d *Native)
 	Native->Translation.Z = Disk[11];
 }
 
+static void geBody_XFormToDiskFloats(const geXForm3d *Native, float Disk[12])
+{
+	Disk[0]=Native->AX; Disk[1]=Native->AY; Disk[2]=Native->AZ;
+	Disk[3]=Native->BX; Disk[4]=Native->BY; Disk[5]=Native->BZ;
+	Disk[6]=Native->CX; Disk[7]=Native->CY; Disk[8]=Native->CZ;
+	Disk[9]=Native->Translation.X;
+	Disk[10]=Native->Translation.Y;
+	Disk[11]=Native->Translation.Z;
+}
+
 static geBoolean GENESISCC geBody_ReadGeometry(geBody *B, geVFile *pFile)
 {
 	uint32_t u;
@@ -1725,9 +1735,17 @@ geBoolean GENESISCC geBody_WriteGeometry(const geBody *B,geVFile *pFile)
 	
 	if (B->XSkinVertexCount>0)
 		{
-			u = sizeof(geBody_XSkinVertex) * B->XSkinVertexCount;
-			if(geVFile_Write(pFile, B->XSkinVertexArray, u) == GE_FALSE)
-				{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
+			for (i=0; i<B->XSkinVertexCount; ++i)
+				{
+				const geBody_XSkinVertex *N = &B->XSkinVertexArray[i];
+				geBody_DiskXSkinVertex D;
+				memset(&D, 0, sizeof(D));
+				D.Point[0]=N->XPoint.X; D.Point[1]=N->XPoint.Y; D.Point[2]=N->XPoint.Z;
+				D.U=N->XU; D.V=N->XV; D.LevelOfDetailMask=N->LevelOfDetailMask;
+				D.BoneIndex=(int16_t)N->BoneIndex;
+				if(geVFile_Write(pFile, &D, sizeof(D)) == GE_FALSE)
+					{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
+				}
 		}
 
 	if(geVFile_Write(pFile, &(B->SkinNormalCount), sizeof(B->SkinNormalCount)) == GE_FALSE)
@@ -1735,9 +1753,17 @@ geBoolean GENESISCC geBody_WriteGeometry(const geBody *B,geVFile *pFile)
 
 	if (B->SkinNormalCount>0)
 		{
-			u = sizeof(geBody_Normal) * B->SkinNormalCount;
-			if(geVFile_Write(pFile, B->SkinNormalArray, u) == GE_FALSE)
-				{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
+			for (i=0; i<B->SkinNormalCount; ++i)
+				{
+				const geBody_Normal *N = &B->SkinNormalArray[i];
+				geBody_DiskNormal D;
+				memset(&D, 0, sizeof(D));
+				D.Normal[0]=N->Normal.X; D.Normal[1]=N->Normal.Y; D.Normal[2]=N->Normal.Z;
+				D.LevelOfDetailMask=N->LevelOfDetailMask;
+				D.BoneIndex=(int16_t)N->BoneIndex;
+				if(geVFile_Write(pFile, &D, sizeof(D)) == GE_FALSE)
+					{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
+				}
 		}
 
 	if(geVFile_Write(pFile, &(B->BoneCount), sizeof(B->BoneCount)) == GE_FALSE)
@@ -1745,9 +1771,18 @@ geBoolean GENESISCC geBody_WriteGeometry(const geBody *B,geVFile *pFile)
 
 	if (B->BoneCount>0)
 		{
-			u = sizeof(geBody_Bone) * B->BoneCount;
-			if(geVFile_Write(pFile, B->BoneArray, u) == GE_FALSE)
-				{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
+			for (i=0; i<B->BoneCount; ++i)
+				{
+				const geBody_Bone *N = &B->BoneArray[i];
+				geBody_DiskBone D;
+				memset(&D, 0, sizeof(D));
+				D.BoundingBoxMin[0]=N->BoundingBoxMin.X; D.BoundingBoxMin[1]=N->BoundingBoxMin.Y; D.BoundingBoxMin[2]=N->BoundingBoxMin.Z;
+				D.BoundingBoxMax[0]=N->BoundingBoxMax.X; D.BoundingBoxMax[1]=N->BoundingBoxMax.Y; D.BoundingBoxMax[2]=N->BoundingBoxMax.Z;
+				geBody_XFormToDiskFloats(&N->AttachmentMatrix, D.AttachmentMatrix);
+				D.ParentBoneIndex=(int16_t)N->ParentBoneIndex;
+				if(geVFile_Write(pFile, &D, sizeof(D)) == GE_FALSE)
+					{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
+				}
 		}
 
 	if (geStrBlock_WriteToBinaryFile(B->BoneNames,pFile)==GE_FALSE)
@@ -1758,9 +1793,15 @@ geBoolean GENESISCC geBody_WriteGeometry(const geBody *B,geVFile *pFile)
 
 	if (B->MaterialCount>0)
 		{
-			u = sizeof(geBody_Material) * B->MaterialCount;
-			if(geVFile_Write(pFile, B->MaterialArray, u) == GE_FALSE)
-				{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
+			for (i=0; i<B->MaterialCount; ++i)
+				{
+				const geBody_Material *N = &B->MaterialArray[i];
+				geBody_DiskMaterial D;
+				D.BitmapPresent = N->Bitmap != NULL ? 1u : 0u;
+				D.Red=N->Red; D.Green=N->Green; D.Blue=N->Blue;
+				if(geVFile_Write(pFile, &D, sizeof(D)) == GE_FALSE)
+					{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
+				}
 		}
 	
 	if (geStrBlock_WriteToBinaryFile(B->MaterialNames,pFile)==GE_FALSE)
@@ -1776,9 +1817,21 @@ geBoolean GENESISCC geBody_WriteGeometry(const geBody *B,geVFile *pFile)
 				{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
 			if (u>0)
 				{
-					u = sizeof(geBody_Triangle) * u;
-					if(geVFile_Write(pFile, B->SkinFaces[i].FaceArray, u) == GE_FALSE)
+				uint32_t face;
+				for (face=0; face<u; ++face)
+					{
+					const geBody_Triangle *N = &B->SkinFaces[i].FaceArray[face];
+					geBody_DiskTriangle D;
+					int corner;
+					for (corner=0; corner<3; ++corner)
+						{
+						D.VtxIndex[corner]=(int16_t)N->VtxIndex[corner];
+						D.NormalIndex[corner]=(int16_t)N->NormalIndex[corner];
+						}
+					D.MaterialIndex=(int16_t)N->MaterialIndex;
+					if(geVFile_Write(pFile, &D, sizeof(D)) == GE_FALSE)
 						{	geErrorLog_Add( ERR_BODY_FILE_WRITE , NULL);	return GE_FALSE; }
+					}
 				}
 		}
 	return GE_TRUE;
