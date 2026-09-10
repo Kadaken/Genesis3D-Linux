@@ -2235,6 +2235,49 @@ void GENESISCC geXForm3d_SetIn(geXForm3d *M,const geVec3d *In)
 //=====================================================================================
 //	RenderFace
 //=====================================================================================
+// Runtime-only surface flag; never serialized to the BSP.
+#define WORLD_SURF_CAPACITY_REPORTED ((uint32)1 << 31)
+
+static void ReportFaceCapacity(uint32 *Flags, uint32 Bit, const char *Path,
+                              int32 Face, int32 Vertices, int32 Planes, int32 Capacity)
+{
+	char Message[192];
+	if (*Flags & Bit)
+		return;
+	*Flags |= Bit;
+	snprintf(Message, sizeof(Message), "%s: skipping face %d (vertices=%d, clip planes=%d, capacity=%d)",
+	         Path, Face, Vertices, Planes, Capacity);
+	geErrorLog_AddExplicit(GE_ERR_DATA_FORMAT, "face capacity", "World.c", __LINE__, Message, NULL);
+}
+
+// A convex BSP polygon gains at most one vertex per applied clip plane.
+// Subtraction keeps even corrupt large counts from overflowing the check.
+static geBoolean FaceCapacityFits(int32 Vertices, int32 Planes, int32 Capacity)
+{
+	return Vertices >= 3 && Planes >= 0 && Planes <= MAX_FCP &&
+	       Planes <= Capacity && Vertices <= Capacity - Planes;
+}
+
+// Wave deformation can break convexity. Before a potentially full scratch
+// write, count exactly what the UV/UVRGB edge loop will emit. Small polygons
+// cannot overflow even if every edge crosses the plane.
+static geBoolean FaceClipFits(const GFX_Plane *Plane, const geVec3d *Verts, int32 Count)
+{
+	int32 i, Output = 0;
+	if (Count <= MAX_RENDERFACE_VERTS / 2)
+		return GE_TRUE;
+	for (i = 0; i < Count; ++i)
+	{
+		const geVec3d *A = &Verts[i], *B = &Verts[(i + 1) % Count];
+		geBoolean InA = (A->X * Plane->Normal.X + A->Y * Plane->Normal.Y + A->Z * Plane->Normal.Z) >= Plane->Dist;
+		geBoolean InB = (B->X * Plane->Normal.X + B->Y * Plane->Normal.Y + B->Z * Plane->Normal.Z) >= Plane->Dist;
+		Output += InA + (InA != InB);
+		if (Output > MAX_RENDERFACE_VERTS)
+			return GE_FALSE;
+	}
+	return GE_TRUE;
+}
+
 static void RenderFace(int32 Face, const geWorld_RenderInfo *RenderInfo, int32 ClipFlags)
 {
 	geVec3d				Dest1[MAX_RENDERFACE_VERTS], Dest2[MAX_RENDERFACE_VERTS];
@@ -2271,7 +2314,21 @@ static void RenderFace(int32 Face, const geWorld_RenderInfo *RenderInfo, int32 C
 
 	NumVerts = pFace->NumVerts;
 
-	assert(NumVerts < MAX_RENDERFACE_VERTS);
+	{
+		int32 ClipCount = 0;
+		if (Fi->NumPlanes < 0 || Fi->NumPlanes > MAX_FCP)
+			ClipCount = -1;
+		else
+			for (p = 0; p < Fi->NumPlanes; ++p)
+				if ((uint32)ClipFlags & ((uint32)1 << p))
+					++ClipCount;
+		if (!FaceCapacityFits(NumVerts, ClipCount, MAX_RENDERFACE_VERTS))
+		{
+			ReportFaceCapacity(&pSurfInfo[Face].Flags, WORLD_SURF_CAPACITY_REPORTED,
+			                   "RenderFace", Face, NumVerts, ClipCount, MAX_RENDERFACE_VERTS);
+			return;
+		}
+	}
 
 	pTexInfo = &BSPData->GFXTexInfo[pFace->TexInfo];
 	TexFlags = pTexInfo->Flags;
@@ -2351,8 +2408,14 @@ static void RenderFace(int32 Face, const geWorld_RenderInfo *RenderInfo, int32 C
 		for (p=0; p< Fi->NumPlanes; p++)
 		{
 			// Only do clipping if we have to
-			if (!(ClipFlags & (1<<p)) )
+			if (!((uint32)ClipFlags & ((uint32)1 << p)))
 				continue;
+			if (!FaceClipFits(&FPlanes[p], pDest1, Length1))
+			{
+				ReportFaceCapacity(&pSurfInfo[Face].Flags, WORLD_SURF_CAPACITY_REPORTED,
+				                   "RenderFace clip output", Face, Length1, 1, MAX_RENDERFACE_VERTS);
+				return;
+			}
 
 			if (TexFlags & TEXINFO_GOURAUD)
 			{
@@ -2406,7 +2469,12 @@ static void RenderFace(int32 Face, const geWorld_RenderInfo *RenderInfo, int32 C
 		Frustum_Info	SkyFrustum;
 
 		// Create a frustum from the poly
-		Frustum_SetFromPoly(&SkyFrustum, pDest2, Length1, MirrorRecursion&1);
+		if (!Frustum_SetFromPoly(&SkyFrustum, pDest2, Length1, MirrorRecursion&1))
+		{
+			ReportFaceCapacity(&pSurfInfo[Face].Flags, WORLD_SURF_CAPACITY_REPORTED,
+			                   "Sky portal", Face, Length1, 0, MAX_FCP - 1);
+			return;
+		}
 
 		// Render the sky through the poly's frustum
 		RenderSkyThroughFrustum(&CWorld->SkyBox, RenderInfo->SkyTData, Camera, &SkyFrustum);
@@ -4159,6 +4227,15 @@ static void RenderSkyThroughFrustum(World_SkyBox *SkyBox, geWorld_SkyBoxTData *S
 	  if(nFoo > 4)							// EVIL HACK - 5 planes means far clip enabled
 	    nFoo = Fi->NumPlanes-1;								// EVIL HACK - leave my skybox alone!
 
+		if (Fi->NumPlanes < 0 || Fi->NumPlanes > MAX_FCP ||
+		    !FaceCapacityFits(Length1, nFoo, (int32)(sizeof(Dest1) / sizeof(Dest1[0]))))
+		{
+			int32 SkyFace = SkyTData->OriginalFaces[i];
+			ReportFaceCapacity(&SkyBox->CapacityReported, (uint32)1 << SkyFace,
+			                   "RenderSkyThroughFrustum", SkyFace, Length1, nFoo, 30);
+			continue;
+		}
+
 		for (p=0; p< nFoo; p++)
 		{
 			if (!Frustum_ClipToPlaneUV(&Planes[p], pDest1, pDest2, pTex1, pTex2, Length1, &Length2))
@@ -4268,6 +4345,17 @@ static void SetupSkyBoxFaceForScene(World_SkyBox *SkyBox, int32 Face, const geXF
 
 	if(nFoo > 4)							// EVIL HACK - 5 planes means far clip enabled
 	  nFoo = Fi->NumPlanes-1;								// EVIL HACK - leave my skybox alone!
+
+	// The post-clip destination is narrower than the local scratch arrays.
+	if (Fi->NumPlanes < 0 || Fi->NumPlanes > MAX_FCP ||
+	    !FaceCapacityFits(Length1, nFoo, MAX_RENDERFACE_VERTS) ||
+	    !FaceCapacityFits(Length1, nFoo,
+	        (int32)(sizeof(SkyTData->TransformedVerts[0]) / sizeof(SkyTData->TransformedVerts[0][0]))))
+	{
+		ReportFaceCapacity(&SkyBox->CapacityReported, (uint32)1 << Face,
+		                   "SetupSkyBoxFaceForScene", Face, Length1, nFoo, 10);
+		return;
+	}
 
 	for (p=0; p< nFoo; p++, pFPlane++)
 	{

@@ -12,6 +12,62 @@
 
 static const char *Stage = "SDL initialization";
 
+static int capacity_cases(geEngine *engine)
+{
+    const int counts[] = {63,64,75,130,123,124,75};
+    geRect rect = {0,319,0,239};
+    geCamera *camera = geCamera_Create(2.0f, &rect);
+    geXForm3d transform;
+    geWorld *world = NULL;
+    geVFile *file = NULL;
+    int c, frame, added = 0, ok = 0;
+    unsigned char before[3], after[3];
+#define CAP_CHECK(expr) do { if (!(expr)) { fprintf(stderr, "face capacity fixture: line %d: %s\n", __LINE__, #expr); goto done; } } while(0)
+    CAP_CHECK(camera);
+    geXForm3d_SetIdentity(&transform);
+    CAP_CHECK(geCamera_SetWorldSpaceXForm(camera, &transform));
+    for (c=0; c<7; ++c) {
+        geVFile_MemoryContext context = {0};
+        file = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_MEMORY, NULL, &context, GE_VFILE_OPEN_CREATE);
+        CAP_CHECK(file);
+        CAP_CHECK(neutral_bsp_write_polygon(file, NULL, 0, counts[c], c == 6 ? 256 : 60));
+        CAP_CHECK(geVFile_Seek(file, 0, GE_VFILE_SEEKSET));
+        world = geWorld_Create(file);
+        CAP_CHECK(geVFile_Close(file)); file = NULL;
+        CAP_CHECK(world);
+        CAP_CHECK(geEngine_AddWorld(engine, world)); added = 1;
+        geErrorLog_Clear();
+        for (frame=0; frame<2; ++frame) {
+            CAP_CHECK(geEngine_BeginFrame(engine, camera, GE_TRUE));
+            glReadBuffer(GL_BACK);
+            glReadPixels(160,120,1,1,GL_RGB,GL_UNSIGNED_BYTE,before);
+            CAP_CHECK(geEngine_RenderWorld(engine, world, camera, 0));
+            glReadPixels(160,120,1,1,GL_RGB,GL_UNSIGNED_BYTE,after);
+            CAP_CHECK(geEngine_EndFrame(engine));
+            CAP_CHECK(glGetError() == GL_NO_ERROR);
+            fprintf(stderr,"face capacity: vertices=%d clipped=%d frame=%d rgb=%u/%u/%u diagnostics=%d\n",
+                counts[c],c==6,frame,after[0],after[1],after[2],geErrorLog_Count());
+            if (counts[c] == 130 || counts[c] == 124) {
+                CAP_CHECK(!memcmp(before,after,3));
+                CAP_CHECK(geErrorLog_Count() == 1);
+            } else {
+                CAP_CHECK(abs(after[0]-12)<=2 && abs(after[1]-110)<=2 && abs(after[2]-24)<=2);
+                CAP_CHECK(geErrorLog_Count() == 0);
+            }
+        }
+        CAP_CHECK(geEngine_RemoveWorld(engine,world)); added = 0;
+        geWorld_Free(world); world = NULL;
+    }
+    ok = 1;
+done:
+    if (file) geVFile_Close(file);
+    if (added) geEngine_RemoveWorld(engine,world);
+    if (world) geWorld_Free(world);
+    if (camera) geCamera_Destroy(&camera);
+#undef CAP_CHECK
+    return ok;
+}
+
 static void errors(void)
 {
     int i;
@@ -40,7 +96,7 @@ int main(int argc, char **argv)
 
     setvbuf(stdout, NULL, _IONBF, 0);
     if (argc != 2 && argc != 3) {
-        fprintf(stderr, "usage: legacy_frame_test <driver-directory> [--bsp]\n");
+        fprintf(stderr, "usage: legacy_frame_test <driver-directory> [--bsp|--face-capacity]\n");
         return 2;
     }
     if (SDL_Init(SDL_INIT_VIDEO) != 0) goto cleanup;
@@ -72,6 +128,12 @@ int main(int argc, char **argv)
     puts(Stage);
     if (!geEngine_SetDriverAndModeNoSplash(engine, driver, mode)) goto cleanup;
     printf("GL renderer: %s\n", glGetString(GL_RENDERER));
+
+    if (argc == 3 && !strcmp(argv[2], "--face-capacity")) {
+        Stage = "face capacity cases";
+        result = capacity_cases(engine) ? 0 : 1;
+        goto cleanup;
+    }
 
     Stage = argc == 3 ? "geWorld_Create(synthetic BSP)" : "geWorld_Create(NULL)";
     puts(Stage);

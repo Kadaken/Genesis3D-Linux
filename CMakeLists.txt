@@ -204,6 +204,11 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/Engine/Drivers/OpenGl")
     target_link_libraries(genesis3d_sdl_window_test PRIVATE PkgConfig::SDL2)
     if(XVFB_RUN_EXECUTABLE)
+        add_test(NAME genesis3d_face_capacity_fixture
+            COMMAND "${XVFB_RUN_EXECUTABLE}" -a -s "-screen 0 640x480x24"
+            $<TARGET_FILE:genesis3d_legacy_frame_test> $<TARGET_FILE_DIR:OglDrv> --face-capacity)
+        set_tests_properties(genesis3d_face_capacity_fixture PROPERTIES
+            TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "SDL_VIDEODRIVER=x11;LIBGL_ALWAYS_SOFTWARE=1")
         add_test(NAME genesis3d_sdl_window_contract
             COMMAND "${XVFB_RUN_EXECUTABLE}" -a -s "-screen 0 640x480x24"
             $<TARGET_FILE:genesis3d_sdl_window_test>)

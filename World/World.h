@@ -59,7 +59,7 @@ extern "C" {
 
 // Upper limits on misc things
 #define	MAX_MIRROR_RECURSION		1
-#define MAX_RENDERFACE_VERTS		64
+#define MAX_RENDERFACE_VERTS		128
 
 //=====================================================================================
 //	Structure defines
@@ -143,6 +143,7 @@ typedef struct
 	geFloat			Dpm;								// Degres per minute
 	geFloat			DrawScale;							// Texture drawscale
 	int32			Textures[6];
+	uint32          CapacityReported; // Once per sky face, across frames.
 	
 	geFloat			Angle;								// Current rotation angle around roation axis
 

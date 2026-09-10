@@ -3,6 +3,23 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-09 — bounded world-face render scratch
+
+- World/World.h and World.c: raise render scratch from 64 to 128 vertices.
+  A measured 75-vertex BSP face exceeded the inherited Windows arrays too;
+  disabling its assertion in Release did not make those writes safe.
+- RenderFace budgets input vertices plus the active frustum mask's clip-plane
+  count before writing. Overflow is skipped with one retained diagnostic per
+  face per world lifetime. High-count clip passes also count their output before
+  writing, since wave deformation need not preserve convexity.
+- Sky setup respects both the 128-vertex scratch and 10-vertex output arrays;
+  sky rendering respects its separate 30-vertex scratch. Both derive clipping
+  counts from their existing loops (including the existing far-plane omission).
+  Sky-portal frustum construction failure is now checked before use.
+- Synthetic hidden-frame fixture covers 63/64/75/130 vertices, the five-plane
+  budget boundary at 123/124, a clipped 75-vertex polygon, flat-color readback,
+  and repeated-frame diagnostic counts. No map rewriting or format change.
+
 ## 2026-09-09 — defined 32-bit pixel composition
 
 - Bitmap/pixelformat.c: six RGBX/BGRX/RGBA/ARGB/BGRA/ABGR composers now

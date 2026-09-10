@@ -6,6 +6,7 @@
 #include "Gbspfile.h"
 #include <stddef.h>
 #include <string.h>
+#include <math.h>
 
 static int fixture_chunk(geVFile *file, int type, int size, int count, const void *data)
 {
@@ -14,7 +15,8 @@ static int fixture_chunk(geVFile *file, int type, int size, int count, const voi
            (!count || geVFile_Write(file, data, size * count));
 }
 
-static int neutral_bsp_write_with_entities(geVFile *file, const void *entities, int entity_bytes)
+static int neutral_bsp_write_polygon(geVFile *file, const void *entities, int entity_bytes,
+                                    int vertex_count, float radius)
 {
     GBSP_Header header = {{'G','B','S','P',0}, GBSP_VERSION, {0}};
     GFX_Model model = {0};
@@ -29,18 +31,31 @@ static int neutral_bsp_write_with_entities(geVFile *file, const void *entities, 
     GFX_Texture texture = {"NEUTRAL_GREEN",0,16,16,0,0};
     DRV_Palette palette = {{0}};
     GFX_SkyData sky = {0};
-    int32 indices[4] = {0,1,2,3}, leaf_face = 0;
-    geVec3d verts[4] = {{-48,48,-100},{48,48,-100},
+    int32 indices[160] = {0,1,2,3}, leaf_face = 0;
+    geVec3d verts[160] = {{-48,48,-100},{48,48,-100},
                         {48,-48,-100},{-48,-48,-100}};
-    geVec3d rgb[4] = {{255,255,255},{255,255,255},
+    geVec3d rgb[160] = {{255,255,255},{255,255,255},
                       {255,255,255},{255,255,255}};
     unsigned char pixels[1+16*16*3], light[1+7*7*3];
     int result = 0;
     int i;
+    if (vertex_count < 3 || vertex_count > 160) return 0;
+    if (vertex_count != 4) {
+        for (i=0; i<vertex_count; ++i) {
+            double angle = 2.356194490192345 - 6.283185307179586 * i / vertex_count;
+            indices[i] = i;
+            verts[i] = (geVec3d){radius*cos(angle), radius*sin(angle), -100};
+            rgb[i] = (geVec3d){255,255,255};
+        }
+    }
     model.RootNode[0] = 0;
     model.RootNode[1] = -1;
     model.Mins = (geVec3d){-128,-128,-128};
     model.Maxs = (geVec3d){128,128,128};
+    if (radius > 128) {
+        model.Mins.X = model.Mins.Y = -radius;
+        model.Maxs.X = model.Maxs.Y = radius;
+    }
     model.NumFaces = 1; model.NumLeafs = 2; model.NumClusters = 1;
     /* The disk model has a 32-bit motion placeholder; host pointers never
      * enter the fixture stream. The first 76 bytes are fixed-width fields. */
@@ -52,9 +67,11 @@ static int neutral_bsp_write_with_entities(geVFile *file, const void *entities, 
     leaves[0].Maxs = leaves[1].Maxs = model.Maxs;
     leaves[0].NumFaces = 1; leaves[0].Area = 1;
     leaves[1].Contents = GE_CONTENTS_SOLID; leaves[1].Cluster = -1;
-    face.NumVerts = 4; face.LWidth = 7; face.LHeight = 7;
+    face.NumVerts = vertex_count; face.LWidth = 7; face.LHeight = 7;
     face.LTypes[1] = face.LTypes[2] = face.LTypes[3] = 255;
     texinfo.Vecs[0].X = 1; texinfo.Vecs[1].Y = 1;
+    // Keep the generated polygon inside the same seven-texel lightmap.
+    if (vertex_count != 4) texinfo.Vecs[0].X = texinfo.Vecs[1].Y = 48.0f / radius;
     texinfo.DrawScale[0] = texinfo.DrawScale[1] = 1;
     texinfo.Alpha = 255;
     for (i = 0; i < 6; ++i) sky.Textures[i] = -1;
@@ -76,9 +93,9 @@ static int neutral_bsp_write_with_entities(geVFile *file, const void *entities, 
     CHUNK(GBSP_CHUNK_PLANES, &plane, 1);
     CHUNK(GBSP_CHUNK_FACES, &face, 1);
     CHUNK(GBSP_CHUNK_LEAF_FACES, &leaf_face, 1);
-    CHUNK(GBSP_CHUNK_VERT_INDEX, indices, 4);
-    CHUNK(GBSP_CHUNK_VERTS, verts, 4);
-    CHUNK(GBSP_CHUNK_RGB_VERTS, rgb, 4);
+    CHUNK(GBSP_CHUNK_VERT_INDEX, indices, vertex_count);
+    CHUNK(GBSP_CHUNK_VERTS, verts, vertex_count);
+    CHUNK(GBSP_CHUNK_RGB_VERTS, rgb, vertex_count);
     CHUNK(GBSP_CHUNK_TEXINFO, &texinfo, 1);
     CHUNK(GBSP_CHUNK_TEXTURES, &texture, 1);
     CHUNK(GBSP_CHUNK_TEXDATA, pixels, sizeof(pixels));
@@ -90,6 +107,11 @@ static int neutral_bsp_write_with_entities(geVFile *file, const void *entities, 
     result = fixture_chunk(file, GBSP_CHUNK_END, 0, 0, NULL);
 done:
     return result;
+}
+
+static int neutral_bsp_write_with_entities(geVFile *file, const void *entities, int entity_bytes)
+{
+    return neutral_bsp_write_polygon(file, entities, entity_bytes, 4, 48);
 }
 
 static int neutral_bsp_write(geVFile *file)
