@@ -3,6 +3,17 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-09 — defined 32-bit pixel composition
+
+- Bitmap/pixelformat.c: six RGBX/BGRX/RGBA/ARGB/BGRA/ABGR composers now
+  convert channels to uint32 before shifting and combine with bitwise OR.
+  Signatures, channel order, assertions and ignored-alpha semantics unchanged.
+- Public-API fixture covers all combinations of 0/127/128/182/255 in four
+  input channels for each format (3,750 cases). It checks independent packed
+  word order plus round trips; RGBX/BGRX still decode alpha as 255.
+- Each original composer independently triggers UBSan on top-byte value 128.
+  This is an in-range arithmetic fix, not a malformed-input handling change.
+
 ## 2026-09-09 — rejected actor cleanup
 
 - Actor/actor.c: clear closed Header/Body subfile handles and route missing

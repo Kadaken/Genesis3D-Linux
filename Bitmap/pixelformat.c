@@ -584,7 +584,7 @@ uint8 * ptr = *ppData;
 uint32	Compose_32rgbx   (int R,int G,int B,int A)
 {
 	assert( (R&0xFF) == R && (G&0xFF) == G && (B&0xFF) == B );
-	return	(R<<24) + (G<<16) + (B<<8);
+	return	((uint32)R << 24) | ((uint32)G << 16) | ((uint32)B << 8);
 }
 
 void	Decompose_32rgbx (uint32 Pixel,int *R,int *G,int *B,int *A)
@@ -646,7 +646,7 @@ void	Put_32xrgb(uint8 **ppData,int  R,int  G,int  B,int  A)
 uint32	Compose_32bgrx   (int R,int G,int B,int A)
 {
 	assert( (R&0xFF) == R && (G&0xFF) == G && (B&0xFF) == B );
-	return	(B<<24) + (G<<16) + (R<<8);
+	return	((uint32)B << 24) | ((uint32)G << 16) | ((uint32)R << 8);
 }
 
 void	Decompose_32bgrx (uint32 Pixel,int *R,int *G,int *B,int *A)
@@ -710,7 +710,7 @@ void	Put_32xbgr(uint8 **ppData,int  R,int  G,int  B,int  A)
 uint32	Compose_32rgba   (int R,int G,int B,int A)
 {
 	assert( (R&0xFF) == R && (G&0xFF) == G && (B&0xFF) == B && (A&0xFF) == A );
-	return	(R<<24) + (G<<16) + (B<<8) + A;
+	return	((uint32)R << 24) | ((uint32)G << 16) | ((uint32)B << 8) | (uint32)A;
 }
 
 void	Decompose_32rgba (uint32 pixel,int *R,int *G,int *B,int *A)
@@ -740,7 +740,7 @@ void	Put_32rgba(uint8 **ppData,int  R,int  G,int  B,int  A)
 uint32	Compose_32argb   (int R,int G,int B,int A)
 {
 	assert( (R&0xFF) == R && (G&0xFF) == G && (B&0xFF) == B && (A&0xFF) == A );
-	return	(A<<24) + (R<<16) + (G<<8) + (B);
+	return	((uint32)A << 24) | ((uint32)R << 16) | ((uint32)G << 8) | (uint32)B;
 }
 
 void	Decompose_32argb (uint32 pixel,int *R,int *G,int *B,int *A)
@@ -770,7 +770,7 @@ void	Put_32argb(uint8 **ppData,int  R,int  G,int  B,int  A)
 uint32	Compose_32bgra   (int R,int G,int B,int A)
 {
 	assert( (R&0xFF) == R && (G&0xFF) == G && (B&0xFF) == B && (A&0xFF) == A );
-	return	(B<<24) + (G<<16) + (R<<8) + A;
+	return	((uint32)B << 24) | ((uint32)G << 16) | ((uint32)R << 8) | (uint32)A;
 }
 
 void	Decompose_32bgra (uint32 pixel,int *R,int *G,int *B,int *A)
@@ -800,7 +800,7 @@ void	Put_32bgra(uint8 **ppData,int  R,int  G,int  B,int  A)
 uint32	Compose_32abgr   (int R,int G,int B,int A)
 {
 	assert( (R&0xFF) == R && (G&0xFF) == G && (B&0xFF) == B && (A&0xFF) == A );
-	return	(A<<24) + (B<<16) + (G<<8) + (R);
+	return	((uint32)A << 24) | ((uint32)B << 16) | ((uint32)G << 8) | (uint32)R;
 }
 
 void	Decompose_32abgr (uint32 pixel,int *R,int *G,int *B,int *A)
