@@ -13,10 +13,11 @@ static void string(const char *s) { int n=(int)strlen(s)+1; number(n); memcpy(da
 static void pair(const char *k,const char *v) { string(k); string(v); }
 static void field(const char *k,const char *v) { pair(k,v); pair("%defaultvalue%",""); }
 static void field_default(const char *k,const char *v,const char *d) { pair(k,v); pair("%defaultvalue%",d); }
-typedef struct Node { int32 a; geVec3d w,g,c; geFloat z,alpha; struct Node *link; int32 bad; } Node;
+typedef struct Node { int32 a; geVec3d w,g,c; geFloat z,alpha; struct Node *link; int32 bad,decl,truth,declbad; } Node;
 static const geEntity_FieldDecl fields[]={
-    {"a","int"},{"w","point"},{"g","point"},{"c","point"},
-    {"z","geFloat"},{"alpha","geFloat"},{"link","ptr"},{"bad","int"}
+    {"a","int",NULL},{"w","point",NULL},{"g","point",NULL},{"c","point",NULL},
+    {"z","geFloat",NULL},{"alpha","geFloat","111"},{"link","ptr",NULL},{"bad","int",NULL},
+    {"decl","int","77"},{"truth","int","True"},{"declbad","int","not-an-int"}
 };
 #define CHECK(c) do { if (!(c)) { fprintf(stderr,"entity schema failed at %d\n",__LINE__); goto done; } } while (0)
 static geWorld *make_world(geEntity_EntitySet *schema)
@@ -37,8 +38,8 @@ int main(int argc,char **argv)
     geEntity *a,*b;
     Node *p,*q;
     const char *name;
-    char caller_class[]="Node", caller_field[]="a", caller_type[]="int";
-    geEntity_FieldDecl copied[8];
+    char caller_class[]="Node", caller_field[]="a", caller_type[]="int", caller_default[]="77";
+    geEntity_FieldDecl copied[11];
     int ok=0, i, names=argc>1 && !strcmp(argv[1],"names");
     number(3);
     number(16); pair("classname","%typedef%"); pair("%typename%","Node");
@@ -51,13 +52,15 @@ int main(int argc,char **argv)
     number(4); pair("classname","Node"); pair("%Name%","second"); pair("a","41"); pair("bad","invalid again");
     schema=geEntity_EntitySetCreate(); CHECK(schema);
     memcpy(copied,fields,sizeof(copied)); copied[0].Name=caller_field; copied[0].TypeName=caller_type;
-    CHECK(geEntity_EntitySetDeclareClass(schema,caller_class,copied,8));
-    caller_class[0]='X'; caller_field[0]='X'; caller_type[0]='X'; /* Declarations own their strings. */
+    copied[8].DefaultValue=caller_default;
+    CHECK(geEntity_EntitySetDeclareClass(schema,caller_class,copied,11));
+    caller_class[0]='X'; caller_field[0]='X'; caller_type[0]='X'; caller_default[0]='9';
+    /* Declarations own names, types, and default strings. */
     CHECK(!geEntity_EntitySetDeclareClass(schema,"Node",fields,0));
     world=make_world(schema); CHECK(world);
     geEntity_EntitySetDestroy(schema); schema=NULL; /* World owns independent metadata. */
     set=geWorld_GetEntitySet(world,NULL); CHECK(set);
-    CHECK(!geEntity_EntitySetDeclareClass(set,"Node",fields,8));
+    CHECK(!geEntity_EntitySetDeclareClass(set,"Node",fields,11));
     a=geEntity_EntitySetFindEntityByName(set,"first"); b=geEntity_EntitySetFindEntityByName(set,"second"); CHECK(a && b);
     p=geEntity_GetUserData(a); q=geEntity_GetUserData(b);
     if (names) {
@@ -72,9 +75,12 @@ int main(int argc,char **argv)
         CHECK(p->a==37 && q->a==41 && p->link==q);
         CHECK(p->g.X==0 && p->g.Y==-4.6f && p->g.Z==0);
         CHECK(p->c.X==1 && p->c.Y==2 && p->c.Z==3);
-        CHECK(p->w.X==0 && p->w.Y==0 && p->w.Z==0 && p->z==0);
+        CHECK(p->w.X==0 && p->w.Y==0 && p->w.Z==0 && p->z==99);
         CHECK(p->alpha==0 && q->alpha==255 && p->bad==0 && q->bad==0);
+        CHECK(p->decl==77 && q->decl==77 && p->truth==1 && q->truth==1 &&
+            p->declbad==0 && q->declbad==0);
         CHECK(geEntity_ClassFindFieldByName(a->Class,"bad")->Diagnostics==1);
+        CHECK(geEntity_ClassFindFieldByName(a->Class,"declbad")->Diagnostics==1);
         CHECK(!geEntity_ClassFindFieldByName(a->Class,"removed"));
         /* No declarations leak into legacy construction; omit extra epair it rejects. */
         used=0; number(2); number(4); pair("classname","%typedef%"); pair("%typename%","Node"); field("g","geFloat");

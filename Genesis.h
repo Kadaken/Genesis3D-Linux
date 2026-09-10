@@ -483,16 +483,19 @@ GENESISAPI const char *geEntity_GetNameString(const geEntity *Entity);
 typedef struct geEntity_FieldDecl {
     const char *Name;
     const char *TypeName;
+    /* Optional application-authored default text. NULL means no default;
+     * an empty string is a present default and is copied by DeclareClass. */
+    const char *DefaultValue;
 } geEntity_FieldDecl;
 /* Empty declaration set -> DeclareClass -> explicit world constructor.
  * Strings are copied. Destroy the declaration set after construction.
  * No global registration; the world retains no borrowed schema pointer.
  * Fields replace the authored layout by name in native aligned order.
- * Missing instance fields use authored class defaults when parseable; fields
- * without a recorded/parseable default are zero. Explicit instance values,
- * including zero, always override defaults. Removed authored fields are ignored.
+ * Value precedence is: authored instance epair (including zero), then the
+ * level's %defaultvalue%, then FieldDecl.DefaultValue, then zero. Defaults
+ * use the same conversion rules as instance values. Invalid values stay zero
+ * with a once-per-field diagnostic. Removed authored fields are ignored.
  * Scalar -> point is (0,value,0); integer -> float is numeric conversion.
- * Unsupported/invalid values stay zero with a once-per-field diagnostic.
  * FieldSize excludes trailing C struct padding: reserve sizeof(struct) if needed.
  * Construction retains the engine's existing single-threaded world contract. */
 GENESISAPI geEntity_EntitySet *geEntity_EntitySetCreate(void);

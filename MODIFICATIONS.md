@@ -277,3 +277,14 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
 - Extended the version-21 input ABI with bounded mouse-wheel edge counts. The
   renderer preserves SDL's high-resolution wheel motion and exposes neutral
   next/previous actions while leaving inventory policy to applications.
+
+## 2026-09-10 — Application declaration defaults
+
+- Extended the generic entity declaration record with an optional copied
+  default string. World construction applies values in this order: instance
+  epair, level `%defaultvalue%`, application declaration default, then zero.
+- Declaration-only fields now parse instance/default text using their declared
+  type instead of being left zero unconditionally. Boolean declaration text
+  accepts `True` and `False` in addition to numeric values.
+- Expanded the synthetic schema fixture across declaration-only, level-wins,
+  explicit-zero, invalid-default, and caller-lifetime cases.

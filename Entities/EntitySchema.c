@@ -31,8 +31,10 @@ static void FreeDeclaration(geEntity_Declaration *d)
     int i;
     for (i=0;i<d->Count;++i) {
         void *name=(void *)d->Fields[i].Name, *type=(void *)d->Fields[i].TypeName;
+        void *value=(void *)d->Fields[i].DefaultValue;
         if (name) geRam_Free(name);
         if (type) geRam_Free(type);
+        if (value) geRam_Free(value);
     }
     if (d->Fields) geRam_Free(d->Fields);
     if (d->Name) geRam_Free(d->Name);
@@ -68,7 +70,12 @@ GENESISAPI geBoolean geEntity_EntitySetDeclareClass(geEntity_EntitySet *set,
     for (i=0;i<count;++i) {
         d->Fields[i].Name=CopyText(fields[i].Name);
         d->Fields[i].TypeName=CopyText(fields[i].TypeName);
-        if (!d->Fields[i].Name || !d->Fields[i].TypeName) { FreeDeclaration(d); return GE_FALSE; }
+        if (fields[i].DefaultValue)
+            d->Fields[i].DefaultValue=CopyText(fields[i].DefaultValue);
+        if (!d->Fields[i].Name || !d->Fields[i].TypeName ||
+            (fields[i].DefaultValue && !d->Fields[i].DefaultValue)) {
+            FreeDeclaration(d); return GE_FALSE;
+        }
     }
     for (slot=&set->Declarations;*slot;slot=&(*slot)->Next)
         if (!stricmp((*slot)->Name,name)) break;
@@ -120,7 +127,9 @@ geBoolean Ent_ApplySchema(geEntity_EntitySet *set, const geEntity_EntitySet *sch
             f=geEntity_FieldCreate(d->Fields[i].Name,offset,t);
             if (!f) goto Failed;
             if (!f->Name) { geEntity_FieldDestroy(f); goto Failed; }
-            f->HasSource=source!=NULL;
+            /* A declaration-only field is parsed using its declared type. */
+            f->HasSource=GE_TRUE;
+            f->SourceType=t->Type;
             if (source) {
                 f->SourceType=source->TypeClass->Type;
                 f->HasDefault=source->HasDefault;
@@ -128,10 +137,15 @@ geBoolean Ent_ApplySchema(geEntity_EntitySet *set, const geEntity_EntitySet *sch
                     f->DefaultValue=CopyText(source->DefaultValue);
                     if (!f->DefaultValue) { geEntity_FieldDestroy(f); goto Failed; }
                 }
+            } else if (d->Fields[i].DefaultValue) {
+                f->DefaultValue=CopyText(d->Fields[i].DefaultValue);
+                if (!f->DefaultValue) { geEntity_FieldDestroy(f); goto Failed; }
+                f->HasDefault=GE_TRUE;
             }
             geEntity_ClassAddField(&pending,f);
             if (report && !source)
-                fprintf(stderr,"entity-schema: %s field=%s action=zero\n",d->Name,f->Name);
+                fprintf(stderr,"entity-schema: %s field=%s action=%s\n",d->Name,f->Name,
+                    f->HasDefault ? "declaration-default" : "zero");
             else if (report && source->TypeClass->Type!=t->Type)
                 fprintf(stderr,"entity-schema: %s field=%s action=reconcile from=%s to=%s\n",
                     d->Name,f->Name,source->TypeClass->Name,t->Name);
@@ -172,10 +186,15 @@ geBoolean Ent_ParseDeclaredField(geEntity_EntitySet *set, geEntity *entity,
     memset(dst,0,field->TypeClass->TypeSize);
     if (target==TYPE_INT && source==TYPE_INT) {
         char *end; long x;
-        errno=0; x=strtol(value,&end,10);
-        if (end!=value) {
-            while (isspace((unsigned char)*end)) ++end;
-            if (!*end && !errno && x>=INT32_MIN && x<=INT32_MAX) { *(int32 *)dst=(int32)x; ok=GE_TRUE; }
+        if (!stricmp(value,"true") || !stricmp(value,"false")) {
+            *(int32 *)dst=!stricmp(value,"true") ? 1 : 0;
+            ok=GE_TRUE;
+        } else {
+            errno=0; x=strtol(value,&end,10);
+            if (end!=value) {
+                while (isspace((unsigned char)*end)) ++end;
+                if (!*end && !errno && x>=INT32_MIN && x<=INT32_MAX) { *(int32 *)dst=(int32)x; ok=GE_TRUE; }
+            }
         }
     } else if (target==TYPE_FLOAT && (source==TYPE_INT || source==TYPE_FLOAT)) {
         if (Numbers(value,v)==1) { *(geFloat *)dst=(geFloat)v[0]; ok=GE_TRUE; }
