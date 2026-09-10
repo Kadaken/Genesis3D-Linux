@@ -488,7 +488,9 @@ typedef struct geEntity_FieldDecl {
  * Strings are copied. Destroy the declaration set after construction.
  * No global registration; the world retains no borrowed schema pointer.
  * Fields replace the authored layout by name in native aligned order.
- * Missing declared fields are zero; removed authored fields are ignored.
+ * Missing instance fields use authored class defaults when parseable; fields
+ * without a recorded/parseable default are zero. Explicit instance values,
+ * including zero, always override defaults. Removed authored fields are ignored.
  * Scalar -> point is (0,value,0); integer -> float is numeric conversion.
  * Unsupported/invalid values stay zero with a once-per-field diagnostic.
  * FieldSize excludes trailing C struct padding: reserve sizeof(struct) if needed.

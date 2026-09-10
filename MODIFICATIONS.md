@@ -3,6 +3,24 @@
 This file documents changes to Covered Code as required by section 3.4 of the
 Genesis3D Public License v1.01.
 
+## 2026-09-10 — authored entity defaults in application schemas
+
+- `Entities/Entities.c` now retains each `%defaultvalue%` string from an
+  authored `%typedef%` instead of asserting its position and discarding it.
+- `Entities/EntitySchema.c` copies that metadata when replacing an authored
+  layout with an application-declared native layout. Before instance epairs are
+  parsed, omitted fields receive their authored default through the same
+  checked application-type conversion path. Explicit instance values,
+  including zero, are parsed afterwards and therefore always win.
+- Missing or unparseable defaults remain zero and use the existing once-per-
+  field diagnostic bit. Field/class destruction owns and releases copied
+  default strings.
+- The synthetic schema fixture distinguishes omitted 255 from explicit zero
+  and covers an unparseable default's zero fallback and single diagnostic.
+
+Affected files: `Entities/Entities.c`, `Entities/ENTITIES.H`,
+`Entities/EntitySchema.c`, `Genesis.h`, and `tests/entity_schema_test.c`.
+
 ## 2026-09-09 — bounded world-face render scratch
 
 - World/World.h and World.c: raise render scratch from 64 to 128 vertices.

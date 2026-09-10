@@ -12,6 +12,7 @@ static void number(int32 n) { memcpy(data+used,&n,4); used+=4; }
 static void string(const char *s) { int n=(int)strlen(s)+1; number(n); memcpy(data+used,s,n); used+=n; }
 static void pair(const char *k,const char *v) { string(k); string(v); }
 static void field(const char *k,const char *v) { pair(k,v); pair("%defaultvalue%",""); }
+static void field_default(const char *k,const char *v,const char *d) { pair(k,v); pair("%defaultvalue%",d); }
 typedef struct Node { int32 a; geVec3d w,g,c; geFloat z,alpha; struct Node *link; int32 bad; } Node;
 static const geEntity_FieldDecl fields[]={
     {"a","int"},{"w","point"},{"g","point"},{"c","point"},
@@ -42,10 +43,11 @@ int main(int argc,char **argv)
     number(3);
     number(16); pair("classname","%typedef%"); pair("%typename%","Node");
     field("a","int"); field("g","geFloat"); field("c","point");
-    field("alpha","int"); field("link","Node"); field("bad","string"); field("removed","int");
-    number(10); pair("classname","Node"); pair("%Name%","first"); pair("a","37");
-    pair("g","-4.6"); pair("c","1 2 3"); pair("alpha","127"); pair("link","second");
-    pair("removed","8"); pair("bad","invalid"); pair("z","99");
+    field_default("alpha","int","255"); field("link","Node");
+    field_default("bad","string","not-an-int"); field("removed","int");
+    number(9); pair("classname","Node"); pair("%Name%","first"); pair("a","37");
+    pair("g","-4.6"); pair("c","1 2 3"); pair("alpha","0"); pair("link","second");
+    pair("removed","8"); pair("z","99");
     number(4); pair("classname","Node"); pair("%Name%","second"); pair("a","41"); pair("bad","invalid again");
     schema=geEntity_EntitySetCreate(); CHECK(schema);
     memcpy(copied,fields,sizeof(copied)); copied[0].Name=caller_field; copied[0].TypeName=caller_type;
@@ -70,7 +72,8 @@ int main(int argc,char **argv)
         CHECK(p->a==37 && q->a==41 && p->link==q);
         CHECK(p->g.X==0 && p->g.Y==-4.6f && p->g.Z==0);
         CHECK(p->c.X==1 && p->c.Y==2 && p->c.Z==3);
-        CHECK(p->w.X==0 && p->w.Y==0 && p->w.Z==0 && p->z==0 && p->alpha==127 && p->bad==0);
+        CHECK(p->w.X==0 && p->w.Y==0 && p->w.Z==0 && p->z==0);
+        CHECK(p->alpha==0 && q->alpha==255 && p->bad==0 && q->bad==0);
         CHECK(geEntity_ClassFindFieldByName(a->Class,"bad")->Diagnostics==1);
         CHECK(!geEntity_ClassFindFieldByName(a->Class,"removed"));
         /* No declarations leak into legacy construction; omit extra epair it rejects. */

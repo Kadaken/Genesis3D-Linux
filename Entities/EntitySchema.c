@@ -121,7 +121,14 @@ geBoolean Ent_ApplySchema(geEntity_EntitySet *set, const geEntity_EntitySet *sch
             if (!f) goto Failed;
             if (!f->Name) { geEntity_FieldDestroy(f); goto Failed; }
             f->HasSource=source!=NULL;
-            if (source) f->SourceType=source->TypeClass->Type;
+            if (source) {
+                f->SourceType=source->TypeClass->Type;
+                f->HasDefault=source->HasDefault;
+                if (source->HasDefault) {
+                    f->DefaultValue=CopyText(source->DefaultValue);
+                    if (!f->DefaultValue) { geEntity_FieldDestroy(f); goto Failed; }
+                }
+            }
             geEntity_ClassAddField(&pending,f);
             if (report && !source)
                 fprintf(stderr,"entity-schema: %s field=%s action=zero\n",d->Name,f->Name);

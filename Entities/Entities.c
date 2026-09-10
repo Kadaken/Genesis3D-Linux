@@ -444,6 +444,8 @@ void geEntity_FieldDestroy(geEntity_Field *Field)
 
 	if (Field->Name)
 		geRam_Free(Field->Name);
+	if (Field->DefaultValue)
+		geRam_Free(Field->DefaultValue);
 
 	geRam_Free(Field);
 }
@@ -874,12 +876,26 @@ static geBoolean BuildClassTypes(geEntity_EntitySet *EntitySet)
 			if (!Field)
 				goto ExitWithError;
 
-			if (!geEntity_ClassAddField(Class, Field))
-				goto ExitWithError;
-
 			Epair = Epair->Next;
-			assert(Epair);
-			assert(!stricmp(Epair->Key, "%defaultvalue%"));
+			assert(Epair && !stricmp(Epair->Key, "%defaultvalue%"));
+			if (!Epair || stricmp(Epair->Key, "%defaultvalue%"))
+			{
+				geEntity_FieldDestroy(Field);
+				goto ExitWithError;
+			}
+			Field->DefaultValue = CopyString(Epair->Value);
+			if (!Field->DefaultValue)
+			{
+				geEntity_FieldDestroy(Field);
+				goto ExitWithError;
+			}
+			Field->HasDefault = GE_TRUE;
+
+			if (!geEntity_ClassAddField(Class, Field))
+			{
+				geEntity_FieldDestroy(Field);
+				goto ExitWithError;
+			}
 
 		}	
 	}
@@ -905,6 +921,18 @@ static geBoolean ParseClassUserData(geEntity_EntitySet *EntitySet, geEntity *Ent
 	
 	if (!Entity->Class)
 		return GE_TRUE;
+
+	/* Application layouts start from the authored class defaults. Instance
+	 * epairs are parsed afterwards and therefore always win, including zero. */
+	if (Entity->Class->AppDeclared)
+	{
+		geEntity_Field *Field;
+		for (Field = Entity->Class->Fields; Field; Field = Field->Next)
+			if (Field->HasDefault &&
+				!Ent_ParseDeclaredField(EntitySet, Entity, Field,
+					Field->DefaultValue, GWorld))
+				return GE_FALSE;
+	}
 	
 	for (Epair = Entity->Epairs; Epair; Epair = Epair->Next)
 	{

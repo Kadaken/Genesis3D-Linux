@@ -62,6 +62,8 @@ typedef struct geEntity_Field
 
 	geEntity_ClassType SourceType;
 	geBoolean HasSource;
+	char                    *DefaultValue;           // Owned authored %defaultvalue% text
+	geBoolean                HasDefault;
 	unsigned Diagnostics;
 	struct geEntity_Field	*Next;					// Next Field list
 
