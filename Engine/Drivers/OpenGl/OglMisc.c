@@ -18,10 +18,68 @@
 /****************************************************************************************/
 
 #include <string.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <GL/gl.h>
 
 #include "Dcommon.h"
 #include "OglMisc.h"
+
+/* Keep the colour under keyed texels meaningful before GLU constructs mipmaps.
+ * A breadth-first fill copies the nearest opaque edge colour into RGB only;
+ * alpha is copied verbatim and therefore retains the source transparency. */
+geBoolean Ogl_BleedTransparentRgb32(GLubyte *dstPtr, const GLubyte *srcPtr,
+	GLint width, GLint height)
+{
+	size_t pixelCount, byteCount, head = 0, tail = 0, i;
+	size_t *queue;
+	unsigned char *visited;
+
+	if (!dstPtr || !srcPtr || width <= 0 || height <= 0)
+		return GE_FALSE;
+	if ((size_t)width > SIZE_MAX / (size_t)height)
+		return GE_FALSE;
+	pixelCount = (size_t)width * (size_t)height;
+	if (pixelCount > SIZE_MAX / 4 || pixelCount > SIZE_MAX / sizeof(*queue))
+		return GE_FALSE;
+	byteCount = pixelCount * 4;
+	queue = (size_t *)malloc(pixelCount * sizeof(*queue));
+	visited = (unsigned char *)calloc(pixelCount, 1);
+	if (!queue || !visited) {
+		free(queue);
+		free(visited);
+		return GE_FALSE;
+	}
+	memcpy(dstPtr, srcPtr, byteCount);
+	for (i = 0; i < pixelCount; ++i) {
+		if (srcPtr[i * 4 + 3] != 0) {
+			visited[i] = 1;
+			queue[tail++] = i;
+		}
+	}
+	while (head < tail) {
+		const size_t current = queue[head++];
+		const size_t x = current % (size_t)width;
+		const size_t y = current / (size_t)width;
+		size_t neighbours[4], count = 0, n;
+		if (x > 0) neighbours[count++] = current - 1;
+		if (x + 1 < (size_t)width) neighbours[count++] = current + 1;
+		if (y > 0) neighbours[count++] = current - (size_t)width;
+		if (y + 1 < (size_t)height) neighbours[count++] = current + (size_t)width;
+		for (n = 0; n < count; ++n) {
+			const size_t next = neighbours[n];
+			if (visited[next]) continue;
+			visited[next] = 1;
+			dstPtr[next * 4] = dstPtr[current * 4];
+			dstPtr[next * 4 + 1] = dstPtr[current * 4 + 1];
+			dstPtr[next * 4 + 2] = dstPtr[current * 4 + 2];
+			queue[tail++] = next;
+		}
+	}
+	free(visited);
+	free(queue);
+	return GE_TRUE;
+}
 
 
 // Set up the OpenGL viewing frustum using an orthographic projection (as Genesis does all of

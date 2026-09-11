@@ -325,3 +325,14 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
 - The test asserts exact framebuffer readback for every channel, separating
   pixel-format and palette handling from BSP lighting, gamma, and content.
 - No renderer behavior changed.
+
+## 2026-09-10 — Keyed-texture mip edge quality
+
+- The inherited OpenGL driver now propagates the nearest opaque edge RGB into
+  alpha-zero texels before GLU builds mip levels. Alpha remains byte-for-byte
+  unchanged and the engine-owned source bitmap is never modified.
+- Added an asymmetric keyed-edge regression that reduces the prepared texture
+  to a one-pixel sample and rejects darkening from zero-RGB transparent texels.
+- This is a deliberate OpenGL quality improvement. The historical application
+  used its Direct3D driver, so this change is not claimed as original-renderer
+  fidelity restoration.

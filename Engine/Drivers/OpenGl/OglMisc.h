@@ -25,5 +25,7 @@ geBoolean ExtensionExists(const char *extension);
 void CkBlit24_32(GLubyte *dstPtr, GLint width, GLint dstHeight, GLubyte *srcPtr, GLint srcWidth, GLint srcHeight);
 void Blit32(GLubyte *dstPtr, GLint dstPitch, GLubyte *srcPtr, GLint srcWidth, GLint srcHeight,
 			GLint srcPitch);
+geBoolean Ogl_BleedTransparentRgb32(GLubyte *dstPtr, const GLubyte *srcPtr,
+			GLint width, GLint height);
 
 #endif

@@ -156,6 +156,14 @@ target_link_libraries(genesis3d_linux PRIVATE genesis3d_render)
 set_target_properties(genesis3d_linux PROPERTIES BUILD_RPATH "$ORIGIN")
 
 if(BUILD_TESTING)
+    add_executable(genesis3d_keyed_mip_edge_test
+        tests/keyed_mip_edge_test.c
+        Engine/Drivers/OpenGl/OglMisc.c)
+    target_include_directories(genesis3d_keyed_mip_edge_test PRIVATE
+        ${ENGINE_INCLUDE_DIRS} Engine/Drivers/OpenGl)
+    target_link_libraries(genesis3d_keyed_mip_edge_test PRIVATE OpenGL::GL m)
+    add_test(NAME genesis3d_keyed_mip_edge COMMAND genesis3d_keyed_mip_edge_test)
+
     add_executable(genesis3d_pixel_composer_test tests/pixel_composer_test.c)
     target_include_directories(genesis3d_pixel_composer_test PRIVATE ${ENGINE_INCLUDE_DIRS})
     target_link_libraries(genesis3d_pixel_composer_test PRIVATE genesis3d_render)

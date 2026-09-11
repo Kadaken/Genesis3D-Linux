@@ -18,11 +18,14 @@
 /****************************************************************************************/
 
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "THandle.h"
 #include "OGLDrv.h"
 #include "Render.h"
+#include "OglMisc.h"
 
 extern GLint boundTexture;
 extern GLint boundTexture2;
@@ -367,13 +370,25 @@ void THandle_Update(geRDriver_THandle *THandle)
 
 		if(THandle->PixelFormat.PixelFormat == GE_PIXELFORMAT_32BIT_ABGR)
 		{
+			GLubyte *uploadData = THandle->Data[0];
+			GLubyte *bledData = NULL;
+			size_t pixelCount = (size_t)THandle->Width * (size_t)THandle->Height;
+
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 			
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_PRIORITY, 1.0f);
 			
+			if (THandle->Width > 0 && THandle->Height > 0 &&
+				pixelCount <= SIZE_MAX / 4) {
+				bledData = (GLubyte *)malloc(pixelCount * 4);
+				if (bledData && Ogl_BleedTransparentRgb32(bledData, THandle->Data[0],
+					THandle->Width, THandle->Height))
+					uploadData = bledData;
+			}
 			gluBuild2DMipmaps(GL_TEXTURE_2D, 4, THandle->Width, THandle->Height, GL_RGBA,
-				GL_UNSIGNED_BYTE, THandle->Data[0]);
+				GL_UNSIGNED_BYTE, uploadData);
+			free(bledData);
 		}
 		else
 		{
