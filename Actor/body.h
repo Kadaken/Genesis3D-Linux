@@ -53,6 +53,23 @@ extern "C" {
 
 #define GE_BODY_ROOT					(-1)	// for specifying 'root' bounding box.
 
+#define GE_BODY_MAX_SKINNING_INFLUENCES (4)
+
+typedef struct geBody_SkinningInfluence
+{
+	uint16 BoneIndex;
+	uint16 Weight;
+} geBody_SkinningInfluence;
+
+typedef struct geBody_WeightedCorner
+{
+	geVec3d Vertex;
+	geVec3d Normal;
+	geFloat U, V;
+	uint8 InfluenceCount;
+	geBody_SkinningInfluence Influences[GE_BODY_MAX_SKINNING_INFLUENCES];
+} geBody_WeightedCorner;
+
 typedef struct geBody geBody;
 
 
@@ -74,6 +91,15 @@ GENESISAPI geBoolean GENESISCC geBody_AddFace(	geBody *B,
 								const geVec3d *Vertex3, const geVec3d *Normal3, 
 									geFloat U3, geFloat V3, int BoneIndex3,
 								int MaterialIndex);
+
+/* Enables the version-00F2 BODY path.  Add all bones first, assign an inverse
+ * bind matrix to every bone, then add weighted faces.  Weights are normalized
+ * unsigned 16-bit values and must sum exactly to 65535. */
+GENESISAPI geBoolean GENESISCC geBody_SetBoneInverseBind(
+	geBody *B, int BoneIndex, const geXForm3d *InverseBind);
+
+GENESISAPI geBoolean GENESISCC geBody_AddWeightedFace(
+	geBody *B, const geBody_WeightedCorner Corners[3], int MaterialIndex);
 
 			// Bitmap is added to body.  It's reference count is increased.  Caller still owns a pointer
 			// to the bitmap, and is responsible for destroying it.

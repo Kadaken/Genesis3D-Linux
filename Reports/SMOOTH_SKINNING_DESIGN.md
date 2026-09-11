@@ -258,9 +258,43 @@ Estimated total: 29–50 engineering days, approximately 6–10 full-time weeks 
 one experienced engine developer. The engine portion is a bounded extension.
 The converter is substantial new tooling and owns most of the schedule.
 
-## Not covered
+## 6. Round-25 implementation record
 
-No smooth-skinning source, GPU skinning, index widening, GLB converter, or
-asset conversion exists yet. The design does not claim visual improvement
-until converted weighted content is rendered and compared. It also does not
-change the separate Genesis3D startup-logo distribution gate.
+Implemented on 2026-09-11:
+
+- BODY `0x00F2` has explicit little-endian fixed-width records, a maximum of
+  four influences per vertex/normal, normalized `uint16` weights totaling
+  65,535, a 256-bone ceiling, and one inverse-bind transform per bone.
+- `0x00F1` retains its original reader, writer, structures, and rigid
+  single-transform runtime branch. The fixture writes, reloads, rewrites, and
+  byte-compares an F1 body.
+- The F2 runtime blends positions, normals, and DOT3 tangent bases. Its
+  dominant influence is retained only in the inherited compatibility field;
+  it does not drive F2 deformation.
+- `gltf2act` is a separate command-line target. It uses pinned MIT-licensed
+  `cgltf`, accepts GLB-embedded PNG base-colour images through libpng, imports
+  indexed triangle geometry, inverse binds, up to eight input influences
+  reduced deterministically to four, and linear translation/quaternion
+  animation. It writes to a temporary ACT, reopens and validates it, then
+  atomically renames it over the requested output.
+- The generated GLB fixture verifies a two-joint weighted mesh, asymmetric
+  RGBA PNG material, named motion, endpoint poses, deterministic output, and
+  successful ACT reload. The numeric engine fixture rejects zero influence
+  counts, bad sums, duplicate bones, and out-of-range indices.
+
+Measured Release runs on this machine for a three-vertex fixture were 52–60 ns
+per rigid evaluation and 143 ns per two-influence weighted evaluation
+(2.4–2.74x). This microbenchmark establishes branch cost, not whole-frame
+performance.
+
+## 7. Remaining release work
+
+The implemented path does not yet claim visual improvement in authored
+content. A rigid-versus-weighted rendered strip receipt, large 1/50/128/256
+bone fixtures, external PNG URI support, JPEG texture decoding, cubic/step
+animation resampling, sparse accessor support, and actual project asset
+conversion remain open. Unsupported image/channel forms fail with a diagnostic
+or are identified explicitly; they are not silently treated as equivalent.
+
+GPU skinning and index widening remain out of scope. The separate Genesis3D
+startup-logo distribution gate is unchanged.

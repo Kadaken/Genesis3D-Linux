@@ -336,3 +336,17 @@ known gaps are in `Reports/VERIFICATION_SCOPE.md`.
 - This is a deliberate OpenGL quality improvement. The historical application
   used its Direct3D driver, so this change is not claimed as original-renderer
   fidelity restoration.
+
+## 2026-09-11 — BODY F2 smooth skinning and GLB conversion
+
+- Added the explicitly versioned BODY `0x00F2` disk format with little-endian
+  fixed-width records, four normalized influences, inverse-bind transforms,
+  and a 256-bone limit. The inherited `0x00F1` reader/writer/runtime path is
+  unchanged and has a byte-identity control.
+- Added CPU weighted deformation for positions, normals, and tangent-space
+  lighting, with strict influence validation and a measured rigid fast path.
+- Added the standalone `gltf2act` tool using pinned MIT `cgltf` and system
+  libpng. Output is reopened and validated before atomic installation.
+- Added asset-free numeric, malformed-input, round-trip, deterministic GLB,
+  embedded-PNG, material, skeleton, and motion fixtures. This does not claim an
+  authored-content visual improvement yet.

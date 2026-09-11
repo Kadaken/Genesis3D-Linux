@@ -158,6 +158,14 @@ and headless tests through OpenAL Soft's null output driver. The legacy
 `geSound_GetDSound` escape hatch returns null because DirectSound objects do not
 exist on Linux; clients must treat that optional platform handle accordingly.
 
+The actor subsystem also supports a new, explicitly versioned BODY `0x00F2`
+format with up to four normalized skinning influences per vertex. Historical
+`0x00F1` actors remain on their unchanged rigid fast path. The standalone
+`gltf2act` target converts bounded glTF 2.0/GLB skeletons, weighted triangle
+meshes, embedded PNG base-colour materials, and linear animation channels into
+verified ACT containers; see
+[the implementation and remaining gates](Reports/SMOOTH_SKINNING_DESIGN.md).
+
 Visible runtimes request a four-sample multisampled framebuffer and enable
 OpenGL multisampling when the driver grants it. Window creation automatically
 retries without multisampling on systems that cannot provide that format, so

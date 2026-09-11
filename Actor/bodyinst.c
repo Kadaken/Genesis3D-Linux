@@ -248,6 +248,85 @@ static geBodyInst_Geometry *GENESISCC geBodyInst_GetGeometryPrep(
 	return G;
 }
 
+static geBoolean geBodyInst_GetWeightedGeometry(const geBody *B,
+	geBodyInst_Geometry *G, const geVec3d *ScaleVector,
+	const geXForm3d *BoneXFArray, int LevelOfDetail, const geCamera *Camera)
+{
+	geXForm3d SkinWorld[GE_BODY_F2_BONE_LIMIT];
+	geXForm3d SkinOutput[GE_BODY_F2_BONE_LIMIT];
+	const geXForm3d *CameraSpace = Camera ? geCamera_GetCameraSpaceXForm(Camera) : NULL;
+	const int LevelOfDetailBit = 1 << LevelOfDetail;
+	int Bone, i;
+	for (Bone = 0; Bone < B->BoneCount; ++Bone)
+		{
+		geXForm3d_Multiply(&BoneXFArray[Bone], &B->InverseBindArray[Bone],
+			&SkinWorld[Bone]);
+		if (CameraSpace)
+			geXForm3d_Multiply(CameraSpace, &SkinWorld[Bone], &SkinOutput[Bone]);
+		else
+			SkinOutput[Bone] = SkinWorld[Bone];
+		geBodyInst_PostScale(&SkinOutput[Bone], ScaleVector, &SkinOutput[Bone]);
+		geBodyInst_ClampTransform(&SkinOutput[Bone]);
+		geBodyInst_ClampTransform(&SkinWorld[Bone]);
+		}
+	geVec3d_Set(&G->Maxs, -GE_BODY_REALLY_BIG_NUMBER,
+		-GE_BODY_REALLY_BIG_NUMBER, -GE_BODY_REALLY_BIG_NUMBER);
+	geVec3d_Set(&G->Mins, GE_BODY_REALLY_BIG_NUMBER,
+		GE_BODY_REALLY_BIG_NUMBER, GE_BODY_REALLY_BIG_NUMBER);
+	for (i = 0; i < B->XSkinVertexCount; ++i)
+		{
+		const geBody_XSkinVertex *Source = &B->XSkinVertexArray[i];
+		const geBody_InfluenceSet *Set = &B->VertexInfluenceArray[i];
+		geBodyInst_SkinVertex *Destination = &G->SkinVertexArray[i];
+		geVec3d Blended = {0.0f, 0.0f, 0.0f};
+		int Influence;
+		if (!(Source->LevelOfDetailMask && LevelOfDetailBit)) continue;
+		for (Influence = 0; Influence < Set->InfluenceCount; ++Influence)
+			{
+			geVec3d Point;
+			const geBody_SkinningInfluence *Weight = &Set->Influences[Influence];
+			const geFloat Factor = (geFloat)Weight->Weight / 65535.0f;
+			geXForm3d_Transform(&SkinOutput[Weight->BoneIndex], &Source->XPoint, &Point);
+			Blended.X += Point.X * Factor;
+			Blended.Y += Point.Y * Factor;
+			Blended.Z += Point.Z * Factor;
+			}
+		geBodyInst_ClampPoint(&Blended);
+		Destination->SVPoint = Blended;
+		Destination->SVU = Source->XU;
+		Destination->SVV = Source->XV;
+		Destination->ReferenceBoneIndex = Source->BoneIndex;
+		if (Blended.X > G->Maxs.X) G->Maxs.X = Blended.X;
+		if (Blended.X < G->Mins.X) G->Mins.X = Blended.X;
+		if (Blended.Y > G->Maxs.Y) G->Maxs.Y = Blended.Y;
+		if (Blended.Y < G->Mins.Y) G->Mins.Y = Blended.Y;
+		if (Blended.Z > G->Maxs.Z) G->Maxs.Z = Blended.Z;
+		if (Blended.Z < G->Mins.Z) G->Mins.Z = Blended.Z;
+		}
+	for (i = 0; i < B->SkinNormalCount; ++i)
+		{
+		const geBody_Normal *Source = &B->SkinNormalArray[i];
+		const geBody_InfluenceSet *Set = &B->NormalInfluenceArray[i];
+		geVec3d Blended = {0.0f, 0.0f, 0.0f};
+		int Influence;
+		if (!(Source->LevelOfDetailMask && LevelOfDetailBit)) continue;
+		for (Influence = 0; Influence < Set->InfluenceCount; ++Influence)
+			{
+			geVec3d Normal;
+			const geBody_SkinningInfluence *Weight = &Set->Influences[Influence];
+			const geFloat Factor = (geFloat)Weight->Weight / 65535.0f;
+			geXForm3d_Rotate(&SkinWorld[Weight->BoneIndex], &Source->Normal, &Normal);
+			Blended.X += Normal.X * Factor;
+			Blended.Y += Normal.Y * Factor;
+			Blended.Z += Normal.Z * Factor;
+			}
+		if (geVec3d_Normalize(&Blended) == 0.0f) return GE_FALSE;
+		geBodyInst_ClampPoint(&Blended);
+		G->NormalArray[i] = Blended;
+		}
+	return GE_TRUE;
+}
+
 const geBodyInst_Geometry *GENESISCC geBodyInst_GetGeometry(
 	const geBodyInst *BI, 
 	const geVec3d *ScaleVector,
@@ -291,12 +370,21 @@ const geBodyInst_Geometry *GENESISCC geBodyInst_GetGeometry(
 	{	
 		int i,LevelOfDetailBit;
 	
-		if (Camera != NULL)
+		LevelOfDetailBit = 1 << LevelOfDetail;
+		if (B->FileVersion == GE_BODY_FILE_VERSION_F2)
+			{
+			if (!geBodyInst_GetWeightedGeometry(B, G, ScaleVector, BoneXFArray,
+				LevelOfDetail, Camera))
+				{
+				geErrorLog_Add(ERR_BODY_BONEXFARRAY, NULL);
+				return NULL;
+				}
+			}
+		else if (Camera != NULL)
 		{
 			// transform and project all appropriate points
 			geBody_XSkinVertex *S;
 			geBodyInst_SkinVertex  *D;
-			LevelOfDetailBit = 1 << LevelOfDetail;
 			BoneIndex = -1;  // S->BoneIndex won't ever be this.
 			geVec3d_Set(&(G->Maxs), -GE_BODY_REALLY_BIG_NUMBER, -GE_BODY_REALLY_BIG_NUMBER, -GE_BODY_REALLY_BIG_NUMBER );
 			geVec3d_Set(&(G->Mins), GE_BODY_REALLY_BIG_NUMBER, GE_BODY_REALLY_BIG_NUMBER, GE_BODY_REALLY_BIG_NUMBER );
@@ -350,7 +438,6 @@ const geBodyInst_Geometry *GENESISCC geBodyInst_GetGeometry(
 			// transform all appropriate points
 			geBody_XSkinVertex *S;
 			geBodyInst_SkinVertex  *D;
-			LevelOfDetailBit = 1 << LevelOfDetail;
 			BoneIndex = -1;  // S->BoneIndex won't ever be this.
 			geVec3d_Set(&(G->Maxs), -GE_BODY_REALLY_BIG_NUMBER, -GE_BODY_REALLY_BIG_NUMBER, -GE_BODY_REALLY_BIG_NUMBER );
 			geVec3d_Set(&(G->Mins), GE_BODY_REALLY_BIG_NUMBER, GE_BODY_REALLY_BIG_NUMBER, GE_BODY_REALLY_BIG_NUMBER );
@@ -387,6 +474,7 @@ const geBodyInst_Geometry *GENESISCC geBodyInst_GetGeometry(
 			}
 		}
 
+		if (B->FileVersion == GE_BODY_FILE_VERSION_F1)
 		{
 			geBody_Normal *S;
 			geVec3d *D;

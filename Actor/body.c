@@ -43,6 +43,10 @@
 #include "RAM.H"
 #include "Errorlog.h"
 
+static geBoolean geBody_InfluenceSetIsValid(const geBody *B,
+	const geBody_InfluenceSet *Set);
+static geBoolean geBody_XFormIsFinite(const geXForm3d *Xf);
+
 
 #define MAX(aa,bb)   ( (aa)>(bb)?(aa):(bb) )
 #define MIN(aa,bb)   ( (aa)<(bb)?(aa):(bb) )
@@ -288,6 +292,55 @@ void GENESISCC geBody_SetVertexColorDot3( geVec3d LightPosition, const geXForm3d
     const geBody_TangentSpace *Mdl2TgtTS;
     const geBody_XSkinVertex *XVA;
 
+	/* F2 tangent space follows the same weighted inverse-bind deformation as
+	 * positions and normals.  The F1 cache below remains byte-for-byte on its
+	 * inherited single-bone path. */
+	if (B->FileVersion == GE_BODY_FILE_VERSION_F2 &&
+		VertexIndex >= 0 && VertexIndex < B->XSkinVertexCount)
+	{
+		const geBody_InfluenceSet *Set = &B->VertexInfluenceArray[VertexIndex];
+		geVec3d WorldPosition = {0, 0, 0};
+		geVec3d WorldTangent = {0, 0, 0};
+		geVec3d WorldBinormal = {0, 0, 0};
+		geVec3d WorldNormal = {0, 0, 0};
+		geVec3d LightVector;
+		int Influence;
+		if (!B->XSkinTangentSpace || !Mdl2WldXFA || !ColorDot3 || !Reset)
+			return;
+		for (Influence = 0; Influence < Set->InfluenceCount; ++Influence)
+		{
+			const geBody_SkinningInfluence *Item = &Set->Influences[Influence];
+			const geFloat Weight = (geFloat)Item->Weight / 65535.0f;
+			geXForm3d SkinWorld;
+			geVec3d PositionPart, TangentPart, BinormalPart, NormalPart;
+			geXForm3d_Multiply(&Mdl2WldXFA[Item->BoneIndex],
+				&B->InverseBindArray[Item->BoneIndex], &SkinWorld);
+			geXForm3d_Transform(&SkinWorld,
+				&B->XSkinVertexArray[VertexIndex].XPoint, &PositionPart);
+			geXForm3d_Rotate(&SkinWorld, &B->XSkinTangentSpace[VertexIndex].T, &TangentPart);
+			geXForm3d_Rotate(&SkinWorld, &B->XSkinTangentSpace[VertexIndex].B, &BinormalPart);
+			geXForm3d_Rotate(&SkinWorld, &B->XSkinTangentSpace[VertexIndex].N, &NormalPart);
+			geVec3d_AddScaled(&WorldPosition, &PositionPart, Weight, &WorldPosition);
+			geVec3d_AddScaled(&WorldTangent, &TangentPart, Weight, &WorldTangent);
+			geVec3d_AddScaled(&WorldBinormal, &BinormalPart, Weight, &WorldBinormal);
+			geVec3d_AddScaled(&WorldNormal, &NormalPart, Weight, &WorldNormal);
+		}
+		geVec3d_Normalize(&WorldTangent);
+		geVec3d_Normalize(&WorldBinormal);
+		geVec3d_Normalize(&WorldNormal);
+		if (LightType == 1)
+			geVec3d_Subtract(&LightPosition, &WorldPosition, &LightVector);
+		else
+			LightVector = LightPosition;
+		geVec3d_Normalize(&LightVector);
+		ColorDot3[0] = geVec3d_DotProduct(&WorldTangent, &LightVector) * 127.5f + 127.5f;
+		ColorDot3[1] = geVec3d_DotProduct(&WorldBinormal, &LightVector) * 127.5f + 127.5f;
+		ColorDot3[2] = geVec3d_DotProduct(&WorldNormal, &LightVector) * 127.5f + 127.5f;
+		ColorDot3[3] = 0;
+		*Reset = GE_FALSE;
+		return;
+	}
+
     if ( !B->XSkinTangentSpace ) return;
 
     #define geDirectionalLightDot3 0
@@ -532,6 +585,12 @@ geBoolean GENESISCC geBody_SanityCheck(const geBody *B)
 		return GE_FALSE;
 	if ((B->SkinNormalArray == NULL) && (B->SkinNormalCount>0))
 		return GE_FALSE;
+	if ((B->FileVersion == GE_BODY_FILE_VERSION_F2) &&
+		((B->VertexInfluenceArray == NULL && B->XSkinVertexCount > 0) ||
+		 (B->NormalInfluenceArray == NULL && B->SkinNormalCount > 0) ||
+		 (B->InverseBindArray == NULL && B->BoneCount > 0) ||
+		 (B->InverseBindValid == NULL && B->BoneCount > 0)))
+		return GE_FALSE;
 	if ((B->BoneArray == NULL) && (B->BoneCount>0))
 		return GE_FALSE;
 	if ((B->MaterialArray == NULL) && (B->MaterialCount>0))
@@ -559,16 +618,26 @@ geBoolean GENESISCC geBody_SanityCheck(const geBody *B)
 		{
 			if ((SV->BoneIndex < 0) || (SV->BoneIndex >= BoneCount))
 				return GE_FALSE;
+			if (B->FileVersion == GE_BODY_FILE_VERSION_F2 &&
+				geBody_InfluenceSetIsValid(B, &B->VertexInfluenceArray[i]) == GE_FALSE)
+				return GE_FALSE;
 		}
 
 	for (i=0,N = B->SkinNormalArray; i<NormalCount; i++,N++)
 		{
 			if ((N->BoneIndex < 0) || (N->BoneIndex >= BoneCount))
 				return GE_FALSE;
+			if (B->FileVersion == GE_BODY_FILE_VERSION_F2 &&
+				geBody_InfluenceSetIsValid(B, &B->NormalInfluenceArray[i]) == GE_FALSE)
+				return GE_FALSE;
 		}
 
 	for (i=0,Bone = B->BoneArray; i<BoneCount; i++,Bone++)
 		{
+			if (B->FileVersion == GE_BODY_FILE_VERSION_F2 &&
+				B->InverseBindValid[i] &&
+				geBody_XFormIsFinite(&B->InverseBindArray[i]) == GE_FALSE)
+				return GE_FALSE;
 			if (Bone->ParentBoneIndex != GE_BODY_NO_PARENT_BONE)
 				{
 					if ((Bone->ParentBoneIndex < 0) || (Bone->ParentBoneIndex > i))
@@ -610,10 +679,15 @@ static geBody *GENESISCC geBody_CreateNull(void)
 	
 	B->SkinNormalCount	= 0;
 	B->SkinNormalArray	= NULL;
+	B->VertexInfluenceArray = NULL;
+	B->NormalInfluenceArray = NULL;
 
 	B->BoneCount		= 0;
 	B->BoneArray		= NULL;
+	B->InverseBindArray = NULL;
+	B->InverseBindValid = NULL;
 	B->BoneNames		= NULL;
+	B->FileVersion		= GE_BODY_FILE_VERSION_F1;
 			
 	B->MaterialCount	= 0;
 	B->MaterialArray	= NULL;
@@ -657,6 +731,16 @@ static void GENESISCC geBody_DestroyPossiblyIncompleteBody( geBody **PB )
 			geRam_Free( B->SkinNormalArray );
 			B->SkinNormalArray = NULL;
 		}
+	if (B->VertexInfluenceArray != NULL)
+		{
+			geRam_Free(B->VertexInfluenceArray);
+			B->VertexInfluenceArray = NULL;
+		}
+	if (B->NormalInfluenceArray != NULL)
+		{
+			geRam_Free(B->NormalInfluenceArray);
+			B->NormalInfluenceArray = NULL;
+		}
 	if (B->BoneNames != NULL)
 		{
 			geStrBlock_Destroy(&(B->BoneNames));
@@ -666,6 +750,16 @@ static void GENESISCC geBody_DestroyPossiblyIncompleteBody( geBody **PB )
 		{	
 			geRam_Free(B->BoneArray);
 			B->BoneArray = NULL;
+		}
+	if (B->InverseBindArray != NULL)
+		{
+			geRam_Free(B->InverseBindArray);
+			B->InverseBindArray = NULL;
+		}
+	if (B->InverseBindValid != NULL)
+		{
+			geRam_Free(B->InverseBindValid);
+			B->InverseBindValid = NULL;
 		}
 	if (B->MaterialArray != NULL)
 		{
@@ -905,6 +999,52 @@ static geBoolean GENESISCC geBody_XSkinVertexCompare(
 	return GE_TRUE;
 }	
 
+static geBoolean geBody_InfluenceSetIsValid(const geBody *B,
+	const geBody_InfluenceSet *Set)
+{
+	uint32 Sum = 0;
+	int i, j;
+	if (Set == NULL || Set->InfluenceCount < 1 ||
+		Set->InfluenceCount > GE_BODY_MAX_SKINNING_INFLUENCES)
+		return GE_FALSE;
+	for (i = 0; i < Set->InfluenceCount; ++i)
+		{
+		if (Set->Influences[i].BoneIndex >= (uint16)B->BoneCount ||
+			Set->Influences[i].Weight == 0)
+			return GE_FALSE;
+		for (j = 0; j < i; ++j)
+			if (Set->Influences[j].BoneIndex == Set->Influences[i].BoneIndex)
+				return GE_FALSE;
+		Sum += Set->Influences[i].Weight;
+		}
+	for (i = Set->InfluenceCount; i < GE_BODY_MAX_SKINNING_INFLUENCES; ++i)
+		if (Set->Influences[i].BoneIndex != 0 || Set->Influences[i].Weight != 0)
+			return GE_FALSE;
+	return Sum == 65535u ? GE_TRUE : GE_FALSE;
+}
+
+static geBody_Index geBody_InfluenceSetDominant(const geBody_InfluenceSet *Set)
+{
+	int i;
+	geBody_Index Best = (geBody_Index)Set->Influences[0].BoneIndex;
+	uint16 BestWeight = Set->Influences[0].Weight;
+	for (i = 1; i < Set->InfluenceCount; ++i)
+		if (Set->Influences[i].Weight > BestWeight ||
+			(Set->Influences[i].Weight == BestWeight &&
+			 Set->Influences[i].BoneIndex < (uint16)Best))
+			{
+			Best = (geBody_Index)Set->Influences[i].BoneIndex;
+			BestWeight = Set->Influences[i].Weight;
+			}
+	return Best;
+}
+
+static geBoolean geBody_InfluenceSetEqual(const geBody_InfluenceSet *A,
+	const geBody_InfluenceSet *B)
+{
+	return memcmp(A, B, sizeof(*A)) == 0 ? GE_TRUE : GE_FALSE;
+}
+
 
 static void GENESISCC geBody_SwapVertexIndices( geBody *B, geBody_Index Index1, geBody_Index Index2)
 	// zips through all triangles, and swaps index1 and index2.
@@ -984,6 +1124,12 @@ static void GENESISCC geBody_SortSkinVertices( geBody *B )
 							Swap= B->XSkinVertexArray[j];
 							B->XSkinVertexArray[j] = B->XSkinVertexArray[j+1];
 							B->XSkinVertexArray[j+1] = Swap;
+							if (B->VertexInfluenceArray != NULL)
+								{
+								geBody_InfluenceSet InfluenceSwap = B->VertexInfluenceArray[j];
+								B->VertexInfluenceArray[j] = B->VertexInfluenceArray[j+1];
+								B->VertexInfluenceArray[j+1] = InfluenceSwap;
+								}
 							geBody_SwapVertexIndices(B,(geBody_Index)j,(geBody_Index)(j+1));
 							AnyChanges = GE_TRUE;
 						}
@@ -1152,6 +1298,183 @@ static geBoolean GENESISCC geBody_AddToFaces( geBody *B, geBody_Triangle *F, int
 
 	return GE_TRUE;
 }
+
+static geBoolean geBody_XFormIsFinite(const geXForm3d *Xf)
+{
+	const geFloat *Values = (const geFloat *)Xf;
+	int i;
+	for (i = 0; i < 12; ++i)
+		if (!isfinite((double)Values[i]))
+			return GE_FALSE;
+	return GE_TRUE;
+}
+
+geBoolean GENESISCC geBody_SetBoneInverseBind(geBody *B, int BoneIndex,
+	const geXForm3d *InverseBind)
+{
+	int i;
+	assert(B != NULL);
+	assert(InverseBind != NULL);
+	if (B == NULL || InverseBind == NULL || geBody_IsValid(B) == GE_FALSE ||
+		BoneIndex < 0 || BoneIndex >= B->BoneCount ||
+		B->BoneCount > GE_BODY_F2_BONE_LIMIT ||
+		geBody_XFormIsFinite(InverseBind) == GE_FALSE)
+		return GE_FALSE;
+	if (B->FileVersion == GE_BODY_FILE_VERSION_F1 && B->XSkinVertexCount != 0)
+		{
+		geErrorLog_AddString(-1,
+			"Weighted skinning must be enabled before rigid faces are added", NULL);
+		return GE_FALSE;
+		}
+	if (B->InverseBindArray == NULL)
+		{
+		B->InverseBindArray = GE_RAM_ALLOCATE_ARRAY(geXForm3d, B->BoneCount);
+		B->InverseBindValid = GE_RAM_ALLOCATE_ARRAY(uint8, B->BoneCount);
+		if (B->InverseBindArray == NULL || B->InverseBindValid == NULL)
+			{
+			if (B->InverseBindArray != NULL) geRam_Free(B->InverseBindArray);
+			if (B->InverseBindValid != NULL) geRam_Free(B->InverseBindValid);
+			B->InverseBindArray = NULL;
+			B->InverseBindValid = NULL;
+			geErrorLog_Add(ERR_BODY_ENOMEM, NULL);
+			return GE_FALSE;
+			}
+		for (i = 0; i < B->BoneCount; ++i)
+			{
+			geXForm3d_SetIdentity(&B->InverseBindArray[i]);
+			B->InverseBindValid[i] = 0;
+			}
+		}
+	B->InverseBindArray[BoneIndex] = *InverseBind;
+	B->InverseBindValid[BoneIndex] = 1;
+	B->FileVersion = GE_BODY_FILE_VERSION_F2;
+	return GE_TRUE;
+}
+
+static geBoolean geBody_AddWeightedSkinVertex(geBody *B,
+	const geBody_WeightedCorner *Corner, geBody_Index *Index)
+{
+	geBody_XSkinVertex NewVertex, *Vertices;
+	geBody_InfluenceSet Set, *Sets;
+	geBody_Index Dominant;
+	int i, influence;
+	memset(&Set, 0, sizeof(Set));
+	Set.InfluenceCount = Corner->InfluenceCount;
+	memcpy(Set.Influences, Corner->Influences, sizeof(Set.Influences));
+	if (geBody_InfluenceSetIsValid(B, &Set) == GE_FALSE)
+		return GE_FALSE;
+	Dominant = geBody_InfluenceSetDominant(&Set);
+	NewVertex.XPoint = Corner->Vertex;
+	NewVertex.XU = Corner->U;
+	NewVertex.XV = Corner->V;
+	NewVertex.LevelOfDetailMask = GE_BODY_HIGHEST_LOD_MASK;
+	NewVertex.BoneIndex = Dominant;
+	for (i = 0; i < B->XSkinVertexCount; ++i)
+		if (geBody_XSkinVertexCompare(&B->XSkinVertexArray[i], &NewVertex) &&
+			geBody_InfluenceSetEqual(&B->VertexInfluenceArray[i], &Set))
+			{
+			*Index = (geBody_Index)i;
+			return GE_TRUE;
+			}
+	Vertices = GE_RAM_REALLOC_ARRAY(B->XSkinVertexArray,
+		geBody_XSkinVertex, B->XSkinVertexCount + 1);
+	if (Vertices == NULL)
+		return GE_FALSE;
+	B->XSkinVertexArray = Vertices;
+	Sets = GE_RAM_REALLOC_ARRAY(B->VertexInfluenceArray,
+		geBody_InfluenceSet, B->XSkinVertexCount + 1);
+	if (Sets == NULL)
+		return GE_FALSE;
+	B->VertexInfluenceArray = Sets;
+	B->XSkinVertexArray[B->XSkinVertexCount] = NewVertex;
+	B->VertexInfluenceArray[B->XSkinVertexCount] = Set;
+	*Index = B->XSkinVertexCount++;
+	for (influence = 0; influence < Set.InfluenceCount; ++influence)
+		{
+		geBody_Bone *Bone = &B->BoneArray[Set.Influences[influence].BoneIndex];
+		Bone->BoundingBoxMin.X = MIN(Bone->BoundingBoxMin.X, Corner->Vertex.X);
+		Bone->BoundingBoxMin.Y = MIN(Bone->BoundingBoxMin.Y, Corner->Vertex.Y);
+		Bone->BoundingBoxMin.Z = MIN(Bone->BoundingBoxMin.Z, Corner->Vertex.Z);
+		Bone->BoundingBoxMax.X = MAX(Bone->BoundingBoxMax.X, Corner->Vertex.X);
+		Bone->BoundingBoxMax.Y = MAX(Bone->BoundingBoxMax.Y, Corner->Vertex.Y);
+		Bone->BoundingBoxMax.Z = MAX(Bone->BoundingBoxMax.Z, Corner->Vertex.Z);
+		}
+	return GE_TRUE;
+}
+
+static geBoolean geBody_AddWeightedNormal(geBody *B,
+	const geBody_WeightedCorner *Corner, geBody_Index *Index)
+{
+	geBody_Normal NewNormal, *Normals;
+	geBody_InfluenceSet Set, *Sets;
+	int i;
+	memset(&Set, 0, sizeof(Set));
+	Set.InfluenceCount = Corner->InfluenceCount;
+	memcpy(Set.Influences, Corner->Influences, sizeof(Set.Influences));
+	if (geBody_InfluenceSetIsValid(B, &Set) == GE_FALSE)
+		return GE_FALSE;
+	NewNormal.Normal = Corner->Normal;
+	if (geVec3d_Normalize(&NewNormal.Normal) == 0.0f)
+		return GE_FALSE;
+	NewNormal.LevelOfDetailMask = GE_BODY_HIGHEST_LOD_MASK;
+	NewNormal.BoneIndex = geBody_InfluenceSetDominant(&Set);
+	for (i = 0; i < B->SkinNormalCount; ++i)
+		if (geVec3d_Compare(&B->SkinNormalArray[i].Normal, &NewNormal.Normal,
+			GE_BODY_TOLERANCE) &&
+			geBody_InfluenceSetEqual(&B->NormalInfluenceArray[i], &Set))
+			{
+			*Index = (geBody_Index)i;
+			return GE_TRUE;
+			}
+	Normals = GE_RAM_REALLOC_ARRAY(B->SkinNormalArray,
+		geBody_Normal, B->SkinNormalCount + 1);
+	if (Normals == NULL)
+		return GE_FALSE;
+	B->SkinNormalArray = Normals;
+	Sets = GE_RAM_REALLOC_ARRAY(B->NormalInfluenceArray,
+		geBody_InfluenceSet, B->SkinNormalCount + 1);
+	if (Sets == NULL)
+		return GE_FALSE;
+	B->NormalInfluenceArray = Sets;
+	B->SkinNormalArray[B->SkinNormalCount] = NewNormal;
+	B->NormalInfluenceArray[B->SkinNormalCount] = Set;
+	*Index = B->SkinNormalCount++;
+	return GE_TRUE;
+}
+
+geBoolean GENESISCC geBody_AddWeightedFace(geBody *B,
+	const geBody_WeightedCorner Corners[3], int MaterialIndex)
+{
+	geBody_Triangle Face;
+	int i, influence;
+	assert(B != NULL);
+	assert(Corners != NULL);
+	if (B == NULL || Corners == NULL || geBody_IsValid(B) == GE_FALSE ||
+		B->FileVersion != GE_BODY_FILE_VERSION_F2 ||
+		MaterialIndex < 0 || MaterialIndex >= B->MaterialCount)
+		return GE_FALSE;
+	for (i = 0; i < 3; ++i)
+		{
+		geBody_InfluenceSet Set;
+		memset(&Set, 0, sizeof(Set));
+		Set.InfluenceCount = Corners[i].InfluenceCount;
+		memcpy(Set.Influences, Corners[i].Influences, sizeof(Set.Influences));
+		if (geBody_InfluenceSetIsValid(B, &Set) == GE_FALSE)
+			return GE_FALSE;
+		for (influence = 0; influence < Set.InfluenceCount; ++influence)
+			if (!B->InverseBindValid[Set.Influences[influence].BoneIndex])
+				return GE_FALSE;
+		}
+	for (i = 0; i < 3; ++i)
+		if (geBody_AddWeightedSkinVertex(B, &Corners[i], &Face.VtxIndex[i]) == GE_FALSE ||
+			geBody_AddWeightedNormal(B, &Corners[i], &Face.NormalIndex[i]) == GE_FALSE)
+			return GE_FALSE;
+	Face.MaterialIndex = (geBody_Index)MaterialIndex;
+	if (geBody_AddToFaces(B, &Face, GE_BODY_HIGHEST_LOD) == GE_FALSE)
+		return GE_FALSE;
+	geBody_SortSkinVertices(B);
+	return GE_TRUE;
+}
 			
 
 
@@ -1186,6 +1509,12 @@ geBoolean GENESISCC geBody_AddFace(	geBody *B,
 
 	assert( MaterialIndex >= 0 );
 	assert(	MaterialIndex < B->MaterialCount );
+	if (B->FileVersion != GE_BODY_FILE_VERSION_F1)
+		{
+		geErrorLog_AddString(-1,
+			"Rigid faces cannot be added after weighted skinning is enabled", NULL);
+		return GE_FALSE;
+		}
 
 	if (geBody_AddSkinVertex(B,Vertex1,U1,V1,(geBody_Index)BoneIndex1,&(F.VtxIndex[0]))==GE_FALSE)
 		{	// error already recorded
@@ -1348,6 +1677,12 @@ geBoolean GENESISCC geBody_AddBone( geBody *B,
 	assert( ParentBoneIndex < B->BoneCount );
 	assert( ( ParentBoneIndex >= 0)  || (ParentBoneIndex == GE_BODY_NO_PARENT_BONE));
 	assert( B->BoneCount >= 0 );
+	if (B->InverseBindArray != NULL)
+		{
+		geErrorLog_AddString(-1,
+			"All bones must be added before inverse bind matrices", NULL);
+		return GE_FALSE;
+		}
 	
 	NewBones = GE_RAM_REALLOC_ARRAY( B->BoneArray, 
 						geBody_Bone, (B->BoneCount+1) );
@@ -1399,7 +1734,7 @@ geBoolean GENESISCC geBody_ComputeLevelsOfDetail( geBody *B ,int Levels)
 #define GE_BODY_BITMAP_DIRECTORY_NAME "Bitmaps"
 
 #define GE_BODY_FILE_TYPE 0x5E444F42     // 'BODY'
-#define GE_BODY_FILE_VERSION 0x00F1		// Restrict version to 16 bits
+#define GE_BODY_FILE_VERSION GE_BODY_FILE_VERSION_F1
 
 /* BODY 00F1 was written by the 32-bit engine.  Keep its byte records
  * separate from the native runtime structures: in particular, a material's
@@ -1469,6 +1804,293 @@ static void geBody_XFormToDiskFloats(const geXForm3d *Native, float Disk[12])
 	Disk[11]=Native->Translation.Z;
 }
 
+static geBoolean geBody_ReadBytes(geVFile *File, void *Bytes, int Size)
+{
+	return geVFile_Read(File, Bytes, Size);
+}
+
+static geBoolean geBody_WriteBytes(geVFile *File, const void *Bytes, int Size)
+{
+	return geVFile_Write(File, Bytes, Size);
+}
+
+static uint16 geBody_DecodeU16LE(const uint8 Bytes[2])
+{
+	return (uint16)((uint16)Bytes[0] | ((uint16)Bytes[1] << 8));
+}
+
+static uint32 geBody_DecodeU32LE(const uint8 Bytes[4])
+{
+	return (uint32)Bytes[0] | ((uint32)Bytes[1] << 8) |
+		((uint32)Bytes[2] << 16) | ((uint32)Bytes[3] << 24);
+}
+
+static geFloat geBody_DecodeF32LE(const uint8 Bytes[4])
+{
+	uint32 Bits = geBody_DecodeU32LE(Bytes);
+	geFloat Value;
+	memcpy(&Value, &Bits, sizeof(Value));
+	return Value;
+}
+
+static void geBody_EncodeU16LE(uint16 Value, uint8 Bytes[2])
+{
+	Bytes[0] = (uint8)(Value & 0xffu);
+	Bytes[1] = (uint8)((Value >> 8) & 0xffu);
+}
+
+static void geBody_EncodeU32LE(uint32 Value, uint8 Bytes[4])
+{
+	Bytes[0] = (uint8)(Value & 0xffu);
+	Bytes[1] = (uint8)((Value >> 8) & 0xffu);
+	Bytes[2] = (uint8)((Value >> 16) & 0xffu);
+	Bytes[3] = (uint8)((Value >> 24) & 0xffu);
+}
+
+static void geBody_EncodeF32LE(geFloat Value, uint8 Bytes[4])
+{
+	uint32 Bits;
+	memcpy(&Bits, &Value, sizeof(Bits));
+	geBody_EncodeU32LE(Bits, Bytes);
+}
+
+static geBoolean geBody_ReadU16LE(geVFile *File, uint16 *Value)
+{
+	uint8 Bytes[2];
+	if (geBody_ReadBytes(File, Bytes, sizeof(Bytes)) == GE_FALSE) return GE_FALSE;
+	*Value = geBody_DecodeU16LE(Bytes);
+	return GE_TRUE;
+}
+
+static geBoolean geBody_ReadU32LE(geVFile *File, uint32 *Value)
+{
+	uint8 Bytes[4];
+	if (geBody_ReadBytes(File, Bytes, sizeof(Bytes)) == GE_FALSE) return GE_FALSE;
+	*Value = geBody_DecodeU32LE(Bytes);
+	return GE_TRUE;
+}
+
+static geBoolean geBody_ReadF32LE(geVFile *File, geFloat *Value)
+{
+	uint8 Bytes[4];
+	if (geBody_ReadBytes(File, Bytes, sizeof(Bytes)) == GE_FALSE) return GE_FALSE;
+	*Value = geBody_DecodeF32LE(Bytes);
+	return GE_TRUE;
+}
+
+static geBoolean geBody_WriteU16LE(geVFile *File, uint16 Value)
+{
+	uint8 Bytes[2];
+	geBody_EncodeU16LE(Value, Bytes);
+	return geBody_WriteBytes(File, Bytes, sizeof(Bytes));
+}
+
+static geBoolean geBody_WriteU32LE(geVFile *File, uint32 Value)
+{
+	uint8 Bytes[4];
+	geBody_EncodeU32LE(Value, Bytes);
+	return geBody_WriteBytes(File, Bytes, sizeof(Bytes));
+}
+
+static geBoolean geBody_WriteF32LE(geVFile *File, geFloat Value)
+{
+	uint8 Bytes[4];
+	geBody_EncodeF32LE(Value, Bytes);
+	return geBody_WriteBytes(File, Bytes, sizeof(Bytes));
+}
+
+static geBoolean geBody_ReadVec3F2(geVFile *File, geVec3d *Value)
+{
+	return geBody_ReadF32LE(File, &Value->X) &&
+		geBody_ReadF32LE(File, &Value->Y) &&
+		geBody_ReadF32LE(File, &Value->Z) &&
+		isfinite((double)Value->X) && isfinite((double)Value->Y) &&
+		isfinite((double)Value->Z);
+}
+
+static geBoolean geBody_WriteVec3F2(geVFile *File, const geVec3d *Value)
+{
+	if (!isfinite((double)Value->X) || !isfinite((double)Value->Y) ||
+		!isfinite((double)Value->Z)) return GE_FALSE;
+	return geBody_WriteF32LE(File, Value->X) &&
+		geBody_WriteF32LE(File, Value->Y) && geBody_WriteF32LE(File, Value->Z);
+}
+
+static geBoolean geBody_ReadXFormF2(geVFile *File, geXForm3d *Value)
+{
+	geFloat *Fields = (geFloat *)Value;
+	int i;
+	for (i = 0; i < 12; ++i)
+		if (!geBody_ReadF32LE(File, &Fields[i]) || !isfinite((double)Fields[i]))
+			return GE_FALSE;
+	return GE_TRUE;
+}
+
+static geBoolean geBody_WriteXFormF2(geVFile *File, const geXForm3d *Value)
+{
+	const geFloat *Fields = (const geFloat *)Value;
+	int i;
+	for (i = 0; i < 12; ++i)
+		if (!isfinite((double)Fields[i]) || !geBody_WriteF32LE(File, Fields[i]))
+			return GE_FALSE;
+	return GE_TRUE;
+}
+
+static geBoolean geBody_ReadInfluenceSetF2(geVFile *File, uint8 Count,
+	geBody_InfluenceSet *Set)
+{
+	uint8 Reserved[2];
+	int i;
+	memset(Set, 0, sizeof(*Set));
+	Set->InfluenceCount = Count;
+	if (geBody_ReadBytes(File, Reserved, sizeof(Reserved)) == GE_FALSE ||
+		Reserved[0] != 0 || Reserved[1] != 0)
+		return GE_FALSE;
+	for (i = 0; i < GE_BODY_MAX_SKINNING_INFLUENCES; ++i)
+		if (!geBody_ReadU16LE(File, &Set->Influences[i].BoneIndex) ||
+			!geBody_ReadU16LE(File, &Set->Influences[i].Weight))
+			return GE_FALSE;
+	return GE_TRUE;
+}
+
+static geBoolean geBody_WriteInfluenceSetF2(geVFile *File,
+	const geBody_InfluenceSet *Set)
+{
+	static const uint8 Reserved[2] = {0, 0};
+	int i;
+	if (geBody_WriteBytes(File, Reserved, sizeof(Reserved)) == GE_FALSE)
+		return GE_FALSE;
+	for (i = 0; i < GE_BODY_MAX_SKINNING_INFLUENCES; ++i)
+		if (!geBody_WriteU16LE(File, Set->Influences[i].BoneIndex) ||
+			!geBody_WriteU16LE(File, Set->Influences[i].Weight))
+			return GE_FALSE;
+	return GE_TRUE;
+}
+
+static geBoolean geBody_ReadGeometryF2(geBody *B, geVFile *File)
+{
+	uint16 Count;
+	uint32 Count32;
+	int i;
+	B->FileVersion = GE_BODY_FILE_VERSION_F2;
+	if (!geBody_ReadVec3F2(File, &B->BoundingBoxMin) ||
+		!geBody_ReadVec3F2(File, &B->BoundingBoxMax) ||
+		!geBody_ReadU16LE(File, &Count) || Count > INT16_MAX)
+		return GE_FALSE;
+	B->XSkinVertexCount = (geBody_Index)Count;
+	if (Count > 0)
+		{
+		B->XSkinVertexArray = GE_RAM_ALLOCATE_ARRAY(geBody_XSkinVertex, Count);
+		B->VertexInfluenceArray = GE_RAM_ALLOCATE_ARRAY(geBody_InfluenceSet, Count);
+		if (!B->XSkinVertexArray || !B->VertexInfluenceArray) return GE_FALSE;
+		for (i = 0; i < Count; ++i)
+			{
+			uint8 Header[2];
+			geBody_XSkinVertex *V = &B->XSkinVertexArray[i];
+			if (!geBody_ReadVec3F2(File, &V->XPoint) ||
+				!geBody_ReadF32LE(File, &V->XU) || !geBody_ReadF32LE(File, &V->XV) ||
+				!isfinite((double)V->XU) || !isfinite((double)V->XV) ||
+				!geBody_ReadBytes(File, Header, sizeof(Header)) ||
+				!geBody_ReadInfluenceSetF2(File, Header[1], &B->VertexInfluenceArray[i])) return GE_FALSE;
+			V->LevelOfDetailMask = (int8)Header[0];
+			V->BoneIndex = geBody_InfluenceSetDominant(&B->VertexInfluenceArray[i]);
+			}
+		}
+	if (!geBody_ReadU16LE(File, &Count) || Count > INT16_MAX) return GE_FALSE;
+	B->SkinNormalCount = (geBody_Index)Count;
+	if (Count > 0)
+		{
+		B->SkinNormalArray = GE_RAM_ALLOCATE_ARRAY(geBody_Normal, Count);
+		B->NormalInfluenceArray = GE_RAM_ALLOCATE_ARRAY(geBody_InfluenceSet, Count);
+		if (!B->SkinNormalArray || !B->NormalInfluenceArray) return GE_FALSE;
+		for (i = 0; i < Count; ++i)
+			{
+			uint8 Header[2];
+			geBody_Normal *N = &B->SkinNormalArray[i];
+			if (!geBody_ReadVec3F2(File, &N->Normal) ||
+				!geBody_ReadBytes(File, Header, sizeof(Header)) ||
+				!geBody_ReadInfluenceSetF2(File, Header[1], &B->NormalInfluenceArray[i])) return GE_FALSE;
+			N->LevelOfDetailMask = (int8)Header[0];
+			N->BoneIndex = geBody_InfluenceSetDominant(&B->NormalInfluenceArray[i]);
+			}
+		}
+	if (!geBody_ReadU16LE(File, &Count) || Count > GE_BODY_F2_BONE_LIMIT)
+		return GE_FALSE;
+	B->BoneCount = (geBody_Index)Count;
+	if (Count > 0)
+		{
+		B->BoneArray = GE_RAM_ALLOCATE_ARRAY(geBody_Bone, Count);
+		B->InverseBindArray = GE_RAM_ALLOCATE_ARRAY(geXForm3d, Count);
+		B->InverseBindValid = GE_RAM_ALLOCATE_ARRAY(uint8, Count);
+		if (!B->BoneArray || !B->InverseBindArray || !B->InverseBindValid)
+			return GE_FALSE;
+		for (i = 0; i < Count; ++i)
+			{
+			uint16 Parent, Reserved;
+			geBody_Bone *Bone = &B->BoneArray[i];
+			if (!geBody_ReadVec3F2(File, &Bone->BoundingBoxMin) ||
+				!geBody_ReadVec3F2(File, &Bone->BoundingBoxMax) ||
+				!geBody_ReadXFormF2(File, &Bone->AttachmentMatrix) ||
+				!geBody_ReadU16LE(File, &Parent) || !geBody_ReadU16LE(File, &Reserved) ||
+				Reserved != 0 || !geBody_ReadXFormF2(File, &B->InverseBindArray[i]))
+				return GE_FALSE;
+			Bone->ParentBoneIndex = (geBody_Index)(int16)Parent;
+			B->InverseBindValid[i] = 1;
+			}
+		}
+	for (i = 0; i < B->XSkinVertexCount; ++i)
+		if (!geBody_InfluenceSetIsValid(B, &B->VertexInfluenceArray[i])) return GE_FALSE;
+	for (i = 0; i < B->SkinNormalCount; ++i)
+		if (!geBody_InfluenceSetIsValid(B, &B->NormalInfluenceArray[i])) return GE_FALSE;
+	B->BoneNames = geStrBlock_CreateFromFile(File);
+	if (!B->BoneNames || !geBody_ReadU16LE(File, &Count) || Count > INT16_MAX)
+		return GE_FALSE;
+	B->MaterialCount = (geBody_Index)Count;
+	if (Count > 0)
+		{
+		B->MaterialArray = GE_RAM_ALLOCATE_ARRAY(geBody_Material, Count);
+		if (!B->MaterialArray) return GE_FALSE;
+		for (i = 0; i < Count; ++i)
+			{
+			uint32 Present;
+			geBody_Material *M = &B->MaterialArray[i];
+			if (!geBody_ReadU32LE(File, &Present) || Present > 1 ||
+				!geBody_ReadF32LE(File, &M->Red) || !geBody_ReadF32LE(File, &M->Green) ||
+				!geBody_ReadF32LE(File, &M->Blue) || !isfinite((double)M->Red) ||
+				!isfinite((double)M->Green) || !isfinite((double)M->Blue)) return GE_FALSE;
+			M->Bitmap = Present ? (geBitmap *)1 : NULL;
+			}
+		}
+	B->MaterialNames = geStrBlock_CreateFromFile(File);
+	if (!B->MaterialNames || !geBody_ReadU32LE(File, &Count32) ||
+		Count32 > GE_BODY_NUMBER_OF_LOD) return GE_FALSE;
+	B->LevelsOfDetail = (int)Count32;
+	for (i = 0; i < B->LevelsOfDetail; ++i)
+		{
+		uint32 FaceCount, Face;
+		if (!geBody_ReadU32LE(File, &FaceCount) || FaceCount > INT16_MAX)
+			return GE_FALSE;
+		B->SkinFaces[i].FaceCount = (geBody_Index)FaceCount;
+		if (FaceCount == 0) continue;
+		B->SkinFaces[i].FaceArray = GE_RAM_ALLOCATE_ARRAY(geBody_Triangle, FaceCount);
+		if (!B->SkinFaces[i].FaceArray) return GE_FALSE;
+		for (Face = 0; Face < FaceCount; ++Face)
+			{
+			geBody_Triangle *T = &B->SkinFaces[i].FaceArray[Face];
+			uint16 Value;
+			int Corner;
+			for (Corner = 0; Corner < 3; ++Corner)
+				{ if (!geBody_ReadU16LE(File, &Value)) return GE_FALSE; T->VtxIndex[Corner] = (geBody_Index)(int16)Value; }
+			for (Corner = 0; Corner < 3; ++Corner)
+				{ if (!geBody_ReadU16LE(File, &Value)) return GE_FALSE; T->NormalIndex[Corner] = (geBody_Index)(int16)Value; }
+			if (!geBody_ReadU16LE(File, &Value)) return GE_FALSE;
+			T->MaterialIndex = (geBody_Index)(int16)Value;
+			}
+		}
+	assert(geBody_SanityCheck(B) != GE_FALSE);
+	return GE_TRUE;
+}
+
 static geBoolean GENESISCC geBody_ReadGeometry(geBody *B, geVFile *pFile)
 {
 	uint32_t u;
@@ -1486,8 +2108,15 @@ static geBoolean GENESISCC geBody_ReadGeometry(geBody *B, geVFile *pFile)
 
 	if(geVFile_Read(pFile, &u, sizeof(u)) == GE_FALSE)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);	return GE_FALSE; }
-	if (u!=GE_BODY_FILE_VERSION)
+	if (u == GE_BODY_FILE_VERSION_F2)
+		{
+		if (geBody_ReadGeometryF2(B, pFile) == GE_FALSE)
+			{	geErrorLog_Add(ERR_BODY_FILE_PARSE, NULL); return GE_FALSE; }
+		return GE_TRUE;
+		}
+	if (u!=GE_BODY_FILE_VERSION_F1)
 		{	geErrorLog_Add( ERR_BODY_FILE_READ , NULL);   return GE_FALSE; }
+	B->FileVersion = GE_BODY_FILE_VERSION_F1;
 	
 
 	if(geVFile_Read(pFile, &(B->BoundingBoxMin), sizeof(B->BoundingBoxMin)) == GE_FALSE)
@@ -1701,6 +2330,91 @@ geBody *GENESISCC geBody_CreateFromFile(geVFile *pFile)
 		return NULL;
 }
 
+static geBoolean geBody_WriteGeometryF2(const geBody *B, geVFile *File)
+{
+	int i;
+	if (B->BoneCount < 0 || B->BoneCount > GE_BODY_F2_BONE_LIMIT ||
+		B->XSkinVertexCount < 0 || B->SkinNormalCount < 0 ||
+		B->MaterialCount < 0 || B->LevelsOfDetail < 0 ||
+		B->LevelsOfDetail > GE_BODY_NUMBER_OF_LOD)
+		return GE_FALSE;
+	for (i = 0; i < B->BoneCount; ++i)
+		if (!B->InverseBindValid || !B->InverseBindValid[i] ||
+			!geBody_XFormIsFinite(&B->InverseBindArray[i])) return GE_FALSE;
+	for (i = 0; i < B->XSkinVertexCount; ++i)
+		if (!geBody_InfluenceSetIsValid(B, &B->VertexInfluenceArray[i])) return GE_FALSE;
+	for (i = 0; i < B->SkinNormalCount; ++i)
+		if (!geBody_InfluenceSetIsValid(B, &B->NormalInfluenceArray[i])) return GE_FALSE;
+	if (!geBody_WriteU32LE(File, GE_BODY_FILE_TYPE) ||
+		!geBody_WriteU32LE(File, GE_BODY_FILE_VERSION_F2) ||
+		!geBody_WriteVec3F2(File, &B->BoundingBoxMin) ||
+		!geBody_WriteVec3F2(File, &B->BoundingBoxMax) ||
+		!geBody_WriteU16LE(File, (uint16)B->XSkinVertexCount)) return GE_FALSE;
+	for (i = 0; i < B->XSkinVertexCount; ++i)
+		{
+		uint8 Header[2];
+		const geBody_XSkinVertex *V = &B->XSkinVertexArray[i];
+		Header[0] = (uint8)V->LevelOfDetailMask;
+		Header[1] = B->VertexInfluenceArray[i].InfluenceCount;
+		if (!geBody_WriteVec3F2(File, &V->XPoint) ||
+			!geBody_WriteF32LE(File, V->XU) || !geBody_WriteF32LE(File, V->XV) ||
+			!geBody_WriteBytes(File, Header, sizeof(Header)) ||
+			!geBody_WriteInfluenceSetF2(File, &B->VertexInfluenceArray[i]))
+			return GE_FALSE;
+		}
+	if (!geBody_WriteU16LE(File, (uint16)B->SkinNormalCount)) return GE_FALSE;
+	for (i = 0; i < B->SkinNormalCount; ++i)
+		{
+		uint8 Header[2];
+		const geBody_Normal *N = &B->SkinNormalArray[i];
+		Header[0] = (uint8)N->LevelOfDetailMask;
+		Header[1] = B->NormalInfluenceArray[i].InfluenceCount;
+		if (!geBody_WriteVec3F2(File, &N->Normal) ||
+			!geBody_WriteBytes(File, Header, sizeof(Header)) ||
+			!geBody_WriteInfluenceSetF2(File, &B->NormalInfluenceArray[i]))
+			return GE_FALSE;
+		}
+	if (!geBody_WriteU16LE(File, (uint16)B->BoneCount)) return GE_FALSE;
+	for (i = 0; i < B->BoneCount; ++i)
+		{
+		const geBody_Bone *Bone = &B->BoneArray[i];
+		if (!geBody_WriteVec3F2(File, &Bone->BoundingBoxMin) ||
+			!geBody_WriteVec3F2(File, &Bone->BoundingBoxMax) ||
+			!geBody_WriteXFormF2(File, &Bone->AttachmentMatrix) ||
+			!geBody_WriteU16LE(File, (uint16)(int16)Bone->ParentBoneIndex) ||
+			!geBody_WriteU16LE(File, 0) ||
+			!geBody_WriteXFormF2(File, &B->InverseBindArray[i])) return GE_FALSE;
+		}
+	if (!geStrBlock_WriteToBinaryFile(B->BoneNames, File) ||
+		!geBody_WriteU16LE(File, (uint16)B->MaterialCount)) return GE_FALSE;
+	for (i = 0; i < B->MaterialCount; ++i)
+		{
+		const geBody_Material *M = &B->MaterialArray[i];
+		if (!geBody_WriteU32LE(File, M->Bitmap ? 1u : 0u) ||
+			!geBody_WriteF32LE(File, M->Red) || !geBody_WriteF32LE(File, M->Green) ||
+			!geBody_WriteF32LE(File, M->Blue)) return GE_FALSE;
+		}
+	if (!geStrBlock_WriteToBinaryFile(B->MaterialNames, File) ||
+		!geBody_WriteU32LE(File, (uint32)B->LevelsOfDetail)) return GE_FALSE;
+	for (i = 0; i < B->LevelsOfDetail; ++i)
+		{
+		uint32 Face;
+		if (B->SkinFaces[i].FaceCount < 0 ||
+			!geBody_WriteU32LE(File, (uint32)B->SkinFaces[i].FaceCount)) return GE_FALSE;
+		for (Face = 0; Face < (uint32)B->SkinFaces[i].FaceCount; ++Face)
+			{
+			const geBody_Triangle *T = &B->SkinFaces[i].FaceArray[Face];
+			int Corner;
+			for (Corner = 0; Corner < 3; ++Corner)
+				if (!geBody_WriteU16LE(File, (uint16)(int16)T->VtxIndex[Corner])) return GE_FALSE;
+			for (Corner = 0; Corner < 3; ++Corner)
+				if (!geBody_WriteU16LE(File, (uint16)(int16)T->NormalIndex[Corner])) return GE_FALSE;
+			if (!geBody_WriteU16LE(File, (uint16)(int16)T->MaterialIndex)) return GE_FALSE;
+			}
+		}
+	return GE_TRUE;
+}
+
 
 
 geBoolean GENESISCC geBody_WriteGeometry(const geBody *B,geVFile *pFile)
@@ -1711,6 +2425,14 @@ geBoolean GENESISCC geBody_WriteGeometry(const geBody *B,geVFile *pFile)
 	assert( B != NULL );
 	assert( pFile != NULL );
 	assert( geBody_IsValid(B) != GE_FALSE );
+	if (B->FileVersion == GE_BODY_FILE_VERSION_F2)
+		{
+		if (!geBody_WriteGeometryF2(B, pFile))
+			geErrorLog_Add(ERR_BODY_FILE_WRITE, NULL);
+		else
+			return GE_TRUE;
+		return GE_FALSE;
+		}
 
 	// Write the format flag
 	u = GE_BODY_FILE_TYPE;

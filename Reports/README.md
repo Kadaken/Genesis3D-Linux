@@ -24,6 +24,7 @@ descriptions.
   licensing, and claims review completed before wider promotion.
 - `GAME_INTEGRATION_READINESS.md` records the boundary between the working
   native engine sandbox and a complete playable game.
-- `SMOOTH_SKINNING_DESIGN.md` specifies a backward-compatible four-influence
-  BODY-format extension, rigid fast path, bone budget, GLB converter, and
-  numerical/visual proof plan. It is a design, not an implemented feature.
+- `SMOOTH_SKINNING_DESIGN.md` specifies and records the implemented
+  backward-compatible four-influence BODY `0x00F2` path, preserved `0x00F1`
+  fast path, bone budget, GLB converter, current fixtures, and remaining visual
+  release gates.

@@ -39,6 +39,10 @@ extern "C" {
 
 #define GE_BODY_INDEX_MAX (0xEFFF)
 
+#define GE_BODY_FILE_VERSION_F1 (0x00F1u)
+#define GE_BODY_FILE_VERSION_F2 (0x00F2u)
+#define GE_BODY_F2_BONE_LIMIT   (256)
+
 #define GE_BODY_REALLY_BIG_NUMBER (9e9f)		// bigger than any skin point
 
 #define GE_BODY_HIGHEST_LOD_MASK	( 1 << GE_BODY_HIGHEST_LOD )
@@ -70,6 +74,12 @@ typedef struct geBody_Normal
 	int8			LevelOfDetailMask;
 	geBody_Index	BoneIndex;
 } geBody_Normal;
+
+typedef struct geBody_InfluenceSet
+{
+	uint8 InfluenceCount;
+	geBody_SkinningInfluence Influences[GE_BODY_MAX_SKINNING_INFLUENCES];
+} geBody_InfluenceSet;
 
 typedef struct geBody_Bone
 {
@@ -109,10 +119,15 @@ typedef struct geBody
 
 	geBody_Index		  SkinNormalCount;
 	geBody_Normal		 *SkinNormalArray;
+	geBody_InfluenceSet *VertexInfluenceArray;
+	geBody_InfluenceSet *NormalInfluenceArray;
 
 	geBody_Index		  BoneCount;
 	geBody_Bone			 *BoneArray;
+	geXForm3d			 *InverseBindArray;
+	uint8				 *InverseBindValid;
 	geStrBlock			 *BoneNames;
+	uint32				 FileVersion;
 
 	geBody_Index		  MaterialCount;
 	geBody_Material		 *MaterialArray;

@@ -18,6 +18,8 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
 pkg_check_modules(OPENAL REQUIRED IMPORTED_TARGET openal)
 
+option(GENESIS3D_BUILD_TOOLS "Build standalone asset conversion tools" ON)
+
 # Discover the native-port implementation graph. CONFIGURE_DEPENDS makes CMake
 # regenerate when a source module is added or removed.
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
@@ -131,6 +133,20 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(genesis3d_render PUBLIC m)
 endif()
 
+if(GENESIS3D_BUILD_TOOLS)
+    find_package(PNG REQUIRED)
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/cgltf/cgltf.h")
+        message(FATAL_ERROR
+            "cgltf submodule missing; run: git submodule update --init --recursive")
+    endif()
+    add_executable(gltf2act tools/gltf2act.cpp)
+    target_include_directories(gltf2act PRIVATE
+        ${ENGINE_INCLUDE_DIRS}
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/cgltf")
+    target_link_libraries(gltf2act PRIVATE genesis3d_render PNG::PNG)
+    set_target_properties(gltf2act PROPERTIES BUILD_RPATH "$ORIGIN")
+endif()
+
 # Historical DRV_Driver ABI, separate from the high-level LinuxRender API.
 add_library(OglDrv SHARED
     Engine/Drivers/OpenGl/OGLDrv.c
@@ -177,6 +193,17 @@ if(BUILD_TESTING)
     target_include_directories(genesis3d_actor_pose_chain_test PRIVATE ${ENGINE_INCLUDE_DIRS})
     target_link_libraries(genesis3d_actor_pose_chain_test PRIVATE genesis3d_render)
     add_test(NAME genesis3d_actor_pose_chain COMMAND genesis3d_actor_pose_chain_test)
+    add_executable(genesis3d_smooth_skinning_test tests/smooth_skinning_test.c)
+    target_include_directories(genesis3d_smooth_skinning_test PRIVATE ${ENGINE_INCLUDE_DIRS})
+    target_link_libraries(genesis3d_smooth_skinning_test PRIVATE genesis3d_render)
+    add_test(NAME genesis3d_smooth_skinning COMMAND genesis3d_smooth_skinning_test)
+    if(GENESIS3D_BUILD_TOOLS)
+        find_program(PYTHON3_EXECUTABLE python3 REQUIRED)
+        add_test(NAME genesis3d_gltf2act
+            COMMAND "${PYTHON3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/gltf2act_fixture.py"
+                "$<TARGET_FILE:gltf2act>")
+    endif()
     add_executable(genesis3d_entity_schema_test tests/entity_schema_test.c)
     target_include_directories(genesis3d_entity_schema_test PRIVATE ${ENGINE_INCLUDE_DIRS})
     target_link_libraries(genesis3d_entity_schema_test PRIVATE genesis3d_render)
